@@ -261,6 +261,25 @@ Each step ends with something playable, and each is a separate chunk of the impl
 5. **AI fill.** Host toggle; host-owned AI cars sent as snapshots.
 6. **Drops and deploy.** Reconnect, DNF, error screens, limits, Railway deploy, real-phone test.
 
+## Changes made while planning
+
+These were found while mapping the spec onto the code, and they override the sections above.
+
+- **Interpolation delay.** The 100–250 ms buffer sits *on top of* the measured network delay, rather than
+  being the whole delay. Phone → server → phone already takes 150–300 ms in Lagos, so a fixed 120 ms
+  would leave remote cars permanently extrapolating.
+- **No steer in snapshots.** The models don't show steered wheels, so the byte is dropped. Each car takes
+  33 bytes, plus an 8-byte header that includes a `raceSeq`, so late snapshots from the previous race are
+  dropped after a rematch.
+- **Referee distance check.** The referee uses `project` / `wrapDelta` with a speed-based allowance, not
+  `updateProgress`. `updateProgress` ignores jumps over 25 m, which would wrongly reject a car that
+  reconnected after a gap.
+- **Grid order.** AI cars start at the front and humans behind, in join order, as in single-player.
+- **Simulated packet loss.** WebSocket runs over TCP, which never drops or reorders messages, so `loss`
+  is simulated as 200–400 ms delay spikes with order kept.
+- **Code layout.** `makeRace` moves from `RaceScene.tsx` to `src/game/setup.ts` so it can be unit-tested.
+  `Racer.id` doubles as the netId.
+
 ## Project doc updates
 
 `CLAUDE.md`: replace "Multiplayer is out of scope for now" with a short note that friends' private rooms
