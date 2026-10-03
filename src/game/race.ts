@@ -86,6 +86,11 @@ export function standings<T extends { progress: RacerProgress }>(racers: T[]): T
   });
 }
 
+/** Coins for finishing in this place (1 is first). */
+export function coinsForPlace(place: number) {
+  return [150, 100, 60, 30][place - 1] ?? 20;
+}
+
 export function formatTime(t: number | null | undefined) {
   if (t === null || t === undefined || !isFinite(t)) return '--:--.--';
   const m = Math.floor(t / 60), s = t - m * 60;

@@ -1,12 +1,13 @@
 import { useGame } from '../game/store';
 import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
+import { useNet } from '../net/store';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
 
 export function Results() {
-  const { results, coinsEarned, startRace, setScreen, showAccountPrompt, dismissAccountPrompt } = useGame();
+  const { results, coinsEarned, online, startRace, setScreen, quitRace, showAccountPrompt, dismissAccountPrompt } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   return (
@@ -30,7 +31,7 @@ export function Results() {
           </tbody>
         </table>
         <p className="earned">+ ₦ {coinsEarned} coins</p>
-        {showAccountPrompt && (
+        {showAccountPrompt && !online && (
           <div className="account">
             <p><b>Keep your coins safe.</b> Create an account to save your coins and high score on any phone.</p>
             <div className="row">
@@ -39,11 +40,18 @@ export function Results() {
             </div>
           </div>
         )}
-        <div className="row">
-          <button className="btn primary" onClick={startRace}>Race again</button>
-          <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
-          <button className="btn" onClick={() => setScreen('menu')}>Menu</button>
-        </div>
+        {online ? (
+          <div className="row">
+            <button className="btn primary" onClick={() => setScreen('lobby')}>Back to lobby</button>
+            <button className="btn" onClick={() => { useNet.getState().leave(); quitRace(); }}>Leave</button>
+          </div>
+        ) : (
+          <div className="row">
+            <button className="btn primary" onClick={startRace}>Race again</button>
+            <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
+            <button className="btn" onClick={() => setScreen('menu')}>Menu</button>
+          </div>
+        )}
       </div>
     </div>
   );

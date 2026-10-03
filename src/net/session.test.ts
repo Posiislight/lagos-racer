@@ -7,6 +7,9 @@ import { SnapshotBuffer } from './interpolation';
 import { ClockSync } from './clock';
 import type { NetLink } from './connection';
 import { NetSession } from './session';
+import { sfx } from '../game/audio';
+
+vi.mock('../game/audio', () => ({ sfx: vi.fn() }));
 
 function fakeLink() {
   const sent: ClientMessage[] = [];
@@ -25,7 +28,10 @@ function clockAhead() {
 const setup = { grid: [], mySlot: 1, seed: 7, raceSeq: 1 };
 
 describe('NetSession', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
 
   it('now() is negative before start and counts seconds from the server start time', () => {
     const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
@@ -234,6 +240,36 @@ describe('NetSession', () => {
       s.onEvent({ t: 'hit', hazard: 200001, netId: 1, from: 2 });
       expect(race.hazards[0].life).toBe(0);
       expect(race.puffs).toEqual([{ x: 4, y: 0.5, z: 5, age: 0, color: 'juju' }]);
+      expect(sfx).not.toHaveBeenCalled();
+    });
+
+    it('plays the juju sound when my juju lands on another phone\'s car, not my AI\'s', () => {
+      const { s, race } = started(1000);
+      race.puffs = [];
+      const mine: Hazard = { id: 100001, kind: 'juju', x: 4, y: 2, z: 5, vx: 40, vy: 0, vz: 0, owner: 0, target: 2, life: 7, armed: 0.6, ground: 0.5 };
+      race.hazards = [mine, { ...mine, id: 100002, owner: 1 }];
+      s.onEvent({ t: 'hit', hazard: 100002, netId: 2, from: 2 });
+      expect(sfx).not.toHaveBeenCalled();
+      s.onEvent({ t: 'hit', hazard: 100001, netId: 2, from: 2 });
+      expect(sfx).toHaveBeenCalledExactlyOnceWith('juju');
+    });
+
+    it('sends a finish with the lap times, and only once the car has finished', () => {
+      const { s, racers, sent } = started(1000);
+      s.finish(racers[0]);
+      racers[1].progress.lapTimes = [30.5, 29.25, 29];
+      racers[1].progress.finishTime = 88.75;
+      s.finish(racers[1]);
+      racers[1].progress.lapTimes.push(1);
+      expect(sent).toEqual([{ t: 'finish', netId: 1, laps: [30.5, 29.25, 29], time: 88.75 }]);
+    });
+
+    it('marks another phone\'s car finished, never one of mine', () => {
+      const { s, racers } = started(1000);
+      s.onEvent({ t: 'finished', netId: 2, time: 91.5 });
+      s.onEvent({ t: 'finished', netId: 0, time: 80 });
+      s.onEvent({ t: 'finished', netId: 9, time: 80 });
+      expect(racers.map(r => r.progress.finishTime)).toEqual([null, null, 91.5]);
     });
 
     it('drops snapshots from another raceSeq or from my own slot', () => {

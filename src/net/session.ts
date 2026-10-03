@@ -3,6 +3,7 @@ import type { Hazard, NetHooks, RaceRuntime, Racer } from '../game/runtime';
 import type { OnlineSetup } from '../game/setup';
 import type { ClockSync } from './clock';
 import type { NetLink } from './connection';
+import { sfx } from '../game/audio';
 import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ServerMessage } from './protocol';
 
 export class NetSession implements NetHooks {
@@ -89,7 +90,7 @@ export class NetSession implements NetHooks {
   }
 
   /**
-   * Another phone's pickup, throw or hit. The victim's phone decides hits, so a hit here only
+   * Another phone's pickup, throw, hit or finish. The victim's phone decides hits, so a hit here only
    * tidies up the hazard; the victim's slowdown or slide arrives in its snapshots.
    */
   onEvent(m: ServerMessage) {
@@ -106,7 +107,13 @@ export class NetSession implements NetHooks {
       if (h.kind === 'juju') {
         race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: 'juju' });
         h.life = 0;
+        // You hear your own juju land, as offline.
+        if (race.racers.find(r => r.id === h.owner)?.isPlayer) sfx('juju');
       } else h.life = Math.min(h.life, 8);
+    } else if (m.t === 'finished') {
+      // The referee accepted another phone's finish: it stops being a juju target and ranks by time.
+      const r = race.racers.find(x => x.id === m.netId);
+      if (r?.kind === 'remote') r.progress.finishTime = m.time;
     }
   }
 
@@ -122,6 +129,10 @@ export class NetSession implements NetHooks {
     this.link.sendJson({ t: 'hit', hazard, netId });
   }
 
-  // The finish goes over the wire with the referee.
-  finish(_r: Racer) {}
+  /** One of my cars crossed the line for the last time: claim the finish with its lap times. */
+  finish(r: Racer) {
+    const time = r.progress.finishTime;
+    if (time === null) return;
+    this.link.sendJson({ t: 'finish', netId: r.id, laps: [...r.progress.lapTimes], time });
+  }
 }

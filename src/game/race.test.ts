@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
-import { createProgress, updateProgress, trackRemote, standings, currentLap, formatTime } from './race';
+import { createProgress, updateProgress, trackRemote, standings, currentLap, formatTime, coinsForPlace } from './race';
 
 // A 100 x 60 rounded rectangle, driven anticlockwise from (0, 0) heading +x.
 const control: [number, number][] = [[0, 0], [50, 0], [70, 15], [70, 45], [50, 60], [-50, 60], [-70, 45], [-70, 15], [-50, 0]];
@@ -115,5 +115,11 @@ describe('trackRemote', () => {
     expect(r.lapsDone).toBe(1);
     expect(r.lapTimes).toEqual([]);
     expect(r.finishTime).toBeNull();
+  });
+});
+
+describe('coinsForPlace', () => {
+  it('pays 150, 100, 60, 30 for the first four places, then 20', () => {
+    expect([1, 2, 3, 4, 5, 6].map(p => coinsForPlace(p))).toEqual([150, 100, 60, 30, 20, 20]);
   });
 });

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
+import { trackById } from '../src/config/tracks';
+import { buildTrack, sampleAt } from '../src/game/track';
 import {
+  FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
   RECONNECT_GRACE_MS,
   ROOM_IDLE_MS,
@@ -635,5 +638,175 @@ describe('item events', () => {
     now += 1;
     server.tick();
     expect(server.rooms.has(room2.code)).toBe(true);
+  });
+});
+
+describe('finish and results', () => {
+  const config = trackById('ojuelegba');
+  const track = buildTrack(config.control, 2, config.hills);
+  const L = track.length;
+  const LAPS = config.laps;
+  const CUTOFF = FINISH_CUTOFF_MS / 1000;
+
+  type Driver = { conn: number; slot: number; netId: number; speed: number; honest?: boolean; sent?: boolean };
+
+  const carAt = (netId: number, distance: number): CarState => {
+    const p = sampleAt(track, distance).pos;
+    return { netId, x: p.x, y: p.y, z: p.z, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 0, distance, laps: 0, flags: 0 };
+  };
+  const lapsAt = (speed: number) => Array.from({ length: LAPS }, () => L / speed);
+  const half = (t: number) => Math.ceil(t * 2) / 2;
+
+  /**
+   * Race time t (s) is server time startAt + t. Every driver sends two snapshots a second at a steady speed from the
+   * line, and its finish once it crosses the line for the last time (a dishonest one claims a 1 s first lap).
+   */
+  function drive(startAt: number, drivers: Driver[], from: number, to: number) {
+    for (let t = from; t <= to + 1e-9; t += 0.5) {
+      now = startAt + t * 1000;
+      for (const d of drivers) {
+        const distance = d.speed * t;
+        server.message(d.conn, encodeSnapshot({ slot: d.slot, raceSeq: 1, time: t, cars: [carAt(d.netId, distance)] }));
+        if (!d.sent && distance >= LAPS * L) {
+          d.sent = true;
+          const laps = d.honest === false ? [1, ...lapsAt(d.speed).slice(1)] : lapsAt(d.speed);
+          send(d.conn, { t: 'finish', netId: d.netId, laps, time: laps.reduce((x, y) => x + y, 0) });
+        }
+      }
+      server.tick();
+    }
+  }
+
+  it('broadcasts finished, then results 30 s after the first finish, then returns to lobby with ready reset', () => {
+    const { a, b, c, d2, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const drivers: Driver[] = [
+      { conn: a.conn, slot: 1, netId: 0, speed: 25 },
+      { conn: b.conn, slot: 2, netId: 1, speed: 24 },
+      { conn: c.conn, slot: 3, netId: 2, speed: 10 },
+    ];
+    const tA = half((LAPS * L) / 25);
+    drive(startAt, drivers, 0, tA);
+    for (const p of [a, b, c]) {
+      const finished = msgs(p.peer, 'finished');
+      expect(finished.map(m => m.netId)).toEqual([0]);
+      expect(finished[0].time).toBeCloseTo((LAPS * L) / 25);
+    }
+    expect(msgs(d2.peer, 'finished')).toHaveLength(0);
+
+    drive(startAt, drivers, tA + 0.5, tA + CUTOFF - 0.5);
+    expect(msgs(a.peer, 'finished').map(m => m.netId)).toEqual([0, 1]);
+    expect(msgs(a.peer, 'results')).toHaveLength(0);
+    expect(room.phase).toBe('racing');
+
+    drive(startAt, drivers, tA + CUTOFF, tA + CUTOFF);
+    const [res] = msgs(a.peer, 'results');
+    expect(res.raceSeq).toBe(1);
+    expect(res.results.map(r => [r.netId, r.place, r.projected, r.dnf])).toEqual([[0, 1, false, false], [1, 2, false, false], [2, 3, true, false]]);
+    expect(res.results[0].time).toBeCloseTo((LAPS * L) / 25);
+    expect(res.results[1].best).toBeCloseTo(L / 24);
+    // The slow car's projection from its average speed is its real pace.
+    expect(res.results[2].time).toBeCloseTo((LAPS * L) / 10, 0);
+    for (const p of [b, c]) expect(msgs(p.peer, 'results')).toEqual([res]);
+    expect(msgs(d2.peer, 'results')).toHaveLength(0);
+
+    expect(room.phase).toBe('lobby');
+    for (const p of [a, b, c, d2]) {
+      const view = lastRoom(p.peer);
+      expect(view.phase).toBe('lobby');
+      expect(view.players.every(pl => !pl.ready)).toBe(true);
+    }
+
+    // Snapshots and finishes after the race are dropped; a rematch gets a new raceSeq.
+    const before = a.peer.sent.length;
+    drive(startAt, drivers, tA + CUTOFF + 1, tA + CUTOFF + 1);
+    send(c.conn, { t: 'finish', netId: 2, laps: lapsAt(10), time: (LAPS * L) / 10 });
+    expect(a.peer.sent.length).toBe(before);
+    for (const p of [a, b, c, d2]) send(p.conn, { t: 'lobby', ready: true });
+    send(a.conn, { t: 'start' });
+    expect(msgs(a.peer, 'grid').at(-1)!.raceSeq).toBe(2);
+    expect(msgs(d2.peer, 'grid').at(-1)!.grid.map(g => g.slot)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('sends results early when every car has finished or is DNF', () => {
+    const { a, b, c, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const drivers: Driver[] = [
+      { conn: a.conn, slot: 1, netId: 0, speed: 25 },
+      { conn: b.conn, slot: 2, netId: 1, speed: 24 },
+      { conn: c.conn, slot: 3, netId: 2, speed: 23, honest: false },
+    ];
+    drive(startAt, drivers, 0, half((LAPS * L) / 24));
+    expect(msgs(a.peer, 'finished').map(m => m.netId)).toEqual([0, 1]);
+    expect(msgs(a.peer, 'results')).toHaveLength(0);
+    // c's finish claims a 1 s lap: it is refused, c is DNF, and nobody is left racing.
+    drive(startAt, drivers, half((LAPS * L) / 24) + 0.5, half((LAPS * L) / 23));
+    expect(msgs(a.peer, 'finished').map(m => m.netId)).toEqual([0, 1]);
+    const [res] = msgs(a.peer, 'results');
+    expect(res.results.map(r => [r.netId, r.dnf, r.time === null])).toEqual([[0, false, false], [1, false, false], [2, true, true]]);
+    expect(room.phase).toBe('lobby');
+  });
+
+  it('drops finish messages that are forged, malformed, repeated or outside the race', () => {
+    const { a, b, room } = racers('countdown');
+    const time = (LAPS * L) / 25;
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    now += START_LEAD_MS;
+    server.tick();
+    expect(room.phase).toBe('racing');
+    const startAt = msgs(a.peer, 'start')[0].at;
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, half(time));
+    const activity = room.lastActivity;
+    now += 1;
+    for (const bad of [
+      { t: 'finish', netId: 1, laps: lapsAt(25), time },
+      { t: 'finish', netId: 0, laps: lapsAt(25).slice(1), time },
+      { t: 'finish', netId: 0, laps: [...lapsAt(25), 1], time },
+      { t: 'finish', netId: 0, laps: [-1, ...lapsAt(25).slice(1)], time },
+      { t: 'finish', netId: 0, laps: ['8', ...lapsAt(25).slice(1)], time },
+      { t: 'finish', netId: 0, laps: 'fast', time },
+      { t: 'finish', netId: 0.5, laps: lapsAt(25), time },
+      { t: 'finish', netId: 0, laps: lapsAt(25), time: 'x' },
+    ]) send(a.conn, bad);
+    server.message(a.conn, JSON.stringify({ t: 'finish', netId: 0, laps: lapsAt(25), time }).replace(/"time":[^,}]+/, '"time":1e999'));
+    expect(msgs(b.peer, 'finished')).toHaveLength(0);
+    expect(room.lastActivity).toBe(activity);
+
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(room.lastActivity).toBe(now);
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+  });
+
+  it('ends a race nobody is left in: no results, back to the lobby', () => {
+    for (const phase of ['loading', 'racing'] as const) {
+      const a = create();
+      const b = join(a.welcome.code);
+      const c = join(a.welcome.code, 'Chidi');
+      for (const p of [a, b, c]) send(p.conn, { t: 'lobby', ready: true });
+      server.close(c.conn);
+      send(a.conn, { t: 'start' });
+      const room = server.rooms.get(a.welcome.code)!;
+      if (phase === 'racing') {
+        for (const p of [a, b]) send(p.conn, { t: 'loaded' });
+        now += START_LEAD_MS;
+        server.tick();
+      }
+      expect(room.phase).toBe(phase);
+      // c is not on the grid and comes back to watch; both racers drop or leave.
+      const c2 = connect();
+      send(c2.conn, { t: 'resume', token: msgs(c.peer, 'welcome')[0].token });
+      server.close(a.conn);
+      send(b.conn, { t: 'leave' });
+      server.tick();
+      expect(room.phase).toBe('lobby');
+      expect(lastRoom(c2.peer).phase).toBe('lobby');
+      for (const p of [a, b, c2]) expect(msgs(p.peer, 'results')).toHaveLength(0);
+      // Once everyone is gone the room is reaped as usual.
+      send(c2.conn, { t: 'leave' });
+      now += RECONNECT_GRACE_MS;
+      server.tick();
+      expect(server.rooms.has(room.code)).toBe(false);
+    }
   });
 });

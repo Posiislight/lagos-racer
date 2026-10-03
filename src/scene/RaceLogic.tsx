@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { getRace, type Racer } from '../game/runtime';
-import { updateProgress, trackRemote, standings, currentLap } from '../game/race';
+import { updateProgress, trackRemote, standings, currentLap, coinsForPlace } from '../game/race';
 import { readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
@@ -91,6 +91,8 @@ export function RaceLogic() {
       const t = r.body.translation();
       if (r.kind === 'remote') { trackRemote(race.track, r.progress, t.x, t.z); continue; }
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
+      // Online, every car this phone drives claims its finish from the room's referee.
+      if (e?.finished) race.net?.finish(r);
       if (e && r.isPlayer) {
         if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); finishedAt.current = race.clock; race.phase = 'finished'; }
         else { sfx('lap'); store.flash(e.lap === laps - 1 ? 'FINAL LAP!' : `LAP ${e.lap + 1}`); }
@@ -145,8 +147,7 @@ export function RaceLogic() {
           };
         });
         const place = order.indexOf(player);
-        const coins = [150, 100, 60, 30][place] ?? 20;
-        store.finishRace(results, coins, results[place].best);
+        store.finishRace(results, coinsForPlace(place + 1), results[place].best);
         store.setHud({ phase: 'finished' });
       }
     }

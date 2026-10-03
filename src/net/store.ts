@@ -2,9 +2,11 @@
 import { create } from 'zustand';
 import type { VehicleId } from '../config/vehicles';
 import { useGame } from '../game/store';
+import { coinsForPlace } from '../game/race';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
 import { NetSession } from './session';
+import { toResults } from './results';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -191,8 +193,19 @@ export const useNet = create<NetState>((set, get) => {
       case 'pickup':
       case 'use':
       case 'hit':
+      case 'finished':
         session?.onEvent(m);
         break;
+      case 'results': {
+        // The room is back in the lobby; the next grid starts a fresh session.
+        const mySlot = get().mySlot;
+        const mine = m.results.find(r => !r.ai && r.slot === mySlot);
+        if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine) break;
+        const game = useGame.getState();
+        game.finishRace(toResults(m.results, mySlot), coinsForPlace(mine.place), mine.best);
+        game.setHud({ phase: 'finished' });
+        break;
+      }
       default:
         break;
     }

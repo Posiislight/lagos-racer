@@ -1,4 +1,5 @@
 import {
+  FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
   MAX_HUMANS,
   RECONNECT_GRACE_MS,
@@ -14,7 +15,9 @@ import {
 } from '../src/net/protocol';
 import { trackById } from '../src/config/tracks';
 import type { VehicleId } from '../src/config/vehicles';
+import { buildTrack } from '../src/game/track';
 import { buildGrid } from './grid';
+import { Referee } from './referee';
 
 export type Send = (conn: number, msg: ServerMessage) => void;
 
@@ -43,6 +46,9 @@ export class Room {
   private loaded = new Set<number>();
   private gridAt = 0;
   private startAt = 0;
+  private referee: Referee | null = null;
+  /** Server time the race ends regardless: FINISH_CUTOFF_MS after the first accepted finish. */
+  private cutoffAt: number | null = null;
 
   constructor(
     readonly code: string,
@@ -139,8 +145,11 @@ export class Room {
     const here = [...this.members.values()].filter(m => m.conn !== null);
     if (here.length < 2 || here.some(m => !m.ready)) return 'not-ready';
 
+    const config = trackById(this.trackId);
     this.raceSeq++;
     this.grid = buildGrid(here);
+    this.referee = new Referee(buildTrack(config.control, 2, config.hills), config.laps, this.grid);
+    this.cutoffAt = null;
     this.loaded.clear();
     this.gridAt = now;
     this.phase = 'loading';
@@ -150,7 +159,7 @@ export class Room {
       grid: this.grid,
       seed: Math.floor(random() * 2 ** 32),
       trackId: this.trackId,
-      laps: trackById(this.trackId).laps,
+      laps: config.laps,
     });
     return null;
   }
@@ -160,6 +169,15 @@ export class Room {
     if (this.phase !== 'loading' || !this.grid.some(g => g.slot === slot)) return;
     this.loaded.add(slot);
     this.advance(now);
+  }
+
+  /** Timers: the start, the finish cutoff, and a race everyone has walked away from. */
+  tick(now: number) {
+    if (this.phase === 'lobby') return;
+    // Nobody left to race or to tell: no results, just the lobby (and the room is reaped if it is empty).
+    if (this.grid.every(g => this.connOf(g.slot) === null)) return this.endRace(now, false);
+    this.advance(now);
+    if (this.phase === 'racing' && (this.referee?.allDone() || (this.cutoffAt !== null && now >= this.cutoffAt))) this.endRace(now, true);
   }
 
   /** Moves loading to countdown and countdown to racing as their conditions are met. */
@@ -206,11 +224,45 @@ export class Room {
     return this.othersOnGrid(slot);
   }
 
+  /** A relayed snapshot's cars, as the referee sees them. */
+  observe(snap: Snapshot) {
+    for (const car of snap.cars) this.referee?.observe(car, snap.time);
+  }
+
+  /**
+   * A racer says one of its cars crossed the line for the last time. Returns false if the claim is dropped
+   * unread: outside the race, a car the sender does not drive, or the wrong number of laps.
+   */
+  finish(slot: number, netId: number, laps: number[], time: number, now: number): boolean {
+    const referee = this.referee;
+    if (this.phase !== 'racing' || !referee || !this.owns(slot, netId)) return false;
+    if (laps.length !== trackById(this.trackId).laps) return false;
+    if (referee.finish(netId, laps, time)) {
+      this.cutoffAt ??= now + FINISH_CUTOFF_MS;
+      for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'finished', netId, time });
+    }
+    if (referee.allDone()) this.endRace(now, true);
+    return true;
+  }
+
+  /** Sends the results to the racers (if asked) and goes back to the lobby for a rematch, everyone unready. */
+  private endRace(now: number, withResults: boolean) {
+    if (withResults && this.referee) {
+      const results = this.referee.results((now - this.startAt) / 1000);
+      for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'results', raceSeq: this.raceSeq, results });
+    }
+    this.phase = 'lobby';
+    this.referee = null;
+    this.cutoffAt = null;
+    for (const m of this.members.values()) m.ready = false;
+    this.broadcastRoom();
+  }
+
   private owns(slot: number, netId: number) {
     return this.grid.some(g => g.netId === netId && g.slot === slot);
   }
 
-  /** Connections of the grid humans other than this slot. */
+  /** Connections of the grid humans other than this slot (0 for all of them). */
   private othersOnGrid(slot: number): number[] {
     const out: number[] = [];
     for (const s of new Set(this.grid.map(g => g.slot))) {

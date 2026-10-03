@@ -20,7 +20,7 @@ export interface Peer {
   close(): void;
 }
 
-type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' }>;
+type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
 
 type Conn = {
   peer: Peer;
@@ -95,6 +95,12 @@ function parse(raw: string): Handled | null {
     }
     case 'hit':
       return Number.isInteger(o.hazard) && Number.isInteger(o.netId) ? { t: 'hit', hazard: o.hazard as number, netId: o.netId as number } : null;
+    case 'finish': {
+      const { netId, laps, time } = o;
+      if (!Number.isInteger(netId) || typeof time !== 'number' || !Number.isFinite(time) || !Array.isArray(laps)) return null;
+      if (!laps.every(t => typeof t === 'number' && Number.isFinite(t) && t > 0)) return null;
+      return { t: 'finish', netId: netId as number, laps: [...laps] as number[], time };
+    }
     default:
       return null;
   }
@@ -142,6 +148,10 @@ export class RoomServer {
     const room = c.room;
     if (!room) return;
     if (m.t === 'pickup' || m.t === 'use' || m.t === 'hit') return this.relayEvent(c, room, m);
+    if (m.t === 'finish') {
+      if (room.finish(c.slot, m.netId, m.laps, m.time, this.now())) room.lastActivity = this.now();
+      return;
+    }
     room.lastActivity = this.now();
     if (m.t === 'leave') this.leave(c, room);
     else if (m.t === 'lobby') this.lobby(conn, c, room, m);
@@ -166,7 +176,7 @@ export class RoomServer {
       else if (now - room.lastActivity >= ROOM_IDLE_MS) this.dispose(code, room);
       else {
         if (changed) room.broadcastRoom();
-        room.advance(now);
+        room.tick(now);
       }
     }
   }
@@ -180,7 +190,7 @@ export class RoomServer {
     return ++c.windowCount <= RATE_LIMIT_PER_S;
   }
 
-  /** Forwards a valid car snapshot, untouched, to the other racers. */
+  /** Forwards a valid car snapshot, untouched, to the other racers, and shows it to the referee. */
   private relay(c: Conn, data: ArrayBuffer) {
     const room = c.room;
     if (!room) return;
@@ -189,6 +199,7 @@ export class RoomServer {
     const targets = room.snapshotTargets(snap);
     if (!targets) return;
     room.lastActivity = this.now();
+    room.observe(snap);
     for (const id of targets) this.conns.get(id)?.peer.send(data);
   }
 
