@@ -123,6 +123,8 @@ function checkHits(race: RaceRuntime, c: Critter) {
     c.state = 'fly'; c.timer = 1.3;
     c.vx = lv.x * 0.7 + (Math.random() - 0.5) * 6; c.vz = lv.z * 0.7 + (Math.random() - 0.5) * 6;
     c.vy = 7 + speed * 0.25; c.spin = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 8);
+    // Another phone's car: the critter flies here too, but that phone works out its own knock.
+    if (r.kind === 'remote') return;
     // It never stops you: a little speed lost and a shaky ride for a moment. Flimsy rides feel
     // it more, buses hardly at all.
     const flimsy = 1.15 - r.vehicle.stats.toughness * 0.09;

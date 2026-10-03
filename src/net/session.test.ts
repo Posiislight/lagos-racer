@@ -68,7 +68,8 @@ describe('NetSession', () => {
       r.kind = kind;
       r.owner = owner;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
-      else r.body = fakeBody(id * 10);
+      // Remote cars have a (kinematic) body too, so the send filter must go by kind.
+      r.body = fakeBody(id * 10);
       return r;
     }
 
@@ -121,6 +122,25 @@ describe('NetSession', () => {
       expect(a.flags).toBe(FLAG.boost | FLAG.horn);
       expect(b.x).toBeCloseTo(10);
       expect(b.flags).toBe(FLAG.slip | FLAG.finished);
+    });
+
+    it('latches a one-frame horn until the next snapshot, then clears it', () => {
+      const { s, race, racers, binary, now } = started(1000);
+      s.update(race);
+      // An AI toots for a single frame between sends.
+      now.mockReturnValue(1030);
+      racers[1].controls.horn = true;
+      s.update(race);
+      racers[1].controls.horn = false;
+      now.mockReturnValue(1070);
+      s.update(race);
+      now.mockReturnValue(1140);
+      s.update(race);
+      expect(binary).toHaveLength(3);
+      const hornOf = (i: number) => decodeSnapshot(binary[i])!.cars.map(c => (c.flags & FLAG.horn) !== 0);
+      expect(hornOf(0)).toEqual([false, false]);
+      expect(hornOf(1)).toEqual([false, true]);
+      expect(hornOf(2)).toEqual([false, false]);
     });
 
     it('after a 20 s frame gap sends one snapshot, not a burst', () => {

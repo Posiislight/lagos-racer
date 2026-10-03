@@ -11,6 +11,8 @@ export class NetSession implements NetHooks {
   private sentLoaded = false;
   private race: RaceRuntime | null = null;
   private lastSend = -Infinity;
+  /** Cars that sounded their horn since the last send: an AI toots for one frame, which a 15 Hz send would miss. */
+  private hornSince = new Set<number>();
 
   constructor(private readonly link: NetLink, private readonly clock: ClockSync, readonly setup: OnlineSetup & { raceSeq: number }) {
     this.raceSeq = setup.raceSeq;
@@ -45,6 +47,7 @@ export class NetSession implements NetHooks {
   /** Every frame: once a snapshot is due, sends every car this phone drives (mine and its AIs). */
   update(race: RaceRuntime) {
     if (this.startAt === null) return;
+    for (const r of race.racers) if (r.kind !== 'remote' && r.controls.horn) this.hornSince.add(r.id);
     const t = this.now();
     // Measured from the last send, not accumulated, so a long gap (backgrounded tab) is one snapshot, not a burst.
     if (t - this.lastSend < 1 / TICK_HZ) return;
@@ -57,9 +60,10 @@ export class NetSession implements NetHooks {
         netId: r.id, x: p.x, y: p.y, z: p.z, qx: q.x, qy: q.y, qz: q.z, qw: q.w, vx: v.x, vy: v.y, vz: v.z,
         distance: r.progress.distance, laps: r.progress.lapsDone,
         flags: (r.boost > 0 ? FLAG.boost : 0) | (r.slip > 0 ? FLAG.slip : 0) | (r.curse > 0 ? FLAG.curse : 0)
-          | (r.wobble > 0 ? FLAG.wobble : 0) | (r.controls.horn ? FLAG.horn : 0) | (r.progress.finishTime !== null ? FLAG.finished : 0),
+          | (r.wobble > 0 ? FLAG.wobble : 0) | (this.hornSince.has(r.id) ? FLAG.horn : 0) | (r.progress.finishTime !== null ? FLAG.finished : 0),
       });
     }
+    this.hornSince.clear();
     if (cars.length) this.link.sendBinary(encodeSnapshot({ slot: this.setup.mySlot, raceSeq: this.raceSeq, time: t, cars }));
   }
 

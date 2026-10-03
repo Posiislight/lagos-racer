@@ -1,18 +1,23 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, RigidBody, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Quaternion, SphereGeometry, Vector3,
+  AdditiveBlending, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Object3D, Quaternion, SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
-import { getRace, type Racer } from '../game/runtime';
+import { getRace, type Racer, type RemoteCar } from '../game/runtime';
 import { sampleAt } from '../game/track';
 import { resyncProgress } from '../game/race';
 import { playHorn } from '../game/audio';
+import type { Pose } from '../net/interpolation';
+import { NameTag } from './NameTag';
 
 const G = 9.81;
 const _q = new Quaternion(), _fwd = new Vector3(), _v = new Vector3();
+// Reused every physics step for remote cars, so following them allocates nothing.
+const _pose: Pose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 0 };
+const _rot = { x: 0, y: 0, z: 0, w: 1 }, _away = { x: 0, y: -200, z: 0 };
 
 /** Physical layout derived from the vehicle config, in metres after scaling. */
 function layout(racer: Racer) {
@@ -31,7 +36,11 @@ function layout(racer: Racer) {
   };
 }
 
-export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: { x: number; y: number; z: number; yaw: number }; merge?: boolean }) {
+type Spawn = { x: number; y: number; z: number; yaw: number };
+
+export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: Spawn; merge?: boolean }) {
+  // Another phone drives this one: it follows that phone's snapshots instead of our physics.
+  const remote = racer.kind === 'remote';
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const tilt = useRef<Group>(null);
@@ -41,12 +50,14 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
   const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, merge]);
   const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0 });
   const fx = useMemo(() => effectMeshes(lay), [lay]);
+  const [dropped, setDropped] = useState(false);
 
   useEffect(() => {
     const b = body.current;
     if (!b) return;
     racer.body = b;
     racer.visual = visual.current;
+    if (remote) return () => { racer.body = null; racer.visual = null; };
     const t = racer.vehicle.tuning;
     const vc = world.createVehicleController(b);
     lay.wheels.forEach(([x, z]) => {
@@ -69,9 +80,14 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       racer.body = null;
       racer.visual = null;
     };
-  }, [world, racer, lay]);
+  }, [world, racer, lay, remote]);
 
   useBeforePhysicsStep(w => {
+    if (racer.remote) {
+      const b = body.current, net = getRace()?.net;
+      if (b && net) followSnapshots(racer, racer.remote, b, net.now(), visual.current, spawn);
+      return;
+    }
     const vc = controller.current, b = body.current, race = getRace();
     if (!vc || !b || !race) return;
     const dt = w.timestep, t = racer.vehicle.tuning, c = racer.controls;
@@ -205,6 +221,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     // Horn
     s.hornCooldown -= dt;
     if (racer.controls.horn && s.hornCooldown <= 0) { playHorn(racer.vehicle.horn, racer.isPlayer); s.hornCooldown = 0.9; }
+    if (racer.remote && racer.remote.dnf !== dropped) setDropped(racer.remote.dnf);
   });
 
   return (
@@ -213,10 +230,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       colliders={false}
       position={[spawn.x, spawn.y + lay.originY + 0.15, spawn.z]}
       rotation={[0, spawn.yaw, 0]}
+      type={remote ? 'kinematicPosition' : 'dynamic'}
       enabledRotations={[false, true, false]}
       linearDamping={0.05}
       angularDamping={1.5}
-      ccd
+      ccd={!remote}
       canSleep={false}
       userData={{ racer: racer.id }}
       onCollisionEnter={({ other, manifold }) => {
@@ -244,9 +262,34 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           <primitive object={fx.flame} />
           <primitive object={fx.aura} />
         </group>
+        {remote && !dropped && (
+          <group position={[0, model.size.y - lay.originY + 0.5, 0]}>
+            <NameTag name={racer.name} />
+          </group>
+        )}
       </group>
     </RigidBody>
   );
+}
+
+/** Another phone's car: replay its snapshots a little behind real time. */
+function followSnapshots(racer: Racer, rem: RemoteCar, b: RapierRigidBody, now: number, visual: Object3D | null, spawn: Spawn) {
+  if (visual) visual.visible = !rem.dnf;
+  if (rem.dnf) {
+    // Dropped out of the race: park it far below the track, out of everyone's way.
+    _away.x = spawn.x; _away.z = spawn.z;
+    b.setNextKinematicTranslation(_away);
+    racer.speed = 0;
+    return;
+  }
+  const got = rem.buffer.sample(rem.buffer.renderTimeAt(now), _pose);
+  if (got === 'empty') return; // nothing heard yet: wait on the grid
+  b.setNextKinematicTranslation(_pose);
+  _rot.x = _pose.qx; _rot.y = _pose.qy; _rot.z = _pose.qz; _rot.w = _pose.qw;
+  b.setNextKinematicRotation(_rot);
+  // Forward speed turns the wheels; a held pose isn't going anywhere.
+  _fwd.set(1, 0, 0).applyQuaternion(_q.set(_pose.qx, _pose.qy, _pose.qz, _pose.qw));
+  racer.speed = got === 'hold' ? 0 : _pose.vx * _fwd.x + _pose.vy * _fwd.y + _pose.vz * _fwd.z;
 }
 
 /** Put a car back on the centre line where it left the track, facing the right way. */
