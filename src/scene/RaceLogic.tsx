@@ -1,14 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { getRace, type Racer } from '../game/runtime';
-import { updateProgress, standings, currentLap } from '../game/race';
+import { updateProgress, trackRemote, standings, currentLap } from '../game/race';
 import { readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateCritters } from '../game/critters';
 import { useGame, type Result } from '../game/store';
 import { beep, Engine, sfx } from '../game/audio';
-import { getSession } from '../net/store';
 
 const COUNT = ['3', '2', '1'];
 const WAITING = 'Waiting for others…';
@@ -58,7 +57,7 @@ export function RaceLogic() {
 
     // Countdown: 3, 2, 1, OYA GO! Online it runs off the room's start time, so every phone goes together.
     if (race.phase === 'countdown') {
-      if (race.net && !getSession()?.started) {
+      if (race.net && !race.net.started) {
         if (lastCount.current !== WAITING) { lastCount.current = WAITING; store.setHud({ countdown: WAITING, phase: 'countdown' }); }
       } else {
         if (race.net) race.countdown = -race.net.now();
@@ -90,12 +89,15 @@ export function RaceLogic() {
     for (const r of race.racers) {
       if (!r.body) continue;
       const t = r.body.translation();
+      if (r.kind === 'remote') { trackRemote(race.track, r.progress, t.x, t.z); continue; }
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
       if (e && r.isPlayer) {
         if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); finishedAt.current = race.clock; race.phase = 'finished'; }
         else { sfx('lap'); store.flash(e.lap === laps - 1 ? 'FINAL LAP!' : `LAP ${e.lap + 1}`); }
       }
     }
+
+    race.net?.update(race);
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
     updateCritters(race, dt);
@@ -116,7 +118,7 @@ export function RaceLogic() {
     hudTimer.current -= dt;
     if (hudTimer.current <= 0) {
       hudTimer.current = 0.1;
-      const order = standings(race.racers);
+      const order = standings(race.racers.filter(r => !r.remote?.dnf));
       const best = player.progress.lapTimes.length ? Math.min(...player.progress.lapTimes) : null;
       store.setHud({
         lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: race.racers.length,

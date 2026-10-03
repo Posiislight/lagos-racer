@@ -64,6 +64,12 @@ export function resyncProgress(track: Track, r: RacerProgress, x: number, z: num
   r.index = p.index; r.s = p.s; r.lateral = p.lateral;
 }
 
+/** Another phone owns this car's distance and laps; we only keep the track-relative position fresh. */
+export function trackRemote(track: Track, r: RacerProgress, x: number, z: number) {
+  const p = project(track, x, z, r.index);
+  r.index = p.index; r.s = p.s; r.lateral = p.lateral;
+}
+
 /** The lap the racer is on now, 1-based and clamped to the race length. */
 export function currentLap(r: RacerProgress, totalLaps: number) {
   return Math.min(totalLaps, Math.max(1, r.lapsDone + 1));

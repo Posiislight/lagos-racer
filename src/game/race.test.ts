@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
-import { createProgress, updateProgress, standings, currentLap, formatTime } from './race';
+import { createProgress, updateProgress, trackRemote, standings, currentLap, formatTime } from './race';
 
 // A 100 x 60 rounded rectangle, driven anticlockwise from (0, 0) heading +x.
 const control: [number, number][] = [[0, 0], [50, 0], [70, 15], [70, 45], [50, 60], [-50, 60], [-70, 45], [-70, 15], [-50, 0]];
@@ -97,5 +97,23 @@ describe('standings', () => {
   it('formats times as m:ss.cc', () => {
     expect(formatTime(65.432)).toBe('1:05.43');
     expect(formatTime(null)).toBe('--:--.--');
+  });
+});
+
+describe('trackRemote', () => {
+  it('updates index, s and lateral but never distance or laps', () => {
+    const grid = sampleAt(track, 40).pos;
+    const r = createProgress(track, grid.x, grid.z);
+    r.distance = 123;
+    r.lapsDone = 1;
+    const at = sampleAt(track, 60);
+    trackRemote(track, r, at.pos.x + at.right.x * 2, at.pos.z + at.right.z * 2);
+    expect(r.s).toBeCloseTo(60, 0);
+    expect(r.lateral).toBeCloseTo(2, 1);
+    expect(Math.abs(r.index * track.spacing - 60)).toBeLessThanOrEqual(track.spacing);
+    expect(r.distance).toBe(123);
+    expect(r.lapsDone).toBe(1);
+    expect(r.lapTimes).toEqual([]);
+    expect(r.finishTime).toBeNull();
   });
 });

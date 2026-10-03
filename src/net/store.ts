@@ -122,7 +122,7 @@ export const useNet = create<NetState>((set, get) => {
         else leaveToOnline('unreachable');
       },
       onMessage: m => { if (id === generation) onMessage(m); },
-      onSnapshot: () => {},
+      onSnapshot: buf => { if (id === generation) session?.onSnapshot(buf); },
       onStatus: s => { if (id === generation) onStatus(s, id); },
     }, { lag: parseLagSim(location.search) });
   }

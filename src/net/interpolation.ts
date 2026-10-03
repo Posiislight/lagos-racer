@@ -39,6 +39,7 @@ function setFrom(c: CarState, out: Pose) {
 /** The last few snapshots of one remote car, replayed a little behind real time so motion stays smooth. */
 export class SnapshotBuffer {
   private entries: Entry[] = [];
+  private cachedDelay = CUSHION_MIN;
 
   /** `arrival` is the local synced race clock at receipt. Snapshots not newer than the newest are dropped. */
   push(car: CarState, time: number, arrival: number): void {
@@ -46,14 +47,15 @@ export class SnapshotBuffer {
     if (last && time <= last.time) return;
     this.entries.push({ car, time, lateness: arrival - time });
     if (this.entries.length > KEEP) this.entries.shift();
+    // Worked out once per snapshot, not per frame: this is read every frame for every remote car.
+    const late = this.entries.slice(-LATENESS_WINDOW).map(e => e.lateness);
+    const cushion = Math.min(CUSHION_MAX, Math.max(CUSHION_MIN, 1 / TICK_HZ + 2 * std(late)));
+    this.cachedDelay = median(late) + cushion;
   }
 
   /** Measured network delay plus a jitter cushion, in seconds. */
   get delay(): number {
-    const late = this.entries.slice(-LATENESS_WINDOW).map(e => e.lateness);
-    if (!late.length) return CUSHION_MIN;
-    const cushion = Math.min(CUSHION_MAX, Math.max(CUSHION_MIN, 1 / TICK_HZ + 2 * std(late)));
-    return median(late) + cushion;
+    return this.cachedDelay;
   }
 
   renderTimeAt(now: number): number {

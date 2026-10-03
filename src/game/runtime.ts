@@ -116,8 +116,12 @@ export type RaceRuntime = {
 
 /** What the race tells the room, and the room's clock. */
 export interface NetHooks {
+  /** True once the room has announced the start time. */
+  readonly started: boolean;
   /** Synced race clock (s), negative before the start. */
   now(): number;
+  /** Called every frame: sends this phone's cars to the room when a snapshot is due. */
+  update(race: RaceRuntime): void;
   pickup(orb: number): void;
   use(h: Hazard): void;
   hit(hazardId: number, victim: number): void;
