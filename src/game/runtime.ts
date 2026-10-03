@@ -6,6 +6,7 @@ import type { Track } from './track';
 import { emptyControls, type Controls } from './input';
 import type { RacerProgress } from './race';
 import type { Critter } from './critters';
+import type { SnapshotBuffer } from '../net/interpolation';
 
 /**
  * Power-ups from the glowing orbs:
@@ -28,8 +29,8 @@ export type AIState = {
   reverseTime: number;
 };
 
-/** A car driven on another phone. Task 9 adds the snapshot buffer it is drawn from. */
-export type RemoteCar = { dnf: boolean };
+/** A car driven on another phone, drawn from its snapshot buffer. */
+export type RemoteCar = { buffer: SnapshotBuffer; dnf: boolean };
 
 export type Racer = {
   /** Online this is the netId (grid index). */

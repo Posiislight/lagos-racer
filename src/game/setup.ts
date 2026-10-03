@@ -1,6 +1,7 @@
 import { trackById } from '../config/tracks';
 import { VEHICLES, vehicleById, type VehicleId } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
+import { SnapshotBuffer } from '../net/interpolation';
 import { buildTrack, sampleAt } from './track';
 import { createProgress } from './race';
 import { makeRacer, type AIState, type RaceRuntime, type Racer } from './runtime';
@@ -47,6 +48,7 @@ export function makeRace(trackId: string, playerVehicle: VehicleId, online?: Onl
       const r = makeRacer(g.netId, g.name, vehicleById(g.vehicle), kind === 'local', progress);
       r.kind = kind;
       r.owner = g.slot;
+      if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
       // Every phone rolls every AI's skill in grid order, so they all agree whoever drives it.
       if (g.ai) r.ai = aiState(lane, g.netId, rand);
       return r;
