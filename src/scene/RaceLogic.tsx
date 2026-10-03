@@ -8,8 +8,10 @@ import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateCritters } from '../game/critters';
 import { useGame, type Result } from '../game/store';
 import { beep, Engine, sfx } from '../game/audio';
+import { getSession } from '../net/store';
 
 const COUNT = ['3', '2', '1'];
+const WAITING = 'Waiting for others…';
 // ?autopilot=1 lets the AI drive the player's car (for play-testing and demos).
 const AUTOPILOT = typeof location !== 'undefined' && new URLSearchParams(location.search).get('autopilot') === '1';
 
@@ -48,24 +50,33 @@ export function RaceLogic() {
   useFrame((_, dtRaw) => {
     const race = getRace();
     const store = useGame.getState();
-    if (!race || store.paused) return;
+    // Online the race goes on while the menu is open: the other phones are still driving.
+    if (!race || (store.paused && !race.net)) return;
     const dt = Math.min(dtRaw, 0.05);
     const player = race.racers.find(r => r.isPlayer)!;
     const laps = race.config.laps;
 
-    // Countdown: 3, 2, 1, OYA GO!
+    // Countdown: 3, 2, 1, OYA GO! Online it runs off the room's start time, so every phone goes together.
     if (race.phase === 'countdown') {
-      race.countdown -= dt;
-      const label = race.countdown > 0 ? COUNT[Math.min(2, Math.floor(3 - race.countdown))] ?? '3' : 'OYA GO!';
-      if (label !== lastCount.current) { lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' }); }
-      if (race.countdown <= 0) { race.phase = 'racing'; store.setHud({ phase: 'racing' }); setTimeout(() => useGame.getState().setHud({ countdown: '' }), 900); }
+      if (race.net && !getSession()?.started) {
+        if (lastCount.current !== WAITING) { lastCount.current = WAITING; store.setHud({ countdown: WAITING, phase: 'countdown' }); }
+      } else {
+        if (race.net) race.countdown = -race.net.now();
+        else race.countdown -= dt;
+        const label = race.countdown > 0 ? COUNT[Math.min(2, Math.floor(3 - race.countdown))] ?? '3' : 'OYA GO!';
+        if (label !== lastCount.current) { lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' }); }
+        if (race.countdown <= 0) { race.phase = 'racing'; store.setHud({ phase: 'racing' }); setTimeout(() => useGame.getState().setHud({ countdown: '' }), 900); }
+      }
+    } else if (race.net) {
+      race.clock = race.net.now();
     } else {
       race.clock += dt;
     }
 
-    // Controls: the player drives until they finish, then the AI brings them home.
+    // Controls: the player drives until they finish, then the AI brings them home. Other phones drive their own cars.
     for (const r of race.racers) {
-      if (r.isPlayer && r.progress.finishTime === null && !AUTOPILOT) {
+      if (r.kind === 'remote') continue;
+      if (r.kind === 'local' && r.progress.finishTime === null && !AUTOPILOT) {
         readPlayer(r.controls, dt, { tilt: store.settings.steering === 'tilt', invertTilt: store.settings.invertTilt });
         unstick(r, dt, race.phase === 'racing');
       }
@@ -115,7 +126,8 @@ export function RaceLogic() {
     }
 
     // Results: once the player is home, wait for the others (or give up after a few seconds).
-    if (finishedAt.current !== null && !reported.current) {
+    // A room race gets its results from the server instead.
+    if (finishedAt.current !== null && !reported.current && !race.net) {
       const allIn = race.racers.every(r => r.progress.finishTime !== null);
       if (allIn || race.clock - finishedAt.current > 6) {
         reported.current = true;

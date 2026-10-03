@@ -24,7 +24,8 @@ export default function Race() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Escape' || e.code === 'KeyP') { const s = useGame.getState(); if (!s.results) s.setPaused(!s.paused); }
     };
-    const onHide = () => { if (document.hidden && !useGame.getState().results) useGame.getState().setPaused(true); };
+    // A room race can't wait for one phone, so only a solo race pauses when the tab is hidden.
+    const onHide = () => { const s = useGame.getState(); if (document.hidden && !s.results && !s.online) s.setPaused(true); };
     window.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', onHide);
     return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); };

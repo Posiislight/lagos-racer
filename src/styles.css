@@ -236,6 +236,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   -webkit-text-stroke: 4px var(--ink); text-shadow: 0 8px 0 var(--ink); animation: pop .5s ease-out;
 }
 .hud-count.go { color: #7ee08a; font-size: clamp(48px, 11vw, 110px); }
+.hud-count.wait { color: #fff; white-space: nowrap; font-size: clamp(24px, 5vw, 44px); -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); }
 .hud-msg {
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;

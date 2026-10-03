@@ -27,7 +27,7 @@ export function Hud({ onPause }: { onPause: () => void }) {
       </button>
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>
-      {hud.countdown && <div className={`hud-count${hud.countdown.length > 1 ? ' go' : ''}`} key={hud.countdown}>{hud.countdown}</div>}
+      {hud.countdown && <div className={`hud-count${hud.countdown === 'OYA GO!' ? ' go' : hud.countdown.length > 1 ? ' wait' : ''}`} key={hud.countdown}>{hud.countdown}</div>}
       {hud.message && <div className="hud-msg" key={hud.messageKey}>{hud.message}</div>}
       {hud.wrongWay && <div className="hud-wrong">WRONG WAY! TURN AM!</div>}
     </div>

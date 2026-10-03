@@ -4,6 +4,7 @@ import type { VehicleId } from '../config/vehicles';
 import { useGame } from '../game/store';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
+import { NetSession } from './session';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -69,9 +70,12 @@ let conn: Connection | null = null;
 let generation = 0;
 let clock = new ClockSync();
 let pingTimer: ReturnType<typeof setTimeout> | null = null;
+let session: NetSession | null = null;
 
 export const getClock = (): ClockSync => clock;
 export const getLink = (): NetLink | null => conn;
+/** The room race in progress (from its grid on), or null. */
+export const getSession = (): NetSession | null => session;
 
 function stopPings() {
   if (pingTimer) clearTimeout(pingTimer);
@@ -93,6 +97,7 @@ function startPings() {
 function drop() {
   generation++;
   stopPings();
+  session = null;
   const old = conn;
   conn = null;
   old?.close();
@@ -171,9 +176,17 @@ export const useNet = create<NetState>((set, get) => {
       case 'pong':
         clock.addSample(m.c, m.s, performance.now());
         break;
-      case 'grid':
-        // The race session that starts from this arrives with the race screen.
+      case 'grid': {
+        // A repeat of the race we already have (say, after a resume) changes nothing.
+        const mySlot = get().mySlot;
+        if (!conn || mySlot === null || session?.raceSeq === m.raceSeq) break;
         set({ pendingGrid: { raceSeq: m.raceSeq, grid: m.grid, seed: m.seed, trackId: m.trackId, laps: m.laps } });
+        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq });
+        useGame.getState().startOnlineRace();
+        break;
+      }
+      case 'start':
+        if (session?.raceSeq === m.raceSeq) session.setStart(m.at);
         break;
       default:
         break;

@@ -9,6 +9,7 @@ import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
 import { useGame, type Quality } from '../game/store';
 import { resetPlayerInput } from '../game/input';
+import { getSession, useNet } from '../net/store';
 import { Track } from './Track';
 import { Vehicle } from './Vehicle';
 import { ChaseCamera } from './ChaseCamera';
@@ -30,22 +31,30 @@ export function RaceScene() {
   const vehicle = useGame(s => s.vehicle);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
+  const online = useGame(s => s.online);
   const q = QUALITY[quality];
 
-  // A fresh race whenever a new one is started.
-  const setup = useMemo(() => makeRace(trackId, VEHICLES.some(v => v.id === vehicle) ? vehicle : 'okada'), [raceId, trackId, vehicle]);
+  // A fresh race whenever a new one is started; a room race is laid out from the server's grid.
+  const { setup, session } = useMemo(() => {
+    const session = online ? getSession() : null;
+    const v = VEHICLES.some(x => x.id === vehicle) ? vehicle : 'okada';
+    const track = session ? useNet.getState().pendingGrid?.trackId ?? trackId : trackId;
+    return { setup: makeRace(track, v, session?.setup), session };
+  }, [raceId, trackId, vehicle, online]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {
     setRace(setup.race);
     resetPlayerInput();
+    if (session) { session.attach(setup.race); session.loaded(); }
     return () => { if (getRace() === setup.race) setRace(null); };
-  }, [setup]);
+  }, [setup, session]);
 
   return (
     <>
       <SkyAndLight shadows={q.shadows} far={q.far} />
-      <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused} interpolate>
+      {/* A room race never stops for one phone's menu. */}
+      <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
         <Track cfg={setup.race.config} track={setup.race.track} density={q.density} />
         {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} />)}
       </Physics>
