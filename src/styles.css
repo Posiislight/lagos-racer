@@ -147,6 +147,41 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .account p { margin: 0 0 8px; }
 @media (max-height: 480px) { .table td, .table th { padding: 3px 6px; } .modal-card h2 { font-size: 20px; } }
 
+/* ---------- online + lobby ---------- */
+.online, .lobby {
+  position: absolute; inset: 0; overflow-y: auto; display: grid; gap: 12px; align-content: center; justify-items: center;
+  background: linear-gradient(180deg, #8fd0f2 0%, #f7e3b5 80%);
+  padding: calc(14px + var(--safe-t)) calc(16px + var(--safe-r)) calc(14px + var(--safe-b)) calc(16px + var(--safe-l));
+}
+.online-card { width: min(440px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.online-card h2 { margin-bottom: 0; }
+.online-card .muted { margin: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 13px; color: var(--muted); }
+.field input {
+  font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 10px;
+  padding: 10px 12px; min-height: 46px; width: 100%; -webkit-user-select: text; user-select: text;
+}
+.field input:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; text-align: center; font-family: Bungee, Impact, sans-serif; }
+.join-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.or { margin: 0; text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.net-note { margin: 0; min-height: 1.4em; font-weight: 700; font-size: 14px; color: var(--muted); }
+.net-note.bad { color: var(--red); }
+.lobby { grid-template-columns: minmax(0, 420px) minmax(0, 420px); justify-content: center; align-items: start; align-content: center; }
+.lobby .card { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.room-code { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); letter-spacing: .12em; line-height: 1; }
+.lobby .table { margin: 4px 0 0; }
+.tick { color: var(--green); font-weight: 900; font-size: 18px; }
+.lobby-picks { flex-wrap: wrap; overflow: visible; }
+.lobby-host .btn { flex: 1; }
+.lobby .btn { white-space: nowrap; }
+@media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
+@media (max-height: 480px) {
+  .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
+  .online-card .muted { display: none; }
+  .room-code { font-size: 36px; }
+}
+
 /* ---------- race ---------- */
 .race { position: absolute; inset: 0; background: #f3e4c8; touch-action: none; }
 .race-canvas { position: absolute !important; inset: 0; }

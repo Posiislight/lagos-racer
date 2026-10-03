@@ -34,7 +34,7 @@ npm run server   # room server on port 8787 (set PORT to change it)
 npm run dev      # the game, as above
 ```
 
-Phones on the same Wi-Fi reach the server through the laptop's address: the game connects to `ws://<the address you opened>:8787`, so open the "Network" address Vite prints on each phone and it finds the server by itself. Set `VITE_ROOM_SERVER` to point at a server somewhere else. Friends can join straight from a link ending in `?room=CODE`. The online menu is coming; the server is the only part in place so far.
+Phones on the same Wi-Fi reach the server through the laptop's address: the game connects to `ws://<the address you opened>:8787`, so open the "Network" address Vite prints on each phone and it finds the server by itself. Set `VITE_ROOM_SERVER` to point at a server somewhere else. In the game, **Race with friends** (main menu) opens the online screen: pick a nickname, then **Create room** or type a friend's 4-letter code and **Join room**. The lobby shows the room code, a **Share** button (a link ending in `?room=CODE`, which opens the join screen with the code filled in), everyone's ride and ready ticks, and for the host a **Start** button once at least two players are ready. The nickname is remembered on the device; the connection is only opened once you create or join a room. Add `?lag=120&jitter=40&loss=3` (ms, ms, percent) to fake a bad network when testing.
 
 ## Controls
 

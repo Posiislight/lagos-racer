@@ -3,7 +3,7 @@ import { VEHICLES, type VehicleId } from '../config/vehicles';
 import type { ItemKind } from './runtime';
 
 export type Quality = 'low' | 'medium' | 'high';
-export type Screen = 'menu' | 'garage' | 'race';
+export type Screen = 'menu' | 'garage' | 'online' | 'lobby' | 'race';
 
 export type Settings = { quality: Quality; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
 
@@ -63,6 +63,8 @@ export type State = Saved & {
   screen: Screen;
   track: string;
   raceId: number;
+  /** True while the race is a room race (Race with friends). */
+  online: boolean;
   paused: boolean;
   hud: Hud;
   results: Result[] | null;
@@ -73,6 +75,7 @@ export type State = Saved & {
   unlock: (v: VehicleId) => void;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   startRace: () => void;
+  startOnlineRace: () => void;
   quitRace: () => void;
   setPaused: (p: boolean) => void;
   setHud: (h: Partial<Hud>) => void;
@@ -91,6 +94,7 @@ export const useGame = create<State>((set, get) => ({
   screen: 'menu',
   track: 'ojuelegba',
   raceId: 0,
+  online: false,
   paused: false,
   hud: emptyHud(),
   results: null,
@@ -105,8 +109,9 @@ export const useGame = create<State>((set, get) => ({
     save();
   },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
-  startRace: () => set(s => ({ screen: 'race', raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
-  quitRace: () => set({ screen: 'menu', paused: false, results: null }),
+  startRace: () => set(s => ({ screen: 'race', online: false, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  startOnlineRace: () => set(s => ({ screen: 'race', online: true, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  quitRace: () => set({ screen: 'menu', online: false, paused: false, results: null }),
   setPaused: paused => set({ paused }),
   setHud: h => set(s => ({ hud: { ...s.hud, ...h } })),
   flash: message => set(s => ({ hud: { ...s.hud, message, messageKey: s.hud.messageKey + 1 } })),

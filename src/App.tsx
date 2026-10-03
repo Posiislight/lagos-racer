@@ -4,6 +4,8 @@ import { setSoundEnabled, unlockAudio } from './game/audio';
 import { startKeyboard } from './game/input';
 import { Menu } from './ui/Menu';
 import { Garage } from './ui/Garage';
+import { Online } from './ui/Online';
+import { Lobby } from './ui/Lobby';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
 const Race = lazy(() => import('./ui/Race'));
@@ -13,6 +15,8 @@ export function App() {
   const sound = useGame(s => s.settings.sound);
 
   useEffect(() => { startKeyboard(); }, []);
+  // A friend's invite link (?room=CODE) lands straight on the join screen.
+  useEffect(() => { if (new URLSearchParams(location.search).has('room')) useGame.getState().setScreen('online'); }, []);
   useEffect(() => { setSoundEnabled(sound); }, [sound]);
   useEffect(() => {
     // Browsers only allow audio after a user gesture.
@@ -26,6 +30,8 @@ export function App() {
     <div className="app">
       {screen === 'menu' && <Menu />}
       {screen === 'garage' && <Garage />}
+      {screen === 'online' && <Online />}
+      {screen === 'lobby' && <Lobby />}
       {screen === 'race' && (
         <Suspense fallback={<Loading />}>
           <Race />
