@@ -41,6 +41,7 @@ export function Menu() {
           <h2>{v.name}</h2>
           <p className="muted">{v.blurb}</p>
           <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[track] ?? null)}</p>
+          <p className="credit muted">Road layout © OpenStreetMap contributors</p>
         </div>
         <button className="btn primary big" onClick={() => { goFullscreen(); if (useGame.getState().settings.steering === 'tilt') void enableTilt(); startRace(); }}>OYA, RACE!</button>
         <div className="row">

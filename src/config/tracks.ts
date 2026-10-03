@@ -54,7 +54,8 @@ export const TRACKS: TrackConfig[] = [
     name: 'Ojuelegba',
     blurb: 'The real Ojuelegba Road: Tejuosho market to under the bridge and back. Mind the agberos.',
     // West along the north carriageway, U-turn under the Western Avenue bridge, back east on the south one.
-    control: outAndBack(OJUELEGBA_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 12, startAt: OJUELEGBA_START }),
+    // U-turns 18 m round the centre line, so a BRT and another vehicle can get round side by side.
+    control: outAndBack(OJUELEGBA_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 18, splay: 50, startAt: OJUELEGBA_START }),
     axis: OJUELEGBA_AXIS,
     median: { width: MEDIAN, redWhite: [80, 118] },
     // The real road is flat; keep gentle rolling and a ripple you feel in the suspension.
@@ -62,7 +63,8 @@ export const TRACKS: TrackConfig[] = [
     hillsAxis: 'x',
     halfWidth: HALF_WIDTH,
     laps: 3,
-    bridges: [{ road: 352, name: 'OJUELEGBA', width: 30 }],
+    // The Western Avenue deck covers the west U-turn.
+    bridges: [{ road: 362, name: 'OJUELEGBA', width: 34 }],
     signs: [{ road: 327, text: 'SURULERE  ·  OSHODI  ·  YABA' }],
     items: [90, 260, 450, 620],
     critters: [

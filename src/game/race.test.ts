@@ -105,11 +105,11 @@ describe('ojuelegba track', () => {
   const cfg = TRACKS.find(t => t.id === 'ojuelegba')!;
   const oj = buildTrack(cfg.control, 2, cfg.hills, cfg.hillsAxis);
 
-  it('is a lap of about 750 m with no bend tighter than the U-turns', () => {
+  it('is a lap of about 800 m with U-turns wide enough for two vehicles side by side', () => {
     expect(oj.length).toBeGreaterThan(700);
-    expect(oj.length).toBeLessThan(850);
+    expect(oj.length).toBeLessThan(880);
     const minRadius = Math.min(...oj.points.map(p => 1 / Math.max(1e-6, Math.abs(p.curvature))));
-    expect(minRadius).toBeGreaterThanOrEqual(11);
+    expect(minRadius).toBeGreaterThanOrEqual(15);
   });
 
   it('starts on the north leg heading west', () => {

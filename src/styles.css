@@ -88,6 +88,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; min-height: 0; }
 .menu-side .card h2 { margin-bottom: 2px; }
 .track-line { margin: 8px 0 0; font-size: 14px; }
+.credit { margin: 4px 0 0; font-size: 11px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
 @media (pointer: coarse) { .keys { display: none; } }
 @media (max-width: 720px) and (orientation: portrait) {

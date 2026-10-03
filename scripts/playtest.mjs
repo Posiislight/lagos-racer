@@ -70,6 +70,15 @@ await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b
 let ready = false;
 for (let i = 0; i < 300 && !ready; i++) { await sleep(100); ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))'); }
 if (!ready) { console.log(JSON.stringify({ error: 'race never became ready', errors, logs: logs.slice(-10) }, null, 2)); done(1); }
+// Contact monitor: the longest time any two racers stay touching while both are moving (> 3 m/s).
+// Vehicles that jam together show up here; bumps that push apart keep it short.
+await evaluate(`(() => { const run = {}; window.__contact = { max: 0, pair: '' }; let last = performance.now();
+  (function f(now) { const r = window.__lr.getRace(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (r && r.phase === 'racing') for (const a of r.racers) for (const id of a.touching) { if (id <= a.id) continue; const b = r.racers.find(x => x.id === id);
+      const k = a.id + '-' + id; run[k] = Math.abs(a.speed) > 3 && b && Math.abs(b.speed) > 3 ? (run[k] || 0) + dt : 0;
+      if (run[k] > window.__contact.max) window.__contact = { max: +run[k].toFixed(2), pair: a.vehicle.id + '/' + b.vehicle.id }; }
+    if (r) for (const k of Object.keys(run)) { const [x, y] = k.split('-').map(Number); if (!r.racers[x]?.touching.has(y)) run[k] = 0; }
+    requestAnimationFrame(f); })(last); })()`);
 // --eval="<js>": run once the race is ready (window.__lr has getRace, useGame, state) and print the result.
 if (args.eval) console.log('eval:', JSON.stringify(await evaluate(args.eval)));
 
@@ -105,5 +114,7 @@ console.log("errors:", JSON.stringify([...new Set(errors)].slice(0, 10)));
 const every = Math.max(1, Math.floor(samples.length / (+args.lines || 12)));
 samples.forEach((s, i) => { if (i % every === 0 || i === samples.length - 1) console.log(typeof s.racers === "object" ? line(s) : JSON.stringify(s)); });
 console.log("results:", JSON.stringify(results));
+const metrics = await evaluate(`({ contact: window.__contact, episodes: window.__episodes, open: window.__openEpisodes, respawnLog: window.__respawnLog, respawns: window.__lr.getRace().racers.map(c => ({ v: c.vehicle.id, player: c.isPlayer, respawns: c.respawns, laps: c.progress.lapsDone })) })`);
+console.log("metrics:", JSON.stringify(metrics));
 console.log("files:", files.join(" "));
 ws.close(); done(errors.length ? 2 : 0);

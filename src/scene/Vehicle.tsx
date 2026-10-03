@@ -88,7 +88,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     if (!vc || !b || !race) return;
     const dt = w.timestep, t = racer.vehicle.tuning, c = racer.controls;
 
-    if (racer.respawn || b.translation().y < race.track.points[racer.progress.index].pos.y - 5) { respawn(racer, b); racer.respawn = false; return; }
+    if (racer.respawn || b.translation().y < race.track.points[racer.progress.index].pos.y - 5) { respawn(racer, b); racer.respawn = false; racer.respawns++; return; }
 
     // Still pressed against another vehicle: keep pushing apart a few times a second.
     const st = state.current;

@@ -1,5 +1,7 @@
 # Overnight progress (2026-10-03)
 
+> **Update (3 October, afternoon):** the track is now the real Ojuelegba Road (out and back, from OpenStreetMap), there are four vehicles with paint colours, bumps push vehicles apart, Space uses power-ups, and boosts show speed lines. Design: [docs/superpowers/specs/2026-10-03-ojuelegba-road-track-design.md](superpowers/specs/2026-10-03-ojuelegba-road-track-design.md). Parts of this page below describe the old made-up loop and the six-vehicle line-up.
+
 You asked me to finish the sporty vehicles, then build the map and the game while you slept.
 The brief says to confirm each milestone plan first; you weren't available, so I wrote the plan
 down and went ahead. Below is what exists now, what changed from your feedback during the

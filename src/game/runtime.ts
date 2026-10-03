@@ -64,6 +64,8 @@ export type Racer = {
   touching: Set<number>;
   /** Seconds the car has been stuck; used to back it out or put it back on the road. */
   trouble: number;
+  /** How many times this racer has been put back on the road (play-test metric). */
+  respawns: number;
   /** Request a respawn on the track at the next physics step. */
   respawn: boolean;
   ai: AIState | null;
@@ -115,6 +117,6 @@ export function makeRacer(id: number, name: string, vehicle: VehicleConfig, pain
   return {
     id, name, vehicle, paint, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
     speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0, bump: { x: 0, z: 0 }, touching: new Set(),
-    trouble: 0, respawn: false, ai: null,
+    trouble: 0, respawns: 0, respawn: false, ai: null,
   };
 }
