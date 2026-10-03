@@ -25,6 +25,17 @@ Other commands:
 
 Handy URL flags: `?unlock=all` opens the locked BRTs, `?autopilot=1` lets the AI drive your vehicle.
 
+## Multiplayer (local)
+
+Racing with friends needs the room server running next to the game:
+
+```bash
+npm run server   # room server on port 8787 (set PORT to change it)
+npm run dev      # the game, as above
+```
+
+Phones on the same Wi-Fi reach the server through the laptop's address: the game connects to `ws://<the address you opened>:8787`, so open the "Network" address Vite prints on each phone and it finds the server by itself. Set `VITE_ROOM_SERVER` to point at a server somewhere else. Friends can join straight from a link ending in `?room=CODE`. The online menu is coming; the server is the only part in place so far.
+
 ## Controls
 
 You're always on the gas: just steer. Hitting walls or other vehicles costs you speed, and if
