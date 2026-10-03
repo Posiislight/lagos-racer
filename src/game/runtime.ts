@@ -1,6 +1,6 @@
 import type { RapierRigidBody } from '@react-three/rapier';
 import type { Object3D } from 'three';
-import type { VehicleConfig } from '../config/vehicles';
+import type { Paint, VehicleConfig } from '../config/vehicles';
 import type { TrackConfig } from '../config/tracks';
 import type { Track } from './track';
 import { emptyControls, type Controls } from './input';
@@ -32,6 +32,7 @@ export type Racer = {
   id: number;
   name: string;
   vehicle: VehicleConfig;
+  paint: Paint;
   isPlayer: boolean;
   controls: Controls;
   body: RapierRigidBody | null;
@@ -110,9 +111,9 @@ let current: RaceRuntime | null = null;
 export const getRace = () => current;
 export const setRace = (r: RaceRuntime | null) => { current = r; };
 
-export function makeRacer(id: number, name: string, vehicle: VehicleConfig, isPlayer: boolean, progress: RacerProgress): Racer {
+export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress): Racer {
   return {
-    id, name, vehicle, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
+    id, name, vehicle, paint, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
     speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0, bump: { x: 0, z: 0 }, touching: new Set(),
     trouble: 0, respawn: false, ai: null,
   };

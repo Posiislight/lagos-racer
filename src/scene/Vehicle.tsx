@@ -41,7 +41,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
   const controller = useRef<DynamicRayCastVehicleController | null>(null);
   const { world } = useRapier();
   const lay = useMemo(() => layout(racer), [racer]);
-  const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, merge]);
+  const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.paint.color, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, racer.paint, merge]);
   const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0 });
   /** Shove this racer away from another one it's touching. */
   const shove = (other: Racer) => {

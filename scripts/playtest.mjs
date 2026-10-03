@@ -8,7 +8,7 @@
 //   --shots=2,6,12                 screenshot times (s) after the race starts
 //   --out=dir                      where to save screenshots (default: scratch dir)
 //   --gpu                          try the real GPU instead of SwiftShader
-//   --vehicle=okada --quality=high --unlock
+//   --vehicle=okada --paint=blue --quality=high --unlock
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -57,8 +57,8 @@ const params = new URLSearchParams();
 if (args.autopilot) params.set('autopilot', '1');
 if (args.unlock) params.set('unlock', 'all');
 // Seed settings before the app loads.
-const settings = { settings: { quality: args.quality || 'high', sound: false, autoGas: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt-blue', 'brt-red'], accountPromptDismissed: false };
-await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v1', ${JSON.stringify(JSON.stringify(settings))});` });
+const settings = { settings: { quality: args.quality || 'high', sound: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt'], accountPromptDismissed: false, paint: args.paint ? { [args.vehicle || 'okada']: args.paint } : {}, itemHints: 0 };
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v2', ${JSON.stringify(JSON.stringify(settings))});` });
 await send('Page.navigate', { url: base + (params.toString() ? '?' + params : '') });
 await sleep(2500);
 const files = [await shot('menu')];

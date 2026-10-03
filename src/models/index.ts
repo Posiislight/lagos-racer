@@ -2,7 +2,7 @@ import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial
 import { buildBRT, buildDanfo, buildKeke, buildOkada } from './generated/showroom.js';
 import { findAnimated, mergeDecals, mergeStatic } from './optimize';
 
-export type ModelId = 'okada' | 'okada-blue' | 'keke' | 'danfo' | 'brt-blue' | 'brt-red';
+import type { VehicleId } from '../config/vehicles';
 
 export type VehicleModel = {
   /** Wrapper group: faces +x, right side on +z, ground at y = 0, scaled for the game. */
@@ -17,21 +17,21 @@ export type VehicleModel = {
 
 const WHEEL_MAT = new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.4 });
 
-const BUILDERS: Record<ModelId, () => Group> = {
-  okada: () => buildOkada(),
-  'okada-blue': () => buildOkada('#0b55c4'),
-  keke: buildKeke,
-  danfo: buildDanfo,
-  'brt-blue': () => buildBRT('#0f86cf', '01'),
-  'brt-red': () => buildBRT('#d4141c', '02'),
+/** Each builder takes the body colour (paint). */
+const BUILDERS: Record<VehicleId, (color: string) => Group> = {
+  okada: c => buildOkada(c),
+  keke: c => buildKeke(c),
+  danfo: c => buildDanfo(c),
+  brt: c => buildBRT(c, '01'),
 };
 
 /**
- * Build a showroom vehicle for the game. The showroom builders put the kerb side on -z and the
- * showroom mirrors them, so do the same here (and flip text decals back so they still read).
+ * Build a showroom vehicle for the game in the given paint colour. The showroom builders put the kerb
+ * side on -z and the showroom mirrors them, so do the same here (and flip text decals back so they
+ * still read).
  */
-export function buildVehicleModel(id: ModelId, scale = 1, opts: { merge?: boolean; shadowProxy?: boolean } = {}): VehicleModel {
-  const model = BUILDERS[id]();
+export function buildVehicleModel(id: VehicleId, color: string, scale = 1, opts: { merge?: boolean; shadowProxy?: boolean } = {}): VehicleModel {
+  const model = BUILDERS[id](color);
   const anim = model.userData.anim as ((t: number) => void) | undefined;
 
   const wheels: VehicleModel['wheels'] = [];

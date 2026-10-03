@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
-import { vehicleById } from '../config/vehicles';
+import { paintOf, vehicleById } from '../config/vehicles';
 import { trackById } from '../config/tracks';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
@@ -19,9 +19,9 @@ export function goFullscreen() {
 }
 
 export function Menu() {
-  const { vehicle, coins, startRace, setScreen, best, track } = useGame();
+  const { vehicle, coins, startRace, setScreen, best, track, paint } = useGame();
   const [settings, setSettings] = useState(false);
-  const v = vehicleById(vehicle), t = trackById(track);
+  const v = vehicleById(vehicle), t = trackById(track), p = paintOf(v, paint[v.id]);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
@@ -33,7 +33,7 @@ export function Menu() {
         <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
       </header>
       <div className="menu-preview">
-        <Suspense fallback={null}><Preview id={vehicle} /></Suspense>
+        <Suspense fallback={null}><Preview id={vehicle} color={p.color} /></Suspense>
       </div>
       <div className="menu-side">
         <div className="card">

@@ -22,7 +22,7 @@ export function Results() {
               <tr key={i} className={r.isPlayer ? 'me' : ''}>
                 <td>{i + 1}</td>
                 <td>{r.name}</td>
-                <td><span className="dot" style={{ background: vehicleById(r.vehicle).color }} /> {vehicleById(r.vehicle).name}</td>
+                <td><span className="dot" style={{ background: r.color }} /> {vehicleById(r.vehicle).name}</td>
                 <td title={r.projected ? 'Still racing: projected finish' : undefined}>{r.time === null ? 'DNF' : (r.projected ? '~' : '') + formatTime(r.time)}</td>
                 <td>{formatTime(r.best)}</td>
               </tr>

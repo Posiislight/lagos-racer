@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
-import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { VEHICLES, paintOf, type VehicleId } from '../config/vehicles';
 
 const Preview = lazy(() => import('./Preview'));
 
@@ -14,10 +14,11 @@ function Bar({ label, value }: { label: string; value: number }) {
 }
 
 export function Garage() {
-  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock } = useGame();
+  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock, paint, setPaint } = useGame();
   const [looking, setLooking] = useState<VehicleId>(vehicle);
   const v = VEHICLES.find(x => x.id === looking)!;
   const isLocked = !!v.locked && !unlocked.includes(v.id);
+  const current = paintOf(v, paint[v.id]);
   return (
     <div className="garage">
       <header className="garage-head">
@@ -27,7 +28,7 @@ export function Garage() {
       </header>
       <div className="garage-body">
         <div className="garage-preview">
-          <Suspense fallback={null}><Preview id={looking} /></Suspense>
+          <Suspense fallback={null}><Preview id={looking} color={current.color} /></Suspense>
         </div>
         <div className="card garage-card">
           <h2>{v.name}</h2>
@@ -36,6 +37,19 @@ export function Garage() {
             <Bar label="Speed" value={v.stats.speed} />
             <Bar label="Handling" value={v.stats.handling} />
             <Bar label="Toughness" value={v.stats.toughness} />
+          </div>
+          <div className="paints" role="group" aria-label="Paint">
+            {v.paints.map(p => (
+              <button
+                key={p.id}
+                className={`swatch${p.id === current.id ? ' on' : ''}`}
+                style={{ background: p.color }}
+                aria-label={`${p.name} paint`}
+                aria-pressed={p.id === current.id}
+                onClick={() => setPaint(v.id, p.id)}
+              />
+            ))}
+            <span className="paint-name">{current.name}</span>
           </div>
           {isLocked ? (
             <button className="btn primary" disabled={coins < v.locked!.coins} onClick={() => unlock(v.id)}>
@@ -53,7 +67,7 @@ export function Garage() {
           const locked = !!x.locked && !unlocked.includes(x.id);
           return (
             <button key={x.id} role="tab" aria-selected={x.id === looking} onClick={() => setLooking(x.id)}>
-              <span className="dot" style={{ background: x.color }} />{x.name}{locked && <span className="lock" aria-label="locked"> 🔒</span>}
+              <span className="dot" style={{ background: paintOf(x, paint[x.id]).color }} />{x.name}{locked && <span className="lock" aria-label="locked"> 🔒</span>}
             </button>
           );
         })}

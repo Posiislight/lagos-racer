@@ -40,7 +40,7 @@ export function RaceLogic() {
   useEffect(() => {
     const race = getRace();
     const player = race?.racers.find(r => r.isPlayer);
-    engine.current = new Engine(player?.vehicle.id.startsWith('okada') ? 70 : player?.vehicle.id === 'keke' ? 60 : 42);
+    engine.current = new Engine(player?.vehicle.id === 'okada' ? 70 : player?.vehicle.id === 'keke' ? 60 : 42);
     engine.current.start();
     return () => engine.current?.stop();
   }, []);
@@ -126,7 +126,7 @@ export function RaceLogic() {
           const avg = r.progress.distance > 0 ? r.progress.distance / race.clock : 0;
           const projected = done === null && avg > 1 ? race.clock + (total - r.progress.distance) / avg : null;
           return {
-            name: r.name, vehicle: r.vehicle.id, isPlayer: r.isPlayer, time: done ?? projected, projected: done === null,
+            name: r.name, vehicle: r.vehicle.id, color: r.paint.color, isPlayer: r.isPlayer, time: done ?? projected, projected: done === null,
             best: r.progress.lapTimes.length ? Math.min(...r.progress.lapTimes) : null,
           };
         });

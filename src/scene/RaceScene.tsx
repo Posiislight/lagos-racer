@@ -5,7 +5,8 @@ import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
 import { trackById } from '../config/tracks';
-import { VEHICLES, vehicleById, type VehicleId } from '../config/vehicles';
+import { paintOf, vehicleById } from '../config/vehicles';
+import { pickRivals, type Pick } from '../game/lineup';
 import { buildTrack, sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
 import { makeRacer, setRace, getRace, type RaceRuntime } from '../game/runtime';
@@ -29,18 +30,14 @@ const QUALITY: Record<Quality, { density: number; shadows: number; far: number }
   high: { density: 1, shadows: 2048, far: 300 },
 };
 
-/** Everyone else on the grid: one of each vehicle except the one you picked, in a random order. */
-function rivals(player: VehicleId): VehicleId[] {
-  return VEHICLES.map(v => v.id).filter(v => v !== player).sort(() => Math.random() - 0.5);
-}
-
-export function makeRace(trackId: string, playerVehicle: VehicleId): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
+export function makeRace(trackId: string, player: Pick): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
   const config = trackById(trackId);
   const track = buildTrack(config.control, 2, config.hills, config.hillsAxis);
-  const lineup = [...rivals(playerVehicle), playerVehicle];
+  // Five rivals (every vehicle at least once, all in different paints), then you at the back.
+  const lineup = [...pickRivals(player, 5), player];
   const names = [...AI_NAMES].sort(() => Math.random() - 0.5);
   const spawns: { x: number; y: number; z: number; yaw: number }[] = [];
-  const racers = lineup.map((vid, k) => {
+  const racers = lineup.map(({ vehicle: vid, paint }, k) => {
     // Two lanes, three rows, staggered; the player is last, at the back of the right lane.
     const row = Math.floor(k / 2), right = k % 2 === 1;
     const s = -8 - row * 12 - (right ? 5 : 0);
@@ -49,7 +46,8 @@ export function makeRace(trackId: string, playerVehicle: VehicleId): { race: Rac
     const x = at.pos.x + at.right.x * lane, z = at.pos.z + at.right.z * lane;
     spawns.push({ x, y: at.pos.y, z, yaw: Math.atan2(-at.tangent.z, at.tangent.x) });
     const isPlayer = k === lineup.length - 1;
-    const r = makeRacer(k, isPlayer ? 'You' : names[k], vehicleById(vid), isPlayer, createProgress(track, x, z));
+    const v = vehicleById(vid);
+    const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, createProgress(track, x, z));
     if (!isPlayer) r.ai = { lane, laneTarget: lane, skill: 0.9 + k * 0.035 + Math.random() * 0.03, itemDelay: 2, stuck: 0, reverseTime: 0 };
     return r;
   });
@@ -65,12 +63,13 @@ export function RaceScene() {
   const raceId = useGame(s => s.raceId);
   const trackId = useGame(s => s.track);
   const vehicle = useGame(s => s.vehicle);
+  const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
   const q = QUALITY[quality];
 
   // A fresh race whenever a new one is started.
-  const setup = useMemo(() => makeRace(trackId, VEHICLES.some(v => v.id === vehicle) ? vehicle : 'okada'), [raceId, trackId, vehicle]);
+  const setup = useMemo(() => makeRace(trackId, { vehicle: vehicleById(vehicle).id, paint }), [raceId, trackId, vehicle, paint]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {

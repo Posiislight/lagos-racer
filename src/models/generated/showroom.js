@@ -566,9 +566,9 @@ function kekeRider(o){ return kekeMerge(person(o)); }
 // Tilt a decal about z after its facing turn (lets text lie on raked faces and on the roof).
 function kekeTilt(d,t){ d.rotation.order='ZYX'; d.rotation.z=t; return d; }
 
-function buildKeke(){
+function buildKeke(bodyColor='#ffb000'){
   const g=new THREE.Group(), body=new THREE.Group(), add=o=>{ body.add(o); return o; };
-  const Y=paint('#ffb000'), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
+  const Y=paint(bodyColor), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
   const LED=glow('#eaf8ff',2.2), RED=glow('#ff1a0a',1.0), NEON=glow('#25ff8a',1.8), TI=mat('#5a5fd0',{metalness:.9,roughness:.25});
   const SIDE=s=>s>0?FACE.pz:FACE.nz, RB=kekeRB;
 
@@ -806,8 +806,8 @@ function danfoWingTex(){
   });
 }
 
-function buildDanfo(){
-  const g=new THREE.Group(), Y=paint('#f7b500'), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
+function buildDanfo(bodyColor='#f7b500'){
+  const g=new THREE.Group(), Y=paint(bodyColor), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
   const WX=1.5, WR=.42, WZ=.92, BOT=.40, AR=.55, HW=.88, TOP=1.64; // wheel x/radius/track, body bottom, arch radius (shape), half width, roof (shape)
   const add=o=>{ g.add(o); return o; };
 

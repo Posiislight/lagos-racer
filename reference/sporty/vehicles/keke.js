@@ -73,9 +73,9 @@ function kekeRider(o){ return kekeMerge(person(o)); }
 // Tilt a decal about z after its facing turn (lets text lie on raked faces and on the roof).
 function kekeTilt(d,t){ d.rotation.order='ZYX'; d.rotation.z=t; return d; }
 
-function buildKeke(){
+function buildKeke(bodyColor='#ffb000'){
   const g=new THREE.Group(), body=new THREE.Group(), add=o=>{ body.add(o); return o; };
-  const Y=paint('#ffb000'), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
+  const Y=paint(bodyColor), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
   const LED=glow('#eaf8ff',2.2), RED=glow('#ff1a0a',1.0), NEON=glow('#25ff8a',1.8), TI=mat('#5a5fd0',{metalness:.9,roughness:.25});
   const SIDE=s=>s>0?FACE.pz:FACE.nz, RB=kekeRB;
 

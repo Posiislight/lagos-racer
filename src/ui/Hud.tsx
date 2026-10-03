@@ -72,7 +72,7 @@ function Minimap() {
       <path d={shape.path} fill="none" stroke="rgba(20,18,16,.75)" strokeWidth="22" strokeLinejoin="round" />
       <path d={shape.path} fill="none" stroke="#f3efe4" strokeWidth="9" strokeLinejoin="round" />
       {race.racers.map((c, i) => (
-        <circle key={i} data-i={i} r={c.isPlayer ? 13 : 10} fill={c.isPlayer ? '#ffffff' : c.vehicle.color} stroke="#141210" strokeWidth={c.isPlayer ? 6 : 4} />
+        <circle key={i} data-i={i} r={c.isPlayer ? 13 : 10} fill={c.isPlayer ? '#ffffff' : c.paint.color} stroke="#141210" strokeWidth={c.isPlayer ? 6 : 4} />
       ))}
     </svg>
   );
