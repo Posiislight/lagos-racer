@@ -1,0 +1,290 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { RoomServer, type Peer } from './rooms';
+import { RECONNECT_GRACE_MS, ROOM_IDLE_MS, type ServerMessage } from '../src/net/protocol';
+
+class FakePeer implements Peer {
+  sent: (string | ArrayBuffer)[] = [];
+  closed = false;
+  send(data: string | ArrayBuffer) {
+    this.sent.push(data);
+  }
+  close() {
+    this.closed = true;
+  }
+}
+
+function msgs<T extends ServerMessage['t']>(peer: FakePeer, t: T): Extract<ServerMessage, { t: T }>[] {
+  return peer.sent
+    .filter((d): d is string => typeof d === 'string')
+    .map(d => JSON.parse(d) as ServerMessage)
+    .filter((m): m is Extract<ServerMessage, { t: T }> => m.t === t);
+}
+
+let now = 0;
+let server: RoomServer;
+
+beforeEach(() => {
+  now = 1_000_000;
+  let seed = 7;
+  const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  server = new RoomServer({ now: () => now, random });
+});
+
+function connect() {
+  const peer = new FakePeer();
+  return { peer, conn: server.open(peer) };
+}
+
+function send(conn: number, m: object) {
+  server.message(conn, JSON.stringify(m));
+}
+
+function create(name = 'Ade') {
+  const c = connect();
+  send(c.conn, { t: 'create', name, vehicle: 'okada' });
+  return { ...c, welcome: msgs(c.peer, 'welcome')[0] };
+}
+
+function join(code: string, name = 'Bola') {
+  const c = connect();
+  send(c.conn, { t: 'join', code, name, vehicle: 'keke' });
+  return c;
+}
+
+const lastRoom = (peer: FakePeer) => msgs(peer, 'room').at(-1)!.room;
+
+describe('RoomServer', () => {
+  it('creates a room with a 4-letter code and makes the creator host in slot 1', () => {
+    const a = create();
+    expect(a.welcome.code).toMatch(/^[A-HJ-NP-Z]{4}$/);
+    expect(a.welcome.slot).toBe(1);
+    expect(a.welcome.token).toHaveLength(24);
+    const room = lastRoom(a.peer);
+    expect(room.hostSlot).toBe(1);
+    expect(room.code).toBe(a.welcome.code);
+    expect(room.players).toEqual([{ slot: 1, name: 'Ade', vehicle: 'okada', ready: false, connected: true }]);
+  });
+
+  it('gives different codes to different rooms even if random repeats', () => {
+    server = new RoomServer({ now: () => now, random: () => 0 });
+    const a = create();
+    const b = create();
+    expect(a.welcome.code).not.toBe(b.welcome.code);
+  });
+
+  it('joins by code case- and space-insensitively', () => {
+    const a = create();
+    const b = join(` ${a.welcome.code.toLowerCase()} `);
+    expect(msgs(b.peer, 'welcome')[0].slot).toBe(2);
+    expect(lastRoom(a.peer).players.map(p => p.slot)).toEqual([1, 2]);
+    expect(lastRoom(b.peer).players[1].name).toBe('Bola');
+  });
+
+  it('rejects unknown codes, a 7th human, and joins after the race started', () => {
+    expect(msgs(join('ZZZZ').peer, 'error')[0].error).toBe('not-found');
+    expect(msgs(join('x').peer, 'error')[0].error).toBe('bad-code');
+
+    const a = create();
+    for (let i = 0; i < 5; i++) expect(msgs(join(a.welcome.code).peer, 'welcome')).toHaveLength(1);
+    expect(msgs(join(a.welcome.code).peer, 'error')[0].error).toBe('full');
+
+    const b = create();
+    server.rooms.get(b.welcome.code)!.phase = 'racing';
+    expect(msgs(join(b.welcome.code).peer, 'error')[0].error).toBe('started');
+  });
+
+  it('rejects blank nicknames with bad-name', () => {
+    const blank = create('  \u0007 ');
+    expect(msgs(blank.peer, 'error')[0].error).toBe('bad-name');
+    expect(server.rooms.size).toBe(0);
+
+    const a = create();
+    expect(msgs(join(a.welcome.code, '   ').peer, 'error')[0].error).toBe('bad-name');
+  });
+
+  it('drops malformed or wrongly typed messages without crashing', () => {
+    const c = connect();
+    for (const bad of [
+      'not json',
+      '[]',
+      'null',
+      '{"t":"nope"}',
+      '{"t":"create","name":5,"vehicle":"okada"}',
+      '{"t":"create","name":"Ade","vehicle":"hovercraft"}',
+      '{"t":"create","name":"Ade"}',
+      '{"t":"join","code":7,"name":"Ade","vehicle":"okada"}',
+      '{"t":"resume","token":{}}',
+      '{"t":"ping","c":"x"}',
+      '{"t":"lobby","ready":"yes"}',
+    ]) server.message(c.conn, bad);
+    server.message(c.conn, new ArrayBuffer(8));
+    expect(c.peer.sent).toHaveLength(0);
+    expect(server.rooms.size).toBe(0);
+  });
+
+  it('resumes a dropped player into the same slot with their token', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    const token = msgs(b.peer, 'welcome')[0].token;
+
+    server.close(b.conn);
+    expect(lastRoom(a.peer).players[1].connected).toBe(false);
+
+    now += 5000;
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token });
+    expect(msgs(b2.peer, 'welcome')[0]).toEqual({ t: 'welcome', code: a.welcome.code, slot: 2, token });
+    expect(lastRoom(b2.peer).players[1].connected).toBe(true);
+    expect(lastRoom(a.peer).players[1].connected).toBe(true);
+
+    // The old connection closing late must not drop the resumed player.
+    server.close(b.conn);
+    expect(lastRoom(a.peer).players[1].connected).toBe(true);
+    now += RECONNECT_GRACE_MS + 1;
+    server.tick();
+    expect(server.rooms.get(a.welcome.code)!.view().players).toHaveLength(2);
+  });
+
+  it('takes over a member whose old socket is still open', () => {
+    const a = create();
+    const token = a.welcome.token;
+    const a2 = connect();
+    send(a2.conn, { t: 'resume', token });
+    expect(msgs(a2.peer, 'welcome')).toHaveLength(1);
+    expect(a.peer.closed).toBe(true);
+    server.close(a.conn);
+    expect(lastRoom(a2.peer).players[0].connected).toBe(true);
+  });
+
+  it('expires an unknown token', () => {
+    const c = connect();
+    send(c.conn, { t: 'resume', token: 'nope' });
+    expect(msgs(c.peer, 'error')[0].error).toBe('expired');
+  });
+
+  it('frees the slot after 15 s without a resume and hands host to the lowest slot', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    join(a.welcome.code);
+    server.close(a.conn);
+    now += RECONNECT_GRACE_MS - 1;
+    server.tick();
+    expect(lastRoom(b.peer).players.map(p => p.slot)).toEqual([1, 2, 3]);
+
+    now += 2;
+    server.tick();
+    const room = lastRoom(b.peer);
+    expect(room.players.map(p => p.slot)).toEqual([2, 3]);
+    expect(room.hostSlot).toBe(2);
+
+    const late = connect();
+    send(late.conn, { t: 'resume', token: a.welcome.token });
+    expect(msgs(late.peer, 'error')[0].error).toBe('expired');
+  });
+
+  it('removes a member at once on leave, hands host on, and reuses the lowest free slot', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    join(a.welcome.code);
+    send(a.conn, { t: 'leave' });
+    const room = lastRoom(b.peer);
+    expect(room.players.map(p => p.slot)).toEqual([2, 3]);
+    expect(room.hostSlot).toBe(2);
+    const d = join(a.welcome.code, 'Dayo');
+    expect(msgs(d.peer, 'welcome')[0].slot).toBe(1);
+  });
+
+  it('hands host to a connected player, not one in grace', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    const c = join(a.welcome.code);
+    server.close(b.conn);
+    send(a.conn, { t: 'leave' });
+    expect(lastRoom(c.peer).hostSlot).toBe(3);
+  });
+
+  it('sets vehicle and ready, and broadcasts to connected members', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    send(b.conn, { t: 'lobby', vehicle: 'danfo', ready: true });
+    for (const p of [a.peer, b.peer]) {
+      expect(lastRoom(p).players[1]).toMatchObject({ vehicle: 'danfo', ready: true });
+    }
+  });
+
+  it('only the host can toggle fillAI', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    send(b.conn, { t: 'lobby', fillAI: true });
+    expect(msgs(b.peer, 'error')[0].error).toBe('not-host');
+    expect(lastRoom(a.peer).fillAI).toBe(false);
+    send(a.conn, { t: 'lobby', fillAI: true });
+    expect(lastRoom(b.peer).fillAI).toBe(true);
+  });
+
+  it('ignores lobby messages once the room is past the lobby', () => {
+    const a = create();
+    server.rooms.get(a.welcome.code)!.phase = 'racing';
+    const before = msgs(a.peer, 'room').length;
+    send(a.conn, { t: 'lobby', ready: true });
+    expect(msgs(a.peer, 'room')).toHaveLength(before);
+  });
+
+  it('drops messages over 4096 bytes and beyond 30 per second', () => {
+    const c = connect();
+    server.message(c.conn, JSON.stringify({ t: 'ping', c: 1, pad: 'x'.repeat(5000) }));
+    expect(msgs(c.peer, 'pong')).toHaveLength(0);
+
+    for (let i = 0; i < 40; i++) send(c.conn, { t: 'ping', c: i });
+    expect(msgs(c.peer, 'pong')).toHaveLength(30);
+
+    now += 1000;
+    send(c.conn, { t: 'ping', c: 99 });
+    expect(msgs(c.peer, 'pong')).toHaveLength(31);
+  });
+
+  it('deletes a room idle for 10 minutes and when its last member leaves', () => {
+    const a = create();
+    now += ROOM_IDLE_MS - 1;
+    server.tick();
+    expect(server.rooms.size).toBe(1);
+    now += 1;
+    server.tick();
+    expect(server.rooms.size).toBe(0);
+    expect(a.peer.closed).toBe(true);
+    server.close(a.conn);
+
+    const b = create();
+    send(b.conn, { t: 'leave' });
+    expect(server.rooms.size).toBe(0);
+
+    const c = create();
+    server.close(c.conn);
+    now += RECONNECT_GRACE_MS;
+    server.tick();
+    expect(server.rooms.size).toBe(0);
+  });
+
+  it('keeps a room alive while members send lobby messages', () => {
+    const a = create();
+    now += ROOM_IDLE_MS - 1;
+    send(a.conn, { t: 'lobby', ready: true });
+    now += ROOM_IDLE_MS - 1;
+    server.tick();
+    expect(server.rooms.size).toBe(1);
+  });
+
+  it('answers ping with the client time and server time', () => {
+    const c = connect();
+    send(c.conn, { t: 'ping', c: 123 });
+    expect(msgs(c.peer, 'pong')[0]).toEqual({ t: 'pong', c: 123, s: now });
+  });
+
+  it('refuses create or join from a connection already in a room', () => {
+    const a = create();
+    send(a.conn, { t: 'create', name: 'Again', vehicle: 'okada' });
+    send(a.conn, { t: 'join', code: a.welcome.code, name: 'Again', vehicle: 'okada' });
+    expect(server.rooms.size).toBe(1);
+    expect(lastRoom(a.peer).players).toHaveLength(1);
+  });
+});
