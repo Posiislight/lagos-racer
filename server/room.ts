@@ -9,6 +9,7 @@ import {
   type RoomPhase,
   type RoomView,
   type ServerMessage,
+  type Snapshot,
 } from '../src/net/protocol';
 import { trackById } from '../src/config/tracks';
 import type { VehicleId } from '../src/config/vehicles';
@@ -172,6 +173,27 @@ export class Room {
     } else if (this.phase === 'countdown' && now >= this.startAt) {
       this.phase = 'racing';
     }
+  }
+
+  /**
+   * Who should receive this snapshot: the other connected racers, or null if it must be dropped.
+   * Only a grid human may send, only in countdown or racing, only for the current race and only for their own cars.
+   */
+  snapshotTargets(snap: Snapshot): number[] | null {
+    if (this.phase !== 'countdown' && this.phase !== 'racing') return null;
+    if (snap.raceSeq !== (this.raceSeq & 255)) return null;
+    if (!this.grid.some(g => g.slot === snap.slot)) return null;
+    if (!Number.isFinite(snap.time)) return null;
+    for (const car of snap.cars) {
+      if (!this.grid.some(g => g.netId === car.netId && g.slot === snap.slot)) return null;
+      if (![car.x, car.y, car.z, car.qx, car.qy, car.qz, car.qw, car.vx, car.vy, car.vz, car.distance].every(Number.isFinite)) return null;
+    }
+    const out: number[] = [];
+    for (const slot of new Set(this.grid.map(g => g.slot))) {
+      const conn = this.connOf(slot);
+      if (slot !== snap.slot && conn !== null) out.push(conn);
+    }
+    return out;
   }
 
   view(): RoomView {

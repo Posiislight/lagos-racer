@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
-import { LOAD_TIMEOUT_MS, RECONNECT_GRACE_MS, ROOM_IDLE_MS, START_LEAD_MS, type ServerMessage } from '../src/net/protocol';
+import {
+  LOAD_TIMEOUT_MS,
+  RECONNECT_GRACE_MS,
+  ROOM_IDLE_MS,
+  START_LEAD_MS,
+  encodeSnapshot,
+  type CarState,
+  type ServerMessage,
+  type Snapshot,
+} from '../src/net/protocol';
 
 class FakePeer implements Peer {
   sent: (string | ArrayBuffer)[] = [];
@@ -424,5 +433,130 @@ describe('race start', () => {
     const { a } = pair();
     send(a.conn, { t: 'start' });
     expect(msgs(join(a.welcome.code).peer, 'error')[0].error).toBe('started');
+  });
+});
+
+describe('snapshot relay', () => {
+  const car = (netId: number, over: Partial<CarState> = {}): CarState => ({
+    netId, x: 1, y: 0.5, z: -3, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 12, distance: 40, laps: 0, flags: 0, ...over,
+  });
+  const snap = (slot: number, over: Partial<Snapshot> = {}): Snapshot => ({ slot, raceSeq: 1, time: 2.5, cars: [car(slot - 1)], ...over });
+  const binary = (peer: FakePeer) => peer.sent.filter((d): d is ArrayBuffer => typeof d !== 'string');
+
+  /** Three humans on the grid (slots 1-3, netIds 0-2) and a fourth who dropped before the start. */
+  function racers(phase: 'countdown' | 'racing' = 'racing') {
+    const a = create();
+    const b = join(a.welcome.code);
+    const c = join(a.welcome.code, 'Chidi');
+    const d = join(a.welcome.code, 'Dayo');
+    for (const p of [a, b, c, d]) send(p.conn, { t: 'lobby', ready: true });
+    server.close(d.conn);
+    send(a.conn, { t: 'start' });
+    for (const p of [a, b, c]) send(p.conn, { t: 'loaded' });
+    const room = server.rooms.get(a.welcome.code)!;
+    if (phase === 'racing') {
+      now += START_LEAD_MS;
+      server.tick();
+    }
+    expect(room.phase).toBe(phase);
+    const d2 = connect();
+    send(d2.conn, { t: 'resume', token: msgs(d.peer, 'welcome')[0].token });
+    return { a, b, c, d2, room };
+  }
+
+  it('forwards a valid snapshot byte-for-byte to the other racers only', () => {
+    for (const phase of ['countdown', 'racing'] as const) {
+      server = new RoomServer({ now: () => now });
+      const { a, b, c, d2 } = racers(phase);
+      const bytes = encodeSnapshot(snap(1));
+      server.message(a.conn, bytes);
+      for (const p of [b, c]) {
+        expect(binary(p.peer)).toHaveLength(1);
+        expect(new Uint8Array(binary(p.peer)[0])).toEqual(new Uint8Array(bytes));
+      }
+      expect(binary(a.peer)).toHaveLength(0);
+      expect(binary(d2.peer)).toHaveLength(0);
+    }
+  });
+
+  it('drops snapshots claiming another slot, another raceSeq, or a car the sender does not own', () => {
+    const { a, b, c } = racers();
+    server.message(a.conn, encodeSnapshot(snap(2)));
+    server.message(a.conn, encodeSnapshot(snap(1, { raceSeq: 2 })));
+    server.message(a.conn, encodeSnapshot(snap(1, { cars: [car(1)] })));
+    server.message(a.conn, encodeSnapshot(snap(1, { cars: [car(0), car(2)] })));
+    server.message(a.conn, encodeSnapshot(snap(1, { cars: [car(7)] })));
+    server.message(a.conn, new ArrayBuffer(3));
+    expect(binary(b.peer)).toHaveLength(0);
+    expect(binary(c.peer)).toHaveLength(0);
+  });
+
+  it('compares raceSeq modulo 256', () => {
+    const { a, b, room } = racers();
+    room.raceSeq = 257;
+    server.message(a.conn, encodeSnapshot(snap(1, { raceSeq: 257 })));
+    expect(binary(b.peer)).toHaveLength(1);
+    server.message(a.conn, encodeSnapshot(snap(1, { raceSeq: 256 })));
+    expect(binary(b.peer)).toHaveLength(1);
+  });
+
+  it('drops snapshots from a member who is not on the grid', () => {
+    const { a, d2 } = racers();
+    server.message(d2.conn, encodeSnapshot(snap(4, { cars: [] })));
+    expect(binary(a.peer)).toHaveLength(0);
+  });
+
+  // Quaternion and velocity are int16 on the wire, so only the float32 fields can decode as non-finite.
+  it('drops snapshots carrying NaN or infinite numbers', () => {
+    const { a, b } = racers();
+    for (const bad of [
+      snap(1, { time: NaN }),
+      snap(1, { cars: [car(0, { x: Infinity })] }),
+      snap(1, { cars: [car(0, { y: NaN })] }),
+      snap(1, { cars: [car(0, { z: -Infinity })] }),
+      snap(1, { cars: [car(0, { distance: Infinity })] }),
+    ]) server.message(a.conn, encodeSnapshot(bad));
+    expect(binary(b.peer)).toHaveLength(0);
+  });
+
+  it('drops snapshots in the lobby and while loading', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    server.message(a.conn, encodeSnapshot(snap(1)));
+    expect(binary(b.peer)).toHaveLength(0);
+
+    send(a.conn, { t: 'lobby', ready: true });
+    send(b.conn, { t: 'lobby', ready: true });
+    send(a.conn, { t: 'start' });
+    server.message(a.conn, encodeSnapshot(snap(1)));
+    expect(binary(b.peer)).toHaveLength(0);
+  });
+
+  it('does not let a connection outside a room relay anything', () => {
+    const { a } = racers();
+    const stranger = connect();
+    server.message(stranger.conn, encodeSnapshot(snap(1)));
+    expect(binary(a.peer)).toHaveLength(0);
+  });
+
+  it('counts relayed snapshots as activity, so a binary-only race is not reaped', () => {
+    const { a, b, room } = racers();
+    for (let i = 0; i < 11 * 60; i++) {
+      now += 1000;
+      server.message(a.conn, encodeSnapshot(snap(1)));
+      server.tick();
+    }
+    expect(server.rooms.has(room.code)).toBe(true);
+    expect(binary(b.peer)).toHaveLength(11 * 60);
+  });
+
+  it('does not count invalid snapshots or pings as activity', () => {
+    const { a, room } = racers();
+    now += ROOM_IDLE_MS - 1;
+    server.message(a.conn, encodeSnapshot(snap(2)));
+    send(a.conn, { t: 'ping', c: 1 });
+    now += 1;
+    server.tick();
+    expect(server.rooms.has(room.code)).toBe(false);
   });
 });

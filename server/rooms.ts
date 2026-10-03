@@ -5,6 +5,7 @@ import {
   RATE_LIMIT_PER_S,
   ROOM_IDLE_MS,
   cleanNick,
+  decodeSnapshot,
   normalizeCode,
   type ClientMessage,
   type ErrorCode,
@@ -99,7 +100,7 @@ export class RoomServer {
     if (!c) return;
     const bytes = typeof data === 'string' ? (data.length > MAX_MESSAGE_BYTES ? Infinity : Buffer.byteLength(data)) : data.byteLength;
     if (bytes > MAX_MESSAGE_BYTES || !this.withinRate(c)) return;
-    if (typeof data !== 'string') return;
+    if (typeof data !== 'string') return this.relay(c, data);
     const m = parse(data);
     if (!m) return;
 
@@ -150,6 +151,18 @@ export class RoomServer {
       c.windowCount = 0;
     }
     return ++c.windowCount <= RATE_LIMIT_PER_S;
+  }
+
+  /** Forwards a valid car snapshot, untouched, to the other racers. */
+  private relay(c: Conn, data: ArrayBuffer) {
+    const room = c.room;
+    if (!room) return;
+    const snap = decodeSnapshot(data);
+    if (!snap || snap.slot !== c.slot) return;
+    const targets = room.snapshotTargets(snap);
+    if (!targets) return;
+    room.lastActivity = this.now();
+    for (const id of targets) this.conns.get(id)?.peer.send(data);
   }
 
   private send(conn: number, msg: ServerMessage) {
