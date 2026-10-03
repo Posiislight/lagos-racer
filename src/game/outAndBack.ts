@@ -66,6 +66,23 @@ export function medianMask(track: Track, halfWidth: number, medianWidth: number)
   });
 }
 
+/**
+ * The lap span [s0, s1] covering axis range [d0, d1] on the leg next to the given street, in driving
+ * order (the north leg runs with the axis, the south leg against it). s1 may exceed the lap length
+ * when the span straddles the start line; sampleAt wraps.
+ */
+export function roadSpan(track: Track, axis: Axis, [d0, d1]: [number, number], street: 'north' | 'south', gap: number): [number, number] {
+  const a = roadToS(track, axis, d0, street, gap), b = roadToS(track, axis, d1, street, gap);
+  const s0 = street === 'north' ? a : b, s1 = street === 'north' ? b : a;
+  return [s0, s1 < s0 ? s1 + track.length : s1];
+}
+
+/** Per track sample: true inside axis range `range` on either leg. */
+export function roadRangeMask(track: Track, axis: Axis, range: [number, number], gap: number): boolean[] {
+  const spans = (['north', 'south'] as const).map(st => roadSpan(track, axis, range, st, gap));
+  return track.points.map(p => spans.some(([s0, s1]) => (p.s >= s0 && p.s <= s1) || (p.s + track.length >= s0 && p.s + track.length <= s1)));
+}
+
 /** Lap distance of the leg next to the given street, `d` metres along the axis. */
 export function roadToS(track: Track, axis: Axis, d: number, street: 'north' | 'south', gap: number): number {
   const a = axisPoint(axis, d), k = (street === 'north' ? 1 : -1) * gap / 2;

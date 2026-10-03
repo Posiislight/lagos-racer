@@ -4,7 +4,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SceneryZone, TrackConfig } from '../config/tracks';
-import { roadToS } from '../game/outAndBack';
+import { roadSpan, roadToS } from '../game/outAndBack';
 import { distanceToCentre, heightAt, sampleAt, type Track } from '../game/track';
 import { mergeStatic } from '../models/optimize';
 import { canvasTex, rng } from './trackGeometry';
@@ -69,7 +69,8 @@ class Atlas {
 type Spot = { x: number; y: number; z: number; yaw: number; s: number; side: number };
 type MatFn = (c: string, o?: Partial<{ roughness: number; metalness: number; emissive: string; side: typeof DoubleSide; shadow: boolean }>) => Material;
 
-export function buildScenery(cfg: TrackConfig, track: Track, density: number): Group {
+/** `median`: per track sample, whether the left side is the median (see medianMask), or null. */
+export function buildScenery(cfg: TrackConfig, track: Track, density: number, median: boolean[] | null = null): Group {
   const root = new Group();
   const r = rng(42);
   const mats = new Map<string, Material>();
@@ -94,11 +95,9 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number): G
   const onLap = (d: number, street: 'north' | 'south') => roadToS(track, cfg.axis!, d, street, gap);
   const zoneRange = (z: SceneryZone): { s0: number; s1: number; sides: number[] } => {
     if (!('road' in z)) return { s0: z.from * track.length, s1: z.to * track.length, sides: z.side === 0 ? [-1, 1] : [z.side] };
-    // The north leg runs with the axis, the south leg against it. A zone may straddle the start line,
-    // so s1 can run past the lap length (sampleAt wraps).
-    const a = onLap(z.road[0], z.street), b = onLap(z.road[1], z.street);
-    const s0 = z.street === 'north' ? a : b, s1 = z.street === 'north' ? b : a;
-    return { s0, s1: s1 < s0 ? s1 + track.length : s1, sides: [1] };
+    // Shops face the road on the right of each leg; the left is the median.
+    const [s0, s1] = roadSpan(track, cfg.axis!, z.road, z.street, gap);
+    return { s0, s1, sides: [1] };
   };
   // A bridge over an out-and-back road crosses both legs.
   const bridgeAt = cfg.bridges.map(b => b.road === undefined
@@ -360,23 +359,39 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number): G
   }
 
   // Concrete electricity poles with sagging wires along both sides (and now and then across).
-  poles(root, track, hw + 0.9, PAVE_Y, m, r);
+  const isMedian = (s: number) => !!median?.[sampleAt(track, s).index];
+  poles(root, track, hw + 0.9, PAVE_Y, m, r, median);
 
-  // Street lamps with banner ads, on the pavement.
+  // Street lamps with banner ads, on the pavement; on the median, down the middle with an arm over each leg.
   const lampPole = m('#6b6f73', { metalness: 0.6, roughness: 0.4 }), lampHead = m('#fff8d6', { emissive: '#fff1b0' });
+  const lamp = (sp: Spot, arm: number) => {
+    const g = new Group();
+    const p = cyl(0.09, 0.12, 9, lampPole, 6); p.position.y = 4.5; g.add(p);
+    [-1, 1].forEach(k => { g.add(box(0.1, 0.1, arm, lampPole, 0, 8.9, k * arm / 2)); g.add(box(0.5, 0.16, 0.7, lampHead, 0, 8.8, k * (arm - 0.1))); });
+    const banner = boards.plane(Math.floor(r() * BILLBOARDS.length), 1.6, 0.8); banner.position.set(0.12, 6.4, 0); banner.rotation.y = Math.PI / 2; g.add(banner);
+    place(g, sp, PAVE_Y);
+  };
   let flip = 1;
   for (let s = 12; s < track.length; s += 40 / Math.max(0.5, density)) {
     flip = -flip;
-    const sp = spot(s, flip, hw + 0.75);
-    const g = new Group();
-    const p = cyl(0.09, 0.12, 9, lampPole, 6); p.position.y = 4.5; g.add(p);
-    [-1, 1].forEach(k => { g.add(box(0.1, 0.1, 2.0, lampPole, 0, 8.9, k * 1.0)); g.add(box(0.5, 0.16, 0.7, lampHead, 0, 8.8, k * 1.9)); });
-    const banner = boards.plane(Math.floor(r() * BILLBOARDS.length), 1.6, 0.8); banner.position.set(0.12, 6.4, 0); banner.rotation.y = Math.PI / 2; g.add(banner);
-    place(g, sp, PAVE_Y);
+    if (flip < 0 && isMedian(s)) continue;
+    lamp(spot(s, flip, hw + 0.75), 2.0);
+  }
+  if (median && cfg.median) {
+    // Both legs border the median: place each lamp once.
+    const placed: Spot[] = [];
+    for (let s = 6; s < track.length; s += 30 / Math.max(0.5, density)) {
+      if (!isMedian(s)) continue;
+      const sp = spot(s, -1, hw + cfg.median.width / 2);
+      if (placed.some(q => Math.hypot(q.x - sp.x, q.z - sp.z) < 12)) continue;
+      placed.push(sp);
+      lamp(sp, 4.0);
+    }
   }
 
-  // Spectators on the pavement at the start line.
+  // Spectators on the pavement at the start line (not on the median).
   for (const side of [-1, 1]) for (let k = 0; k < 14 * density; k++) {
+    if (side < 0 && isMedian(0)) break;
     const p = spot(-14 + k * 2.2 + r(), side, hw + 1.1 + r() * 1.8); person(p.x, p.y + PAVE_Y, p.z);
   }
 
@@ -418,12 +433,15 @@ function horizonRing(track: Track) {
  * Concrete poles along both pavements, with wires sagging between neighbours (thin boxes, so they
  * merge with everything else), and every third pair joined by a wire across the road.
  */
-function poles(root: Group, track: Track, offset: number, lift: number, m: MatFn, r: () => number) {
+function poles(root: Group, track: Track, offset: number, lift: number, m: MatFn, r: () => number, median: boolean[] | null) {
   const concrete = m('#a9a59c', { roughness: 0.9 }), wire = m('#1a1a1a', { roughness: 0.8 });
   const span = 26, H = 9.2, tops: Vector3[][] = [[], []];
   for (let s = 6, i = 0; s < track.length - span / 2; s += span, i++) {
     const at = sampleAt(track, s + (r() - 0.5) * 3);
+    // No poles on the median side, and so no wires across the road there either.
+    const left = !median?.[at.index];
     [-1, 1].forEach((side, k) => {
+      if (side < 0 && !left) return;
       const x = at.pos.x + at.right.x * offset * side, z = at.pos.z + at.right.z * offset * side, y = at.pos.y + lift;
       const g = new Group();
       const p = new Mesh(new CylinderGeometry(0.1, 0.16, H, 6), concrete); p.position.y = H / 2; g.add(p);
@@ -432,7 +450,7 @@ function poles(root: Group, track: Track, offset: number, lift: number, m: MatFn
       root.add(g);
       tops[k].push(new Vector3(x, y + H - 0.35, z));
       // Every third pair of poles gets a wire across the road.
-      if (i % 3 === 1 && k === 1) wireBetween(root, tops[0][tops[0].length - 1], tops[1][tops[1].length - 1], 1.2, wire);
+      if (i % 3 === 1 && k === 1 && left) wireBetween(root, tops[0][tops[0].length - 1], tops[1][tops[1].length - 1], 1.2, wire);
     });
   }
   for (const list of tops) for (let i = 0; i < list.length; i++) {

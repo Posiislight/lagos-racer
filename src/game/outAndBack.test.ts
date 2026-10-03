@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt, type Track } from './track';
-import { medianMask, outAndBack, roadToS } from './outAndBack';
+import { medianMask, outAndBack, roadSpan, roadToS } from './outAndBack';
+import { ribbon } from '../scene/trackGeometry';
 
 // A straight road heading west (-x). The right of travel is north (-z), so the westbound leg is at z < 0.
 const axis: [number, number][] = [[0, 0], [-50, 0], [-100, 0], [-150, 0], [-200, 0]];
@@ -56,6 +57,25 @@ describe('out and back', () => {
     expect(Math.hypot(n.x + 100, n.z + 7.3)).toBeLessThan(0.5);
     const s = sampleAt(track, roadToS(track, axis, 100, 'south', 14.6)).pos;
     expect(Math.hypot(s.x + 100, s.z - 7.3)).toBeLessThan(0.5);
+  });
+
+  it('turns a road range into a lap span on each leg, in driving order', () => {
+    const [n0, n1] = roadSpan(track, axis, [60, 100], 'north', 14.6);
+    expect(n1 - n0).toBeCloseTo(40, 0);
+    expect(sampleAt(track, n0).pos.x).toBeCloseTo(-60, 0);
+    const [s0, s1] = roadSpan(track, axis, [60, 100], 'south', 14.6);
+    expect(s1 - s0).toBeCloseTo(40, 0);
+    expect(sampleAt(track, s0).pos.x).toBeCloseTo(-100, 0);
+    // A range straddling the start line wraps past the lap length.
+    const [w0, w1] = roadSpan(track, axis, [30, 50], 'north', 14.6);
+    expect(w1).toBeGreaterThan(track.length);
+    expect(w1 - w0).toBeCloseTo(20, 0);
+  });
+
+  it('ribbon with a mask only builds the masked stretches', () => {
+    const mask = track.points.map((_, i) => i % 2 === 0);
+    const g = ribbon(track, -7, -6.5, 0, 1, mask);
+    expect(g.index!.count).toBe(6 * mask.filter(Boolean).length);
   });
 
   it('matches heights across the median', () => {

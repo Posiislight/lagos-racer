@@ -3,8 +3,9 @@ import { CuboidCollider, RigidBody, TrimeshCollider } from '@react-three/rapier'
 import { Mesh, MeshStandardMaterial, PlaneGeometry, type Texture } from 'three';
 import type { TrackConfig } from '../config/tracks';
 import { sampleAt, type Track as TrackData } from '../game/track';
+import { medianMask, roadRangeMask } from '../game/outAndBack';
 import {
-  asphaltTexture, canvasTex, groundTexture, kerbConcreteTexture, ribbon, surfaceCollider, sweep, terrainGeometry, wallBoxes,
+  asphaltTexture, canvasTex, groundTexture, kerbConcreteTexture, ribbon, stripeTexture, surfaceCollider, sweep, terrainGeometry, wallBoxes,
 } from './trackGeometry';
 import { KERB, PAVEMENT, buildScenery } from './scenery';
 import { pavementTexture } from './art/textures';
@@ -22,17 +23,29 @@ export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackD
     const hw = cfg.halfWidth;
     const tex = { road: asphaltTexture(), kerb: kerbConcreteTexture(), ground: groundTexture(cfg.ground), pave: pavementTexture() };
     const mat = (map: Texture, o: Partial<MeshStandardMaterial> = {}) => new MeshStandardMaterial({ map, roughness: 0.9, ...o });
+    // Out-and-back roads: where the other leg runs alongside, the left edge is a painted median
+    // (black and white, red and white on one stretch) instead of pavement. Each leg draws its half.
+    const median = cfg.median ? medianMask(track, hw, cfg.median.width) : null;
+    const notMedian = median?.map(m => !m);
+    const redWhite = median && cfg.median?.redWhite && cfg.axis ? roadRangeMask(track, cfg.axis, cfg.median.redWhite, 2 * hw + cfg.median.width) : null;
+    const bw = median?.map((m, i) => m && !redWhite?.[i]), rw = median?.map((m, i) => m && !!redWhite?.[i]);
+    const medianParts = median && cfg.median ? [
+      new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, bw), mat(stripeTexture('#f5f5f0', '#1d1d1d'), { roughness: 0.6 })),
+      new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, rw), mat(stripeTexture('#f5f5f0', '#c62828'), { roughness: 0.6 })),
+      new Mesh(ribbon(track, -(hw + KERB), -(hw + cfg.median.width / 2), 0.18, 3, median), mat(tex.kerb)),
+    ] : [];
     return {
       road: new Mesh(ribbon(track, -hw, hw, 0.02, 14), mat(tex.road, { roughness: 0.85 })),
-      kerbL: new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3), mat(tex.kerb)),
+      kerbL: new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, notMedian), mat(tex.kerb)),
       kerbR: new Mesh(sweep(track, hw, 1, KERB_PROFILE, 3), mat(tex.kerb)),
+      medianParts,
       // Pavement: gutter next to the kerb, out to the shop fronts.
-      paveL: new Mesh(ribbon(track, -(hw + KERB), -(hw + PAVEMENT + 0.6), 0.18, 6), mat(tex.pave)),
+      paveL: new Mesh(ribbon(track, -(hw + KERB), -(hw + PAVEMENT + 0.6), 0.18, 6, notMedian), mat(tex.pave)),
       paveR: new Mesh(ribbon(track, hw + KERB, hw + PAVEMENT + 0.6, 0.18, 6), mat(tex.pave)),
       ground: new Mesh(terrainGeometry(track, hw), mat(tex.ground, { roughness: 1 })),
       surface: surfaceCollider(track, -hw - 1.5, hw + 1.5),
       walls: [...wallBoxes(track, -(hw + 0.35)), ...wallBoxes(track, hw + 0.35)],
-      scenery: buildScenery(cfg, track, density),
+      scenery: buildScenery(cfg, track, density, median),
       startLine: startLine(cfg, track),
     };
   }, [cfg, track, density]);
@@ -51,6 +64,7 @@ export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackD
       <primitive object={shadowy(parts.kerbR)} />
       <primitive object={shadowy(parts.paveL)} />
       <primitive object={shadowy(parts.paveR)} />
+      {parts.medianParts.map((m, i) => <primitive key={i} object={shadowy(m)} />)}
       <primitive object={parts.startLine} />
       <primitive object={parts.scenery} />
       <RigidBody type="fixed" colliders={false} friction={0.9}>

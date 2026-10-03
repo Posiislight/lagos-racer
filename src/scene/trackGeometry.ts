@@ -26,7 +26,7 @@ export function rng(seed: number) {
  * metres, with `across` measured outwards from `offset` (side = 1 right, -1 left). U runs along the
  * profile (0..1), V along the track in units of `vLength` metres.
  */
-export function sweep(track: Track, offset: number, side: 1 | -1, profile: [number, number][], vLength: number): BufferGeometry {
+export function sweep(track: Track, offset: number, side: 1 | -1, profile: [number, number][], vLength: number, mask?: boolean[]): BufferGeometry {
   const pts = track.points, n = pts.length, m = profile.length;
   const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   let pLen = 0;
@@ -40,6 +40,7 @@ export function sweep(track: Track, offset: number, side: 1 | -1, profile: [numb
     }
   }
   for (let i = 0; i < n; i++) for (let j = 0; j < m - 1; j++) {
+    if (mask && !mask[i]) continue;
     const a = i * m + j, b = a + 1, c = a + m, d = c + 1;
     // Profiles run inner-bottom, over the top, to outer-bottom; wind so faces point out of the solid.
     if (side > 0) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
@@ -52,8 +53,11 @@ export function sweep(track: Track, offset: number, side: 1 | -1, profile: [numb
   return g;
 }
 
-/** Flat ribbon between two signed lateral offsets (negative = left), at height y. */
-export function ribbon(track: Track, from: number, to: number, y: number, vLength: number): BufferGeometry {
+/**
+ * Flat ribbon between two signed lateral offsets (negative = left), at height y. With a mask, only the
+ * stretches from sample i to i+1 where mask[i] is true are built.
+ */
+export function ribbon(track: Track, from: number, to: number, y: number, vLength: number, mask?: boolean[]): BufferGeometry {
   const pts = track.points, n = pts.length;
   const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   for (let i = 0; i <= n; i++) {
@@ -63,14 +67,14 @@ export function ribbon(track: Track, from: number, to: number, y: number, vLengt
       uv.push(u, s / vLength);
     }
   }
-  for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  for (let i = 0; i < n; i++) { if (mask && !mask[i]) continue; const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   const g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   // Make sure the ribbon faces up whichever way the offsets were given.
-  if (g.attributes.normal.getY(0) < 0) { g.setIndex(idx.map((_, i, a) => a[i - (i % 3) + [0, 2, 1][i % 3]])); g.computeVertexNormals(); }
+  if (idx.length && g.attributes.normal.getY(idx[0]) < 0) { g.setIndex(idx.map((_, i, a) => a[i - (i % 3) + [0, 2, 1][i % 3]])); g.computeVertexNormals(); }
   return g;
 }
 
@@ -189,10 +193,13 @@ export function asphaltTexture() {
   }, true);
 }
 
-export function kerbTexture() {
+export const kerbTexture = () => stripeTexture('#f2c200', '#1d1d1d');
+
+/** Painted kerb stripes, two colours alternating along the road (Lagos medians: black and white, or red and white). */
+export function stripeTexture(a: string, b: string) {
   return canvasTex(64, 128, (x, w, h) => {
-    x.fillStyle = '#f2c200'; x.fillRect(0, 0, w, h / 2);
-    x.fillStyle = '#1d1d1d'; x.fillRect(0, h / 2, w, h / 2);
+    x.fillStyle = a; x.fillRect(0, 0, w, h / 2);
+    x.fillStyle = b; x.fillRect(0, h / 2, w, h / 2);
     x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(0, 0, w * 0.25, h);
   }, true);
 }
