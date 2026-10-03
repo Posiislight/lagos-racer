@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CuboidCollider, RigidBody, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
+import { RigidBody, RoundCuboidCollider, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
   AdditiveBlending, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Quaternion, SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
 import { getRace, type Racer } from '../game/runtime';
+import { bumpShove } from '../game/bump';
 import { sampleAt } from '../game/track';
 import { resyncProgress } from '../game/race';
 import { playHorn } from '../game/audio';
@@ -24,6 +25,8 @@ function layout(racer: Racer) {
   return {
     half: [chassis.length * s / 2, chassis.height * s / 2, chassis.width * s / 2] as [number, number, number],
     originY, connectY, R, L,
+    /** Collider edge rounding: half the narrower of length and width. */
+    round: Math.min(chassis.length, chassis.width) * s / 4,
     wheels: [
       [wheels.frontX * s, -wheels.frontZ * s], [wheels.frontX * s, wheels.frontZ * s],
       [wheels.rearX * s, -wheels.rearZ * s], [wheels.rearX * s, wheels.rearZ * s],
@@ -39,7 +42,16 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
   const { world } = useRapier();
   const lay = useMemo(() => layout(racer), [racer]);
   const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, merge]);
-  const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0 });
+  const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0 });
+  /** Shove this racer away from another one it's touching. */
+  const shove = (other: Racer) => {
+    const b = body.current, ob = other.body;
+    if (!b || !ob) return;
+    const t = b.translation(), lv = b.linvel(), ot = ob.translation(), ov = ob.linvel();
+    const s = bumpShove({ x: t.x, z: t.z, vx: lv.x, vz: lv.z, mass: racer.vehicle.tuning.mass }, { x: ot.x, z: ot.z, vx: ov.x, vz: ov.z, mass: other.vehicle.tuning.mass });
+    racer.bump.x += s.x; racer.bump.z += s.z;
+    state.current.bumpCooldown = 0.25;
+  };
   const fx = useMemo(() => effectMeshes(lay), [lay]);
 
   useEffect(() => {
@@ -77,6 +89,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     const dt = w.timestep, t = racer.vehicle.tuning, c = racer.controls;
 
     if (racer.respawn || b.translation().y < race.track.points[racer.progress.index].pos.y - 5) { respawn(racer, b); racer.respawn = false; return; }
+
+    // Still pressed against another vehicle: keep pushing apart a few times a second.
+    const st = state.current;
+    st.bumpCooldown -= dt;
+    if (racer.touching.size && st.bumpCooldown <= 0) for (const id of racer.touching) { const o = race.racers.find(r => r.id === id); if (o) shove(o); }
 
     const v = vc.currentVehicleSpeed();
     racer.speed = v;
@@ -133,8 +150,9 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       const k = Math.min(1, t.yawAssist * dt * 4 * (slippy ? 0.35 : 1));
       b.setAngvel({ x: ang.x, y: ang.y + (want - ang.y) * k, z: ang.z }, true);
 
-      // Kill most sideways slide (arcade grip) unless drifting.
-      _v.set(lin.x, 0, lin.z);
+      // Kill most sideways slide (arcade grip) unless drifting. A bump's shove is taken out first and
+      // put back afterwards, so the grip can't cancel it and bumped vehicles really move apart.
+      _v.set(lin.x - racer.bump.x, 0, lin.z - racer.bump.z);
       const fwdSpeed = _v.dot(_fwd);
       const side = _v.clone().addScaledVector(_fwd, -fwdSpeed);
       const keep = slippy ? 0.985 : c.handbrake ? 0.97 : 0.86;
@@ -151,13 +169,17 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       const reach = Math.abs(racer.progress.lateral) + lay.half[2] * along + lay.half[0] * across;
       racer.scraping = reach > race.config.halfWidth + 0.28;
       if (racer.scraping) { const drag = Math.pow(0.55, dt); nx *= drag; nz *= drag; }
-      b.setLinvel({ x: nx, y: lin.y, z: nz }, true);
+      b.setLinvel({ x: nx + racer.bump.x, y: lin.y, z: nz + racer.bump.z }, true);
       // Fuel: a push from behind on top of the extra engine power.
       if (boosting && v < t.topSpeed * 1.3) b.applyImpulse({ x: _fwd.x * t.mass * 9 * dt, y: 0, z: _fwd.z * t.mass * 9 * dt }, true);
 
       // A little downforce keeps the wheels planted over kerbs.
       b.applyImpulse({ x: 0, y: -t.mass * 0.03 * Math.abs(v) * dt, z: 0 }, true);
     }
+    // The shove fades out over about 0.4 s.
+    const fade = Math.exp(-dt / 0.13);
+    racer.bump.x *= fade; racer.bump.z *= fade;
+    if (Math.hypot(racer.bump.x, racer.bump.z) < 0.05) racer.bump.x = racer.bump.z = 0;
   });
 
   useFrame((st, dtRaw) => {
@@ -228,14 +250,20 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
         if (ud.wall) {
           racer.knock = Math.max(racer.knock, 0.06 + 0.4 * headOn);
         } else if (ud.racer !== undefined) {
-          // The lighter vehicle comes off worse.
+          // The lighter vehicle comes off worse: a little speed lost, and a shove away from the other.
           const o = getRace()?.racers.find(r => r.id === ud.racer);
           const share = o ? o.vehicle.tuning.mass / (o.vehicle.tuning.mass + racer.vehicle.tuning.mass) : 0.5;
-          racer.knock = Math.max(racer.knock, (0.05 + 0.2 * headOn) * share * 2);
+          racer.knock = Math.max(racer.knock, (0.03 + 0.12 * headOn) * share * 2);
+          if (o) { racer.touching.add(o.id); shove(o); }
         }
       }}
+      onCollisionExit={({ other }) => {
+        const ud = other.rigidBody?.userData as { racer?: number } | undefined;
+        if (ud?.racer !== undefined) racer.touching.delete(ud.racer);
+      }}
     >
-      <CuboidCollider args={lay.half} mass={racer.vehicle.tuning.mass} friction={0.2} restitution={0.25} />
+      {/* Rounded edges let vehicles slide off each other instead of locking corners. */}
+      <RoundCuboidCollider args={[lay.half[0] - lay.round, lay.half[1] - lay.round, lay.half[2] - lay.round, lay.round]} mass={racer.vehicle.tuning.mass} friction={0.2} restitution={0.25} />
       <group ref={visual}>
         <group position={[0, -lay.originY, 0]}>
           <group ref={tilt} position={[0, lay.originY * 0.4, 0]}>
@@ -262,6 +290,7 @@ export function respawn(racer: Racer, b: RapierRigidBody) {
   b.setLinvel({ x: 0, y: 0, z: 0 }, true);
   b.setAngvel({ x: 0, y: 0, z: 0 }, true);
   racer.scraping = false;
+  racer.bump.x = racer.bump.z = 0;
   resyncProgress(race.track, racer.progress, x, z);
 }
 
