@@ -18,6 +18,21 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-03-multiplayer-design.md` (read it first; this plan argues from it).
 
+## Depends on the Ojuelegba Road work
+
+`docs/superpowers/specs/2026-10-03-ojuelegba-road-track-design.md`, from a parallel session, changes things this
+plan touches. Execute this plan after that work lands, and check these points against the merged code:
+
+- **Four vehicles with paint.** `VehicleId` becomes `okada | keke | danfo | brt`. Add `paint` (whatever type
+  that work defines) next to `vehicle` in `PlayerInfo`, `GridEntry`, `NetResult` and the `lobby` / `create` /
+  `join` messages, and pass it into `makeRace`. With six grid slots and four vehicles, AI vehicles repeat;
+  `buildGrid` gives a repeated AI vehicle a different paint.
+- **Out-and-back track with a median.** `trackRemote` (Task 10) and `Referee.observe` (Task 14) must
+  project using the same leg-aware rule as `updateProgress`, so a remote car is never snapped onto the
+  other leg. Add one test for each, at a point where the two legs run side by side.
+- **Bump shove.** This stays local to each car, as this plan assumes. No change is needed, but recheck
+  Task 12's bump test in the browser.
+
 ## Global Constraints
 
 - Single-player must behave exactly as before. When `race.net` is null, every changed function takes its old path, and `npm test` stays green after every task.
