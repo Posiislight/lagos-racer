@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CuboidCollider, RigidBody, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
+import { CuboidCollider, RigidBody, useAfterPhysicsStep, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
   AdditiveBlending, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Object3D, Quaternion, SphereGeometry, Vector3,
@@ -11,6 +11,7 @@ import { sampleAt } from '../game/track';
 import { resyncProgress } from '../game/race';
 import { playHorn } from '../game/audio';
 import type { Pose } from '../net/interpolation';
+import { clampContactSpeed } from '../game/contact';
 import { NameTag } from './NameTag';
 
 const G = 9.81;
@@ -18,6 +19,8 @@ const _q = new Quaternion(), _fwd = new Vector3(), _v = new Vector3();
 // Reused every physics step for remote cars, so following them allocates nothing.
 const _pose: Pose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 0 };
 const _rot = { x: 0, y: 0, z: 0, w: 1 }, _away = { x: 0, y: -200, z: 0 };
+let _touching = false;
+const _onManifold = (m: { numContacts(): number }) => { if (m.numContacts() > 0) _touching = true; };
 
 /** Physical layout derived from the vehicle config, in metres after scaling. */
 function layout(racer: Racer) {
@@ -51,6 +54,8 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
   const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0 });
   const fx = useMemo(() => effectMeshes(lay), [lay]);
   const [dropped, setDropped] = useState(false);
+  // Touching another phone's car: our speed when the contact began, so its push can be capped.
+  const push = useRef({ pre: 0, touching: false, before: 0 });
 
   useEffect(() => {
     const b = body.current;
@@ -91,6 +96,8 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     const vc = controller.current, b = body.current, race = getRace();
     if (!vc || !b || !race) return;
     const dt = w.timestep, t = racer.vehicle.tuning, c = racer.controls;
+    const lv0 = b.linvel();
+    push.current.pre = Math.hypot(lv0.x, lv0.z);
 
     if (racer.respawn || b.translation().y < race.track.points[racer.progress.index].pos.y - 5) { respawn(racer, b); racer.respawn = false; return; }
 
@@ -176,6 +183,26 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     }
   });
 
+  // A remote car is kinematic, so it shoves us as if it weighed a million tonnes: cap that push.
+  // Checked straight after the step (collision events only arrive once per frame).
+  useAfterPhysicsStep(w => {
+    const b = body.current, race = getRace();
+    if (remote || !b || !race?.net) return;
+    const mine = b.collider(0);
+    let remoteSpeed = -1;
+    for (const o of race.racers) {
+      if (o.kind !== 'remote' || !o.body) continue;
+      _touching = false;
+      w.contactPair(mine, o.body.collider(0), _onManifold);
+      if (_touching) remoteSpeed = Math.max(remoteSpeed, Math.abs(o.speed));
+    }
+    const p = push.current;
+    if (remoteSpeed < 0) { p.touching = false; return; }
+    if (!p.touching) { p.touching = true; p.before = p.pre; }
+    const lv = b.linvel(), out = clampContactSpeed(lv.x, lv.z, p.before, remoteSpeed);
+    if (out.vx !== lv.x || out.vz !== lv.z) b.setLinvel({ x: out.vx, y: lv.y, z: out.vz }, true);
+  });
+
   useFrame((st, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05), s = state.current, t = racer.vehicle.tuning;
     const b = body.current;
@@ -238,6 +265,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
       canSleep={false}
       userData={{ racer: racer.id }}
       onCollisionEnter={({ other, manifold }) => {
+        if (remote) return; // another phone works out its own knocks
         const ud = other.rigidBody?.userData as { wall?: boolean; racer?: number } | undefined;
         const lv = body.current?.linvel();
         if (!ud || !lv) return;
