@@ -1,0 +1,13 @@
+{
+  "vehicle": "okada",
+  "meshes": 168,
+  "drawCalls": 202,
+  "triangles": 61400,
+  "geometries": 169,
+  "textures": 11,
+  "files": [
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\okada\\hero.png",
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\okada\\rearq.png"
+  ],
+  "errors": []
+}

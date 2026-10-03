@@ -1,0 +1,58 @@
+import { Suspense, useEffect, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { ACESFilmicToneMapping } from 'three';
+import { useGame } from '../game/store';
+import { getRace } from '../game/runtime';
+import { RaceScene } from '../scene/RaceScene';
+import { Hud } from './Hud';
+import { TouchControls, useIsTouch } from './TouchControls';
+import { Results } from './Results';
+import { PauseMenu } from './PauseMenu';
+import { Loading } from '../App';
+
+const DPR = { low: [0.75, 1], medium: [1, 1.5], high: [1, 2] } as const;
+
+export default function Race() {
+  const quality = useGame(s => s.settings.quality);
+  const paused = useGame(s => s.paused);
+  const results = useGame(s => s.results);
+  const setPaused = useGame(s => s.setPaused);
+  const touch = useIsTouch();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') { const s = useGame.getState(); if (!s.results) s.setPaused(!s.paused); }
+    };
+    const onHide = () => { if (document.hidden && !useGame.getState().results) useGame.getState().setPaused(true); };
+    window.addEventListener('keydown', onKey);
+    document.addEventListener('visibilitychange', onHide);
+    return () => { window.removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onHide); };
+  }, []);
+
+  return (
+    <div className="race">
+      <Canvas
+        className="race-canvas"
+        shadows={quality !== 'low'}
+        dpr={[...DPR[quality]]}
+        gl={{ antialias: quality !== 'low', powerPreference: 'high-performance', toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
+        camera={{ fov: 62, near: 0.2, far: 2000, position: [0, 5, 10] }}
+        onCreated={state => {
+          setReady(true);
+          // Dev-only handle for play-testing scripts and the console.
+          if (import.meta.env.DEV) (window as unknown as { __lr: unknown }).__lr = { state, getRace, useGame };
+        }}
+      >
+        <Suspense fallback={null}>
+          <RaceScene />
+        </Suspense>
+      </Canvas>
+      {!ready && <Loading />}
+      <Hud onPause={() => setPaused(true)} />
+      {touch && !results && <TouchControls />}
+      {paused && !results && <PauseMenu />}
+      {results && <Results />}
+    </div>
+  );
+}

@@ -1,0 +1,13 @@
+{
+  "vehicle": "danfo",
+  "meshes": 176,
+  "drawCalls": 216,
+  "triangles": 96744,
+  "geometries": 170,
+  "textures": 9,
+  "files": [
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\danfo\\hero.png",
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\danfo\\rearq.png"
+  ],
+  "errors": []
+}

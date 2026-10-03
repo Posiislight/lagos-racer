@@ -1,0 +1,13 @@
+{
+  "vehicle": "brt-blue",
+  "meshes": 101,
+  "drawCalls": 174,
+  "triangles": 93308,
+  "geometries": 109,
+  "textures": 8,
+  "files": [
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\brt-blue\\hero.png",
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\brt-blue\\rearq.png"
+  ],
+  "errors": []
+}

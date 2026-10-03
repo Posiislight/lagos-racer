@@ -1,0 +1,13 @@
+{
+  "vehicle": "keke",
+  "meshes": 226,
+  "drawCalls": 260,
+  "triangles": 115580,
+  "geometries": 166,
+  "textures": 9,
+  "files": [
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\keke\\hero.png",
+    "C:\\Users\\adele\\lagos-racer\\reference\\sporty\\shots\\_baseline\\keke\\rearq.png"
+  ],
+  "errors": []
+}
