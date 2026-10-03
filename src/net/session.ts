@@ -3,7 +3,7 @@ import type { Hazard, NetHooks, RaceRuntime, Racer } from '../game/runtime';
 import type { OnlineSetup } from '../game/setup';
 import type { ClockSync } from './clock';
 import type { NetLink } from './connection';
-import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState } from './protocol';
+import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ServerMessage } from './protocol';
 
 export class NetSession implements NetHooks {
   readonly raceSeq: number;
@@ -88,9 +88,40 @@ export class NetSession implements NetHooks {
     }
   }
 
-  // Items and the finish go over the wire from Task 10 on.
-  pickup(_orb: number) {}
-  use(_h: Hazard) {}
-  hit(_hazardId: number, _victim: number) {}
+  /**
+   * Another phone's pickup, throw or hit. The victim's phone decides hits, so a hit here only
+   * tidies up the hazard; the victim's slowdown or slide arrives in its snapshots.
+   */
+  onEvent(m: ServerMessage) {
+    const race = this.race;
+    if (!race) return;
+    if (m.t === 'pickup') {
+      const orb = race.pickups.find(p => p.id === m.orb);
+      if (orb) orb.respawn = 3;
+    } else if (m.t === 'use') {
+      if (!race.hazards.some(h => h.id === m.hazard.id)) race.hazards.push({ ...m.hazard });
+    } else if (m.t === 'hit') {
+      const h = race.hazards.find(x => x.id === m.hazard);
+      if (!h) return;
+      if (h.kind === 'juju') {
+        race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: 'juju' });
+        h.life = 0;
+      } else h.life = Math.min(h.life, 8);
+    }
+  }
+
+  pickup(orb: number) {
+    this.link.sendJson({ t: 'pickup', orb });
+  }
+
+  use(h: Hazard) {
+    this.link.sendJson({ t: 'use', hazard: { ...h } });
+  }
+
+  hit(hazard: number, netId: number) {
+    this.link.sendJson({ t: 'hit', hazard, netId });
+  }
+
+  // The finish goes over the wire with the referee.
   finish(_r: Racer) {}
 }

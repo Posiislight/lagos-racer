@@ -3,6 +3,7 @@ import {
   MAX_HUMANS,
   RECONNECT_GRACE_MS,
   START_LEAD_MS,
+  type ClientMessage,
   type ErrorCode,
   type GridEntry,
   type PlayerInfo,
@@ -185,13 +186,36 @@ export class Room {
     if (!this.grid.some(g => g.slot === snap.slot)) return null;
     if (!Number.isFinite(snap.time)) return null;
     for (const car of snap.cars) {
-      if (!this.grid.some(g => g.netId === car.netId && g.slot === snap.slot)) return null;
+      if (!this.owns(snap.slot, car.netId)) return null;
       if (![car.x, car.y, car.z, car.qx, car.qy, car.qz, car.qw, car.vx, car.vy, car.vz, car.distance].every(Number.isFinite)) return null;
     }
+    return this.othersOnGrid(snap.slot);
+  }
+
+  /**
+   * Who should hear about this pickup, throw or hit, or null if it must be dropped. Only while racing, only from
+   * a grid human, hazards only from the sender's id block and cars, and hits only on the sender's own cars.
+   */
+  eventTargets(slot: number, m: Extract<ClientMessage, { t: 'pickup' | 'use' | 'hit' }>): number[] | null {
+    if (this.phase !== 'racing' || !this.grid.some(g => g.slot === slot)) return null;
+    if (m.t === 'use') {
+      const h = m.hazard;
+      if (h.id < slot * 100000 || h.id >= (slot + 1) * 100000 || !this.owns(slot, h.owner)) return null;
+      if (h.target !== null && !this.grid.some(g => g.netId === h.target)) return null;
+    } else if (m.t === 'hit' && !this.owns(slot, m.netId)) return null;
+    return this.othersOnGrid(slot);
+  }
+
+  private owns(slot: number, netId: number) {
+    return this.grid.some(g => g.netId === netId && g.slot === slot);
+  }
+
+  /** Connections of the grid humans other than this slot. */
+  private othersOnGrid(slot: number): number[] {
     const out: number[] = [];
-    for (const slot of new Set(this.grid.map(g => g.slot))) {
-      const conn = this.connOf(slot);
-      if (slot !== snap.slot && conn !== null) out.push(conn);
+    for (const s of new Set(this.grid.map(g => g.slot))) {
+      const conn = this.connOf(s);
+      if (s !== slot && conn !== null) out.push(conn);
     }
     return out;
   }

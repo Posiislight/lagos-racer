@@ -188,6 +188,11 @@ export const useNet = create<NetState>((set, get) => {
       case 'start':
         if (session?.raceSeq === m.raceSeq) session.setStart(m.at);
         break;
+      case 'pickup':
+      case 'use':
+      case 'hit':
+        session?.onEvent(m);
+        break;
       default:
         break;
     }

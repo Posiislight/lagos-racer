@@ -11,6 +11,7 @@ import {
   type ErrorCode,
   type ServerMessage,
 } from '../src/net/protocol';
+import type { Hazard } from '../src/game/runtime';
 import type { VehicleId } from '../src/config/vehicles';
 import { Room, type LobbyChange } from './room';
 
@@ -19,7 +20,7 @@ export interface Peer {
   close(): void;
 }
 
-type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' }>;
+type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' }>;
 
 type Conn = {
   peer: Peer;
@@ -35,6 +36,23 @@ const VEHICLE_IDS: Record<VehicleId, true> = { okada: true, 'okada-blue': true, 
 const CODE_SPACE = CODE_ALPHABET.length ** 4;
 
 const isVehicle = (v: unknown): v is VehicleId => typeof v === 'string' && Object.hasOwn(VEHICLE_IDS, v);
+
+const HAZARD_NUMBERS = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'armed', 'ground'] as const;
+
+/** A well-formed hazard, rebuilt field by field so nothing extra is relayed. Who may send it is the room's call. */
+function parseHazard(v: unknown): Hazard | null {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (!Number.isInteger(o.id) || !Number.isInteger(o.owner)) return null;
+  if (o.kind !== 'oil' && o.kind !== 'juju') return null;
+  if (o.target !== null && !Number.isInteger(o.target)) return null;
+  if (!HAZARD_NUMBERS.every(k => typeof o[k] === 'number' && Number.isFinite(o[k]))) return null;
+  const n = o as Record<(typeof HAZARD_NUMBERS)[number], number>;
+  return {
+    id: o.id as number, kind: o.kind, owner: o.owner as number, target: o.target as number | null,
+    x: n.x, y: n.y, z: n.z, vx: n.vx, vy: n.vy, vz: n.vz, life: n.life, armed: n.armed, ground: n.ground,
+  };
+}
 
 function parse(raw: string): Handled | null {
   let m: unknown;
@@ -69,6 +87,14 @@ function parse(raw: string): Handled | null {
       return { t: 'start' };
     case 'loaded':
       return { t: 'loaded' };
+    case 'pickup':
+      return Number.isInteger(o.orb) && (o.orb as number) >= 0 ? { t: 'pickup', orb: o.orb as number } : null;
+    case 'use': {
+      const hazard = parseHazard(o.hazard);
+      return hazard ? { t: 'use', hazard } : null;
+    }
+    case 'hit':
+      return Number.isInteger(o.hazard) && Number.isInteger(o.netId) ? { t: 'hit', hazard: o.hazard as number, netId: o.netId as number } : null;
     default:
       return null;
   }
@@ -115,6 +141,7 @@ export class RoomServer {
 
     const room = c.room;
     if (!room) return;
+    if (m.t === 'pickup' || m.t === 'use' || m.t === 'hit') return this.relayEvent(c, room, m);
     room.lastActivity = this.now();
     if (m.t === 'leave') this.leave(c, room);
     else if (m.t === 'lobby') this.lobby(conn, c, room, m);
@@ -163,6 +190,15 @@ export class RoomServer {
     if (!targets) return;
     room.lastActivity = this.now();
     for (const id of targets) this.conns.get(id)?.peer.send(data);
+  }
+
+  /** Passes a valid pickup, throw or hit on to the other racers, saying who sent it. */
+  private relayEvent(c: Conn, room: Room, m: Extract<Handled, { t: 'pickup' | 'use' | 'hit' }>) {
+    const targets = room.eventTargets(c.slot, m);
+    if (!targets) return;
+    room.lastActivity = this.now();
+    const msg: ServerMessage = { ...m, from: c.slot };
+    for (const id of targets) this.send(id, msg);
   }
 
   private send(conn: number, msg: ServerMessage) {

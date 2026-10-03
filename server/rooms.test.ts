@@ -436,33 +436,33 @@ describe('race start', () => {
   });
 });
 
+/** Three humans on the grid (slots 1-3, netIds 0-2) and a fourth who dropped before the start. */
+function racers(phase: 'countdown' | 'racing' = 'racing') {
+  const a = create();
+  const b = join(a.welcome.code);
+  const c = join(a.welcome.code, 'Chidi');
+  const d = join(a.welcome.code, 'Dayo');
+  for (const p of [a, b, c, d]) send(p.conn, { t: 'lobby', ready: true });
+  server.close(d.conn);
+  send(a.conn, { t: 'start' });
+  for (const p of [a, b, c]) send(p.conn, { t: 'loaded' });
+  const room = server.rooms.get(a.welcome.code)!;
+  if (phase === 'racing') {
+    now += START_LEAD_MS;
+    server.tick();
+  }
+  expect(room.phase).toBe(phase);
+  const d2 = connect();
+  send(d2.conn, { t: 'resume', token: msgs(d.peer, 'welcome')[0].token });
+  return { a, b, c, d2, room };
+}
+
 describe('snapshot relay', () => {
   const car = (netId: number, over: Partial<CarState> = {}): CarState => ({
     netId, x: 1, y: 0.5, z: -3, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 12, distance: 40, laps: 0, flags: 0, ...over,
   });
   const snap = (slot: number, over: Partial<Snapshot> = {}): Snapshot => ({ slot, raceSeq: 1, time: 2.5, cars: [car(slot - 1)], ...over });
   const binary = (peer: FakePeer) => peer.sent.filter((d): d is ArrayBuffer => typeof d !== 'string');
-
-  /** Three humans on the grid (slots 1-3, netIds 0-2) and a fourth who dropped before the start. */
-  function racers(phase: 'countdown' | 'racing' = 'racing') {
-    const a = create();
-    const b = join(a.welcome.code);
-    const c = join(a.welcome.code, 'Chidi');
-    const d = join(a.welcome.code, 'Dayo');
-    for (const p of [a, b, c, d]) send(p.conn, { t: 'lobby', ready: true });
-    server.close(d.conn);
-    send(a.conn, { t: 'start' });
-    for (const p of [a, b, c]) send(p.conn, { t: 'loaded' });
-    const room = server.rooms.get(a.welcome.code)!;
-    if (phase === 'racing') {
-      now += START_LEAD_MS;
-      server.tick();
-    }
-    expect(room.phase).toBe(phase);
-    const d2 = connect();
-    send(d2.conn, { t: 'resume', token: msgs(d.peer, 'welcome')[0].token });
-    return { a, b, c, d2, room };
-  }
 
   it('forwards a valid snapshot byte-for-byte to the other racers only', () => {
     for (const phase of ['countdown', 'racing'] as const) {
@@ -558,5 +558,82 @@ describe('snapshot relay', () => {
     now += 1;
     server.tick();
     expect(server.rooms.has(room.code)).toBe(false);
+  });
+});
+
+describe('item events', () => {
+  const hazard = (over: Record<string, unknown> = {}) => ({
+    id: 100005, kind: 'juju', x: 1, y: 2, z: 3, vx: 40, vy: 0, vz: 5, owner: 0, target: 1, life: 7, armed: 0.6, ground: 0.5, ...over,
+  });
+  const events = (peer: FakePeer) => [...msgs(peer, 'pickup'), ...msgs(peer, 'use'), ...msgs(peer, 'hit')];
+
+  it('relays item events with from, and drops forged hazard ids and hits on cars not owned', () => {
+    const { a, b, c, d2 } = racers();
+    send(a.conn, { t: 'pickup', orb: 4 });
+    send(a.conn, { t: 'use', hazard: hazard() });
+    send(a.conn, { t: 'use', hazard: hazard({ id: 100006, kind: 'oil', target: null }) });
+    send(b.conn, { t: 'hit', hazard: 100005, netId: 1 });
+    for (const p of [b, c]) {
+      expect(msgs(p.peer, 'pickup')).toEqual([{ t: 'pickup', orb: 4, from: 1 }]);
+      expect(msgs(p.peer, 'use')).toEqual([
+        { t: 'use', hazard: hazard(), from: 1 },
+        { t: 'use', hazard: hazard({ id: 100006, kind: 'oil', target: null }), from: 1 },
+      ]);
+    }
+    for (const p of [a, c]) expect(msgs(p.peer, 'hit')).toEqual([{ t: 'hit', hazard: 100005, netId: 1, from: 2 }]);
+    expect(events(a.peer).filter(m => m.from === 1)).toHaveLength(0);
+    expect(msgs(b.peer, 'hit')).toHaveLength(0);
+    expect(events(d2.peer)).toHaveLength(0);
+
+    const before = events(b.peer).length + events(c.peer).length;
+    // Hazard ids outside the sender's block, cars it does not drive, bad targets and bad numbers.
+    send(a.conn, { t: 'use', hazard: hazard({ id: 200000 }) });
+    send(a.conn, { t: 'use', hazard: hazard({ id: 99999 }) });
+    send(a.conn, { t: 'use', hazard: hazard({ id: 100000.5 }) });
+    send(a.conn, { t: 'use', hazard: hazard({ owner: 1 }) });
+    send(a.conn, { t: 'use', hazard: hazard({ target: 9 }) });
+    send(a.conn, { t: 'use', hazard: hazard({ target: 'x' }) });
+    send(a.conn, { t: 'use', hazard: hazard({ kind: 'fuel' }) });
+    send(a.conn, { t: 'use', hazard: hazard({ x: null }) });
+    send(a.conn, { t: 'use', hazard: hazard({ life: '7' }) });
+    send(a.conn, { t: 'use', hazard: null });
+    server.message(a.conn, JSON.stringify({ t: 'use', hazard: hazard() }).replace('"vx":40', '"vx":1e999'));
+    send(a.conn, { t: 'hit', hazard: 100005, netId: 1 });
+    send(a.conn, { t: 'hit', hazard: 100005, netId: 7 });
+    send(a.conn, { t: 'hit', hazard: 1.5, netId: 0 });
+    send(a.conn, { t: 'pickup', orb: -1 });
+    send(a.conn, { t: 'pickup', orb: 2.5 });
+    send(a.conn, { t: 'pickup', orb: '3' });
+    expect(events(b.peer).length + events(c.peer).length).toBe(before);
+  });
+
+  it('only relays item events while racing, and only from grid members', () => {
+    const { a, b, d2 } = racers('countdown');
+    send(a.conn, { t: 'pickup', orb: 1 });
+    send(a.conn, { t: 'use', hazard: hazard() });
+    expect(events(b.peer)).toHaveLength(0);
+    now += START_LEAD_MS;
+    server.tick();
+    send(d2.conn, { t: 'pickup', orb: 1 });
+    send(d2.conn, { t: 'use', hazard: hazard({ id: 400000, owner: 3 }) });
+    expect(events(b.peer)).toHaveLength(0);
+    send(a.conn, { t: 'pickup', orb: 1 });
+    expect(events(b.peer)).toHaveLength(1);
+  });
+
+  it('counts valid item events as activity, but not dropped ones', () => {
+    const { a, room } = racers();
+    now += ROOM_IDLE_MS - 1;
+    send(a.conn, { t: 'use', hazard: hazard({ id: 5 }) });
+    now += 1;
+    server.tick();
+    expect(server.rooms.has(room.code)).toBe(false);
+
+    const { a: a2, room: room2 } = racers();
+    now += ROOM_IDLE_MS - 1;
+    send(a2.conn, { t: 'pickup', orb: 0 });
+    now += 1;
+    server.tick();
+    expect(server.rooms.has(room2.code)).toBe(true);
   });
 });

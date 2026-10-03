@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FLAG, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage } from './protocol';
-import type { RaceRuntime, Racer } from '../game/runtime';
+import type { Hazard, RaceRuntime, Racer } from '../game/runtime';
 import { makeRacer } from '../game/runtime';
 import { vehicleById } from '../config/vehicles';
 import { SnapshotBuffer } from './interpolation';
@@ -193,6 +193,47 @@ describe('NetSession', () => {
       s.onSnapshot(snapBuf(2, 1, 0.9, [carFor(9, { distance: 5 }), carFor(0, { distance: 99 })]));
       expect(racers[0].progress.distance).toBe(0);
       expect(racers[2].remote!.buffer.latest()).toBeNull();
+    });
+
+    it('sends pickups, throws and hits to the room', () => {
+      const { s, sent } = started(1000);
+      const h: Hazard = { id: 100001, kind: 'oil', x: 1, y: 0, z: 2, vx: 0, vy: 0, vz: 0, owner: 0, target: null, life: 22, armed: 1, ground: 0 };
+      s.pickup(7);
+      s.use(h);
+      h.life = 3;
+      s.hit(200004, 1);
+      expect(sent).toEqual([
+        { t: 'pickup', orb: 7 },
+        { t: 'use', hazard: { ...h, life: 22 } },
+        { t: 'hit', hazard: 200004, netId: 1 },
+      ]);
+    });
+
+    it('applies other phones\' pickups, throws and hits', () => {
+      const { s, race } = started(1000);
+      race.pickups = [{ id: 3, kind: 'oil', x: 0, y: 0, z: 0, s: 0, respawn: 0 }];
+      race.hazards = [];
+      race.puffs = [];
+      const juju: Hazard = { id: 200001, kind: 'juju', x: 4, y: 2, z: 5, vx: 40, vy: 0, vz: 0, owner: 2, target: 0, life: 7, armed: 0.6, ground: 0.5 };
+      const oil: Hazard = { ...juju, id: 200002, kind: 'oil', target: null, life: 22 };
+
+      s.onEvent({ t: 'pickup', orb: 3, from: 2 });
+      expect(race.pickups[0].respawn).toBe(3);
+      s.onEvent({ t: 'pickup', orb: 99, from: 2 });
+
+      s.onEvent({ t: 'use', hazard: juju, from: 2 });
+      s.onEvent({ t: 'use', hazard: oil, from: 2 });
+      s.onEvent({ t: 'use', hazard: { ...juju, x: 50 }, from: 2 });
+      expect(race.hazards).toEqual([juju, oil]);
+      expect(race.hazards[0]).not.toBe(juju);
+
+      s.onEvent({ t: 'hit', hazard: 999, netId: 0, from: 2 });
+      expect(race.puffs).toEqual([]);
+      s.onEvent({ t: 'hit', hazard: 200002, netId: 1, from: 2 });
+      expect(race.hazards[1].life).toBe(8);
+      s.onEvent({ t: 'hit', hazard: 200001, netId: 1, from: 2 });
+      expect(race.hazards[0].life).toBe(0);
+      expect(race.puffs).toEqual([{ x: 4, y: 0.5, z: 5, age: 0, color: 'juju' }]);
     });
 
     it('drops snapshots from another raceSeq or from my own slot', () => {
