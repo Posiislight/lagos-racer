@@ -8,9 +8,11 @@ import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateCritters } from '../game/critters';
 import { useGame, type Result } from '../game/store';
 import { beep, Engine, sfx } from '../game/audio';
+import { itemHint } from '../game/hints';
 
 const COUNT = ['3', '2', '1'];
 // ?autopilot=1 lets the AI drive the player's car (for play-testing and demos).
+const IS_TOUCH = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
 const AUTOPILOT = typeof location !== 'undefined' && new URLSearchParams(location.search).get('autopilot') === '1';
 
 /** Drives the race each frame: countdown, inputs, AI, items, laps, HUD and the finish. */
@@ -19,6 +21,7 @@ export function RaceLogic() {
   const lastCount = useRef('');
   const wrongWay = useRef(0);
   const finishedAt = useRef<number | null>(null);
+  const heldItem = useRef<string | null>(null);
   const reported = useRef(false);
   const engine = useRef<Engine | null>(null);
   const stuck = useRef({ t: 0, reverse: 0, tries: 0 });
@@ -87,6 +90,13 @@ export function RaceLogic() {
     }
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
+
+    // Just picked something up: say what it is and, the first few times, how to use it.
+    if (player.item && !heldItem.current) {
+      store.flash(itemHint(player.item, IS_TOUCH ? 'touch' : 'keys', store.itemHints));
+      store.countItemHint();
+    }
+    heldItem.current = player.item;
     updateCritters(race, dt);
 
     // Wrong way warning.

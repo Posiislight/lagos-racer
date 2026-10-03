@@ -47,7 +47,7 @@ export function Menu() {
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
         </div>
-        <p className="keys muted">You're always on the gas · ← → or A D to steer · E to use items · H to honk · Esc to pause</p>
+        <p className="keys muted">You're always on the gas · ← → or A D to steer · Space to use items · Ctrl to drift · H to honk · Esc to pause</p>
       </div>
       {settings && <Settings onClose={() => setSettings(false)} />}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGame } from '../game/store';
 import { formatTime } from '../game/race';
 import { getRace } from '../game/runtime';
@@ -16,64 +16,64 @@ export function Hud({ onPause }: { onPause: () => void }) {
       <div className="hud-pos" aria-label={`Position ${hud.position} of ${hud.racers}`}>
         <b>{hud.position}</b><sup>{suffix(hud.position)}</sup><span>/{hud.racers}</span>
       </div>
+      <ProgressLine lap={hud.lap} laps={hud.laps} />
       <div className="hud-lap">
-        <div className="lap">LAP <b>{hud.lap}</b>/{hud.laps}</div>
         <div className="time">{formatTime(hud.time)}</div>
         <div className="best">Best lap {formatTime(hud.bestLap ?? best ?? null)}</div>
-        <Minimap />
       </div>
+      {/* The power-up button: middle of the right-hand side, under your right thumb. */}
       <button className={`hud-item${hud.item ? ' full' : ''}`} onPointerDown={e => { e.preventDefault(); queueItem(); }} aria-label={hud.item ? `Use ${hud.item.label}` : 'No item'}>
-        {hud.item ? <img className="icon-img" src={ITEM_ICON[hud.item.kind]} alt="" /> : <span className="icon dim">–</span>}
+        {hud.item ? <img className="icon-img" src={ITEM_ICON[hud.item.kind]} alt="" /> : <span className="icon dim">USE</span>}
       </button>
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>
-      {hud.countdown && <div className={`hud-count${hud.countdown.length > 1 ? ' go' : ''}`} key={hud.countdown}>{hud.countdown}</div>}
-      {hud.message && <div className="hud-msg" key={hud.messageKey}>{hud.message}</div>}
+      {hud.countdown && <div className={`hud-count${hud.countdown.length > 1 ? ' go' : ''}`} key={`count-${hud.countdown}`}>{hud.countdown}</div>}
+      {hud.message && <div className="hud-msg" key={`msg-${hud.messageKey}`}>{hud.message}</div>}
       {hud.wrongWay && <div className="hud-wrong">WRONG WAY! TURN AM!</div>}
     </div>
   );
 }
 
-/** Track outline with a dot per racer, redrawn every frame without re-rendering React. */
-function Minimap() {
-  const svg = useRef<SVGSVGElement>(null);
+/**
+ * The lap as a straight line across the top of the screen, start on the left, with a dot per racer
+ * at how far round the lap they are. Updated every frame without re-rendering React.
+ */
+function ProgressLine({ lap, laps }: { lap: number; laps: number }) {
+  const track = useRef<HTMLDivElement>(null);
   const race = getRace();
-  const shape = useMemo(() => {
-    if (!race) return null;
-    const pts = race.track.points.filter((_, i) => i % 3 === 0);
-    const xs = pts.map(p => p.pos.x), zs = pts.map(p => p.pos.z);
-    const minX = Math.min(...xs), minZ = Math.min(...zs), w = Math.max(...xs) - minX, h = Math.max(...zs) - minZ, pad = 14;
-    const path = pts.map((p, i) => `${i ? 'L' : 'M'}${(p.pos.x - minX).toFixed(0)} ${(p.pos.z - minZ).toFixed(0)}`).join(' ') + 'Z';
-    return { path, viewBox: `${-pad} ${-pad} ${(w + pad * 2).toFixed(0)} ${(h + pad * 2).toFixed(0)}`, minX, minZ };
-  }, [race]);
 
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      const r = getRace(), el = svg.current;
-      if (r && el && shape) {
+      const r = getRace(), el = track.current;
+      if (r && el) {
+        const L = r.track.length;
         r.racers.forEach((c, i) => {
-          const dot = el.querySelector<SVGCircleElement>(`[data-i="${i}"]`);
-          if (!dot || !c.body) return;
-          const t = c.body.translation();
-          dot.setAttribute('cx', (t.x - shape.minX).toFixed(1));
-          dot.setAttribute('cy', (t.z - shape.minZ).toFixed(1));
+          const dot = el.querySelector<HTMLElement>(`[data-i="${i}"]`);
+          if (!dot) return;
+          // Finished racers sit at the end; everyone else at their distance into the current lap.
+          const done = c.progress.finishTime !== null;
+          const frac = done ? 1 : (((c.progress.distance % L) + L) % L) / L;
+          dot.style.left = `${(frac * 100).toFixed(2)}%`;
         });
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [shape]);
+  }, []);
 
-  if (!race || !shape) return null;
+  if (!race) return null;
   return (
-    <svg ref={svg} className="minimap" viewBox={shape.viewBox} aria-hidden="true">
-      <path d={shape.path} fill="none" stroke="rgba(20,18,16,.75)" strokeWidth="22" strokeLinejoin="round" />
-      <path d={shape.path} fill="none" stroke="#f3efe4" strokeWidth="9" strokeLinejoin="round" />
-      {race.racers.map((c, i) => (
-        <circle key={i} data-i={i} r={c.isPlayer ? 13 : 10} fill={c.isPlayer ? '#ffffff' : c.paint.color} stroke="#141210" strokeWidth={c.isPlayer ? 6 : 4} />
-      ))}
-    </svg>
+    <div className="hud-progress" aria-label={`Lap ${lap} of ${laps}`}>
+      <div className="lap">LAP <b>{lap}</b>/{laps}</div>
+      <div className="line" ref={track} aria-hidden="true">
+        <span className="flag" />
+        {/* Player last so their dot draws on top. */}
+        {race.racers.map((c, i) => ({ c, i })).sort((a, b) => Number(a.c.isPlayer) - Number(b.c.isPlayer)).map(({ c, i }) => (
+          <i key={i} data-i={i} className={c.isPlayer ? 'me' : ''} style={{ background: c.isPlayer ? '#ffffff' : c.paint.color }} />
+        ))}
+      </div>
+    </div>
   );
 }

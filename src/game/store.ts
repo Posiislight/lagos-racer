@@ -43,6 +43,8 @@ export type State = Saved & {
   setScreen: (s: Screen) => void;
   setVehicle: (v: VehicleId) => void;
   setPaint: (v: VehicleId, paint: string) => void;
+  /** One more pickup has shown its how-to hint. */
+  countItemHint: () => void;
   unlock: (v: VehicleId) => void;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   startRace: () => void;
@@ -72,6 +74,7 @@ export const useGame = create<State>((set, get) => ({
   setScreen: screen => set({ screen }),
   setVehicle: vehicle => { set({ vehicle }); save(); },
   setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
+  countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), price = VEHICLES.find(x => x.id === v)?.locked?.coins ?? 0;
     if (s.unlocked.includes(v) || s.coins < price) return;

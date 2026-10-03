@@ -154,7 +154,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 /* ---------- race ---------- */
 .race { position: absolute; inset: 0; background: #f3e4c8; touch-action: none; }
 .race-canvas { position: absolute !important; inset: 0; }
-.hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; font-family: Bungee, Impact, sans-serif; color: #fff; }
+.hud { position: absolute; inset: 0; pointer-events: none; z-index: 12; font-family: Bungee, Impact, sans-serif; color: #fff; }
 .hud > * { position: absolute; }
 .hud-pos {
   top: calc(10px + var(--safe-t)); left: calc(12px + var(--safe-l)); background: var(--board); color: var(--led);
@@ -167,30 +167,33 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: calc(10px + var(--safe-t)); right: calc(64px + var(--safe-r)); text-align: right;
   display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
-.hud-lap .lap { background: var(--yellow); color: var(--ink); border-radius: 8px; padding: 3px 10px; font-size: 18px; }
-.hud-lap .lap b { font-weight: 400; font-size: 22px; }
+/* The lap as a straight line across the top middle, a dot per racer. */
+.hud-progress { top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); width: min(46vw, 420px); display: flex; align-items: center; gap: 10px; }
+.hud-progress .lap { background: var(--yellow); color: var(--ink); border-radius: 8px; padding: 3px 10px; font-size: 16px; white-space: nowrap; }
+.hud-progress .lap b { font-weight: 400; font-size: 20px; }
+.hud-progress .line { position: relative; flex: 1; height: 8px; border-radius: 4px; background: rgba(243, 239, 228, .92); box-shadow: 0 0 0 3px rgba(20, 18, 16, .75); }
+.hud-progress .flag { position: absolute; right: -4px; top: -6px; width: 10px; height: 20px; background: repeating-linear-gradient(#141210 0 5px, #f3efe4 5px 10px); border-radius: 2px; }
+.hud-progress i { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 3px solid #141210; }
+.hud-progress i.me { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 4px; }
 .hud-lap .time, .hud-lap .best { font-family: Archivo, sans-serif; font-weight: 900; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; }
 .hud-lap .time { font-size: 20px; }
 .hud-lap .best { font-size: 12px; opacity: .9; }
-.minimap { width: 128px; height: 100px; margin-top: 4px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4)); }
 .hud-pause {
   pointer-events: auto; top: calc(10px + var(--safe-t)); right: calc(12px + var(--safe-r)); width: 44px; height: 44px;
   border-radius: 50%; border: 2px solid var(--ink); background: var(--chip); color: var(--ink); font-family: Archivo, sans-serif; font-weight: 900; cursor: pointer;
 }
 .hud-item {
-  pointer-events: auto; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  pointer-events: auto; top: 50%; right: calc(14px + var(--safe-r)); transform: translateY(-50%);
   width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--ink); background: rgba(255, 250, 240, .85);
   display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--ink);
 }
 .hud-item .icon { font-size: 32px; line-height: 1; font-family: system-ui, sans-serif; }
 .hud-item .icon-img { width: 64px; height: 64px; }
-.pad.use { width: 84px; height: 84px; border-radius: 50%; background: rgba(245, 180, 0, .85); font-size: 16px; }
-.pad.use img { width: 70px; height: 70px; }
-.pad.use.empty { opacity: .45; }
-.hud-item .icon.dim { opacity: .3; font-family: Bungee, sans-serif; }
+.hud-item .icon.dim { opacity: .35; font-family: Bungee, sans-serif; font-size: 18px; }
 .hud-item small { font-family: Archivo, sans-serif; font-weight: 900; font-size: 9px; text-transform: uppercase; }
 .hud-item.full { background: var(--yellow); animation: pulse 1s ease-in-out infinite; }
-@keyframes pulse { 50% { transform: translateX(-50%) scale(1.08); } }
+@keyframes pulse { 50% { transform: translateY(-50%) scale(1.08); } }
+@media (pointer: coarse) { .hud-item { width: 88px; height: 88px; } .hud-item .icon-img { width: 74px; height: 74px; } }
 .hud-speed {
   bottom: calc(12px + var(--safe-b)); left: 50%; transform: translateX(-50%); font-family: Archivo, sans-serif; font-weight: 800;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-size: 14px;
@@ -238,6 +241,5 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .pad.gas { width: 84px; height: 96px; }
   .pad.brake { width: 72px; height: 72px; }
   .hud-pos b { font-size: 34px; }
-  .minimap { width: 96px; height: 76px; }
-  .hud-item { width: 62px; height: 62px; }
+  .hud-item { width: 78px; height: 78px; }
 }

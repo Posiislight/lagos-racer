@@ -9,12 +9,14 @@
 //   --out=dir                      where to save screenshots (default: scratch dir)
 //   --gpu                          try the real GPU instead of SwiftShader
 //   --vehicle=okada --paint=blue --quality=high --unlock
+//   --eval="js"                    run once the race is ready and print the result
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v ?? true]; }));
+// Split on the first '=' only, so values (like --eval JavaScript) may contain '='.
+const args = Object.fromEntries(process.argv.slice(2).map(a => { const s = a.replace(/^--/, ''), i = s.indexOf('='); return i < 0 ? [s, true] : [s.slice(0, i), s.slice(i + 1)]; }));
 const base = args.url || 'http://localhost:5173/';
 const [W, H] = (args.size || '1280x720').split('x').map(Number);
 const seconds = +(args.seconds || 20);
@@ -68,6 +70,8 @@ await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b
 let ready = false;
 for (let i = 0; i < 300 && !ready; i++) { await sleep(100); ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))'); }
 if (!ready) { console.log(JSON.stringify({ error: 'race never became ready', errors, logs: logs.slice(-10) }, null, 2)); done(1); }
+// --eval="<js>": run once the race is ready (window.__lr has getRace, useGame, state) and print the result.
+if (args.eval) console.log('eval:', JSON.stringify(await evaluate(args.eval)));
 
 const keyHold = String(args.keys || '').split(',').filter(Boolean).map(s => { const [k, r] = s.split(':'); const [a, b] = r.split('-').map(Number); return { k, a, b, down: false }; });
 const codeOf = k => ({ ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: 'Space', ' ': 'Space' })[k] || ('Key' + k.toUpperCase());

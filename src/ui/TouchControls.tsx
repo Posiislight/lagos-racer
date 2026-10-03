@@ -1,7 +1,6 @@
 import { useEffect, useState, type PointerEvent, type ReactNode } from 'react';
 import { touch } from '../game/input';
 import { useGame } from '../game/store';
-import { ITEM_ICON } from '../scene/art/items';
 
 type Key = keyof typeof touch;
 
@@ -41,24 +40,16 @@ function Pad({ k, className, label, children }: { k: Key; className: string; lab
 
 /**
  * Phone controls: you're always on the gas, so it's just left (left thumb) and right (right
- * thumb), or tilt the phone. The item button sits above your right thumb.
+ * thumb), or tilt the phone. The power-up button is part of the HUD, mid-right above your right thumb.
  */
 export function TouchControls() {
   const tilt = useGame(s => s.settings.steering === 'tilt');
-  const item = useGame(s => s.hud.item);
   return (
     <div className="touch">
       {!tilt && <div className="touch-left"><Pad k="left" className="steer" label="Steer left">◀</Pad></div>}
       <div className="touch-right">
         <div className="touch-row small">
           <Pad k="horn" className="mini" label="Horn">PON PON</Pad>
-          <button
-            className={`pad use${item ? '' : ' empty'}`}
-            aria-label={item ? `Use ${item.label}` : 'No item'}
-            onPointerDown={e => { e.preventDefault(); touch.item = true; }}
-          >
-            {item ? <img src={ITEM_ICON[item.kind]} alt="" /> : 'USE'}
-          </button>
         </div>
         {!tilt && <Pad k="right" className="steer" label="Steer right">▶</Pad>}
       </div>
