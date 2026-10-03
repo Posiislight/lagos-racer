@@ -5,6 +5,7 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SceneryZone, TrackConfig } from '../config/tracks';
 import { roadSpan, roadToS } from '../game/outAndBack';
+import { church, directionSign, parkedOkada, petrolStation, tejuoshoBlock } from './landmarks';
 import { distanceToCentre, heightAt, sampleAt, type Track } from '../game/track';
 import { mergeStatic } from '../models/optimize';
 import { canvasTex, rng } from './trackGeometry';
@@ -67,7 +68,7 @@ class Atlas {
 }
 
 type Spot = { x: number; y: number; z: number; yaw: number; s: number; side: number };
-type MatFn = (c: string, o?: Partial<{ roughness: number; metalness: number; emissive: string; side: typeof DoubleSide; shadow: boolean }>) => Material;
+export type MatFn = (c: string, o?: Partial<{ roughness: number; metalness: number; emissive: string; side: typeof DoubleSide; shadow: boolean }>) => Material;
 
 /** `median`: per track sample, whether the left side is the median (see medianMask), or null. */
 export function buildScenery(cfg: TrackConfig, track: Track, density: number, median: boolean[] | null = null): Group {
@@ -174,12 +175,13 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
 
   let signIdx = 0;
   /** A building whose front face sits on the spot, with its 3D extras. Returns its height. */
-  const building = (sp: Spot, kind: FacadeKind, scale: number, d: number, o: { sign?: boolean; rooftopAd?: boolean } = {}) => {
+  const building = (sp: Spot, kind: FacadeKind, scale: number, d: number, o: { sign?: boolean; rooftopAd?: boolean; tints?: string[] } = {}) => {
     const f = FACADES[kind], w = f.width * scale, h = f.height * scale + 0.6;
     // Shift the box back so its front face is on the spot.
     const c = local(sp, 0, -d / 2);
     const csp = { ...sp, x: c.x, z: c.z };
-    addBox(csp, kind, w, h, d, PAINT[Math.floor(r() * PAINT.length)]);
+    const tints = o.tints ?? PAINT;
+    addBox(csp, kind, w, h, d, tints[Math.floor(r() * tints.length)]);
     const g = new Group();
     const front = d / 2, top = h - 0.6;
     if (o.sign && kind !== 'shops') {
@@ -237,7 +239,7 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
   };
 
   /** A row of buildings wall to wall along one side of a stretch, with side streets now and then. */
-  const street = (s0: number, s1: number, side: number, pick: () => FacadeKind, o: { rows?: number; ads?: number; sideStreets?: boolean } = {}) => {
+  const street = (s0: number, s1: number, side: number, pick: () => FacadeKind, o: { rows?: number; ads?: number; sideStreets?: boolean; tints?: string[] } = {}) => {
     let s = s0;
     let sinceGap = 0;
     while (s < s1) {
@@ -264,7 +266,7 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
         if (clearOf(k.x, k.z, 2.2)) building(sp, 'shops', 0.5, 4, { sign: false });
         continue;
       }
-      building(sp, kind, scale, d, { sign: true, rooftopAd: r() < (o.ads ?? 0.06) });
+      building(sp, kind, scale, d, { sign: true, rooftopAd: r() < (o.ads ?? 0.06), tints: o.tints });
       // Rows behind, taller, so the skyline stays dense (two rows even on low quality).
       const rows = density > 0.55 ? (o.rows ?? 2) : Math.min(o.rows ?? 2, 2);
       for (let row = 1; row < rows; row++) {
@@ -327,6 +329,30 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
           place(g, sp, PAVE_Y);
           if (r() < 0.85) { const p = local(sp, (r() - 0.5) * 2, -0.9); person(p.x, p.y + PAVE_Y, p.z, r() < 0.5 ? 7 : 0); }
         }
+      } else if (zone.kind === 'tejuosho') {
+        // The market block runs the whole stretch; traders on the pavement in front.
+        place(tejuoshoBlock(m, s1 - s0), spot((s0 + s1) / 2, side, FRONT), PAVE_Y);
+        for (let s = s0 + 1; s < s1; s += 2.6 / density) { const p = spot(s, side, hw + 1.2 + r() * 1.6); person(p.x, p.y + PAVE_Y, p.z); }
+      } else if (zone.kind === 'petrol') {
+        const mid = (s0 + s1) / 2;
+        place(petrolStation(m), spot(mid, side, FRONT + 4), 0);
+        // Okadas parked in a row on the pavement after the forecourt, riders waiting for passengers.
+        for (let s = mid + 9; s < s1 + 4; s += 1.4) {
+          place(parkedOkada(m, r), spot(s, side, hw + 1.6), PAVE_Y);
+          if (r() < 0.35) { const p = spot(s, side, hw + 2.4); person(p.x, p.y + PAVE_Y, p.z, 4); }
+        }
+      } else if (zone.kind === 'danfoRow') {
+        // The shopping complex with yellow danfos lined up nose to tail along the kerb.
+        street(s0, s1, side, () => (r() < 0.6 ? 'plaza' : 'concrete'), { rows: 2 });
+        for (let s = s0 + 3; s < s1 - 2; s += 5) {
+          place(parkedDanfo(m, r), spot(s, side, hw + 2.2), PAVE_Y);
+          if (r() < 0.5) { const p = spot(s + 2.4, side, hw + 1.2); person(p.x, p.y + PAVE_Y, p.z, [4, 2, 5][Math.floor(r() * 3)]); }
+        }
+      } else if (zone.kind === 'church') {
+        place(church(m, 'GRACE BAPTIST CHURCH'), spot((s0 + s1) / 2, side, FRONT), PAVE_Y);
+      } else if (zone.kind === 'sportsShops') {
+        // Shops painted red, blue and cream, covered in signboards.
+        street(s0, s1, side, () => (r() < 0.7 ? 'shops' : 'concrete'), { rows: 2, ads: 0.2, tints: ['#d0141a', '#1565c0', '#f2d0a4', '#1565c0'] });
       } else if (zone.kind === 'danfoPark') {
         // The one open lot: danfos parked nose-in, the motor park arch, agberos everywhere.
         const lot0 = s0 + 4, lot1 = Math.min(s1 - 4, lot0 + 38);
@@ -396,7 +422,12 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
   }
 
   // Flyovers, the start gantry, and a ring of buildings in front of the painted skyline.
-  bridgeAt.forEach(b => root.add(bridge(track, cfg, b.s, b.name, m)));
+  bridgeAt.forEach(b => root.add(bridge(track, cfg, b.s, b.name, m, { depth: b.width, median: cfg.median?.width })));
+  for (const sg of cfg.signs ?? []) {
+    const g = directionSign(m, sg.text, 2 * (hw + 1.2));
+    // Spot frames run x along the road; the sign spans across it.
+    place(g, spot(onLap(sg.road, 'north'), 1, 0)).rotation.y += Math.PI / 2;
+  }
   root.add(gantry(track, cfg, m));
   const ring = horizonRing(track);
   const nRing = Math.round(70 * density);
@@ -532,17 +563,33 @@ function palm(m: MatFn, r: () => number) {
   return g;
 }
 
-function bridge(track: Track, cfg: TrackConfig, s: number, name: string, m: MatFn) {
-  const at = sampleAt(track, s), g = new Group();
+/**
+ * A flyover crossing the road at s. Over an out-and-back road (median width given) it spans both legs:
+ * the deck is centred on the median and the pillars stand outside each leg and in the median.
+ * `depth` is the deck's size along the road (Western Avenue is a wide one).
+ */
+function bridge(track: Track, cfg: TrackConfig, s: number, name: string, m: MatFn, o: { depth?: number; median?: number } = {}) {
+  const at = sampleAt(track, s), g = new Group(), hw = cfg.halfWidth, depth = o.depth ?? 13;
   const concrete = m('#b9b4aa', { roughness: 0.9, shadow: true }), dark = m('#8f8a80', { roughness: 0.9, shadow: true });
-  const span = (cfg.halfWidth + 30) * 2, y = 7.6;
+  const y = 7.6, mw = o.median;
   // Build along local x = across the road, local z = along the road, then rotate into place.
-  const deck = new Mesh(new BoxGeometry(span, 1.3, 13), concrete); deck.position.y = y; g.add(deck);
-  const under = new Mesh(new BoxGeometry(span, 0.4, 11), dark); under.position.y = y - 0.8; g.add(under);
+  // Local +x is the road's left (lateral L sits at x = -L).
+  const centre = mw === undefined ? 0 : hw + mw / 2;
+  const half = mw === undefined ? hw + 30 : 2 * hw + mw / 2 + 22;
+  const candidates: [number, number][] = mw === undefined
+    ? [-(hw + 1.4), hw + 1.4, -(hw + 20), hw + 20].map(x => [x, 1.6])
+    : [[-(hw + 1.4), 1.6], [-(hw + 20), 1.6], [hw + mw / 2, 0.9], [3 * hw + mw + 1.4, 1.6], [3 * hw + mw + 20, 1.6]];
+  // Where the legs splay into a U-turn under the deck, a pillar can land in the road: keep only clear ones.
+  const clear = (x: number, z: number, size: number) =>
+    distanceToCentre(track, at.pos.x - at.right.x * x + at.tangent.x * z, at.pos.z - at.right.z * x + at.tangent.z * z) > hw + size / 2 + 0.3;
+  const deck = new Mesh(new BoxGeometry(half * 2, 1.3, depth), concrete); deck.position.set(centre, y, 0); g.add(deck);
+  const under = new Mesh(new BoxGeometry(half * 2, 0.4, depth - 2), dark); under.position.set(centre, y - 0.8, 0); g.add(under);
   [-1, 1].forEach(side => {
-    const rail = new Mesh(new BoxGeometry(span, 1.1, 0.3), concrete); rail.position.set(0, y + 1.2, side * 6.4); g.add(rail);
-    for (const x of [-(cfg.halfWidth + 1.4), cfg.halfWidth + 1.4, -(cfg.halfWidth + 20), cfg.halfWidth + 20]) {
-      const p = new Mesh(new BoxGeometry(1.6, y, 1.6), concrete); p.position.set(x, y / 2 - 0.6, side * 3.5); g.add(p);
+    const rail = new Mesh(new BoxGeometry(half * 2, 1.1, 0.3), concrete); rail.position.set(centre, y + 1.2, side * (depth / 2 - 0.1)); g.add(rail);
+    for (const [x, size] of candidates) {
+      const z = side * (depth / 2 - 3);
+      if (!clear(x, z, size)) continue;
+      const p = new Mesh(new BoxGeometry(size, y, size), concrete); p.position.set(x, y / 2 - 0.6, z); g.add(p);
     }
   });
   // Name boards on both faces.
@@ -553,11 +600,11 @@ function bridge(track: Track, cfg: TrackConfig, s: number, name: string, m: MatF
   const lm = new MeshStandardMaterial({ map: label, roughness: 0.6 });
   [-1, 1].forEach(side => {
     const p = new Mesh(new PlaneGeometry(14, 1.75), lm);
-    p.position.set(0, y + 0.1, side * 6.62); p.rotation.y = side > 0 ? 0 : Math.PI; g.add(p);
+    p.position.set(centre, y + 0.1, side * (depth / 2 + 0.12)); p.rotation.y = side > 0 ? 0 : Math.PI; g.add(p);
   });
   // A couple of danfos stuck in traffic on top.
   const r = rng(9);
-  [-14, -4, 9].forEach((x, i) => { const d = parkedDanfo(m, r); d.position.set(x, y + 0.65, i % 2 ? 2.8 : -2.8); g.add(d); });
+  [-14, -4, 9].forEach((x, i) => { const d = parkedDanfo(m, r); d.position.set(centre + x, y + 0.65, i % 2 ? 2.8 : -2.8); g.add(d); });
   g.position.set(at.pos.x, at.pos.y, at.pos.z);
   g.rotation.y = Math.atan2(at.tangent.x, at.tangent.z);
   return g;
