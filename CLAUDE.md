@@ -14,6 +14,7 @@ A comedic, Lagos-themed 3D kart racer that runs in the browser, in the style of 
 - Physics: Rapier via `@react-three/rapier`, using its raycast vehicle controller for car-style driving
 - Menus, garage and leaderboard are normal React UI layered over the canvas
 - Installable PWA, deployed on Vercel
+- Multiplayer room server: Node + TypeScript WebSocket server in `server/` (plain `ws`), sharing track and lap code with the client, hosted on Railway
 - Later: backend in FastAPI or Django for accounts, coins and leaderboard. Validate scores on the server (reject physically impossible lap times).
 
 ## Performance budget
@@ -63,13 +64,17 @@ Let people play straight away with no sign-up. After their first race or two, pr
 
 ## Build order
 
-1. Okada driving well on one simple loop track (Ojuelegba-style) with lap counting, touch controls and keyboard, chase camera. Playable on a phone. **Current milestone.**
+1. Okada driving well on one simple loop track (Ojuelegba-style) with lap counting, touch controls and keyboard, chase camera. Playable on a phone.
 2. Three AI opponents and race positions.
 3. Two power-ups: juju bomb and crude oil slick.
 4. Comedy layer: art, sounds, horn, conductor animations.
 5. Accounts, leaderboard, garage (paint, stickers, horns, upgrades), more vehicles and tracks.
 
-Do not start a later milestone until the earlier one feels fun. Multiplayer is out of scope for now.
+Milestones 1–3 are built, and milestone 4 is partly done.
+
+**Current milestone: multiplayer, friends' private rooms** (2–6 players by room code or link, with optional AI fill). Design: `docs/superpowers/specs/2026-10-03-multiplayer-design.md`. Public matchmaking is still out of scope.
+
+Do not start a later milestone until the earlier one feels fun.
 
 ## Working style
 
