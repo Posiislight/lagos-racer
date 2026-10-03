@@ -87,6 +87,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .preview { position: absolute !important; inset: 0; }
 .menu-side { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; min-height: 0; }
 .menu-side .card h2 { margin-bottom: 2px; }
+.menu-side .row { flex-wrap: nowrap; gap: 8px; }
+.menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
 .track-line { margin: 8px 0 0; font-size: 14px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
 @media (pointer: coarse) { .keys { display: none; } }
@@ -174,6 +176,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .tick { color: var(--green); font-weight: 900; font-size: 18px; }
 .lobby-picks { flex-wrap: wrap; overflow: visible; }
 .lobby-host .btn { flex: 1; }
+.lobby .btn.ready { background: #bfe8c9; }
+.lobby .btn.ready::after { content: ' ✓'; }
 .lobby .btn { white-space: nowrap; }
 @media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
 @media (max-height: 480px) {

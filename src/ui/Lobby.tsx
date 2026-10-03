@@ -75,8 +75,8 @@ export function Lobby() {
             </button>
           ))}
         </div>
-        <button className={`btn${me?.ready ? '' : ' primary'}`} aria-pressed={!!me?.ready} onClick={() => setReady(!me?.ready)}>
-          {me?.ready ? 'Ready ✓' : 'Ready'}
+        <button className={`btn${me?.ready ? ' ready' : ' primary'}`} aria-pressed={!!me?.ready} onClick={() => setReady(!me?.ready)}>
+          Ready
         </button>
         {isHost && (
           <div className="row lobby-host">

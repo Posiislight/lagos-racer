@@ -110,8 +110,11 @@ export const useNet = create<NetState>((set, get) => {
     conn = new Connection(serverUrl(), {
       onOpen: reconnect => {
         if (id !== generation) return;
-        const token = reconnect ? readToken() : null;
-        conn?.sendJson(token ? { t: 'resume', token } : first);
+        if (!reconnect) return conn?.sendJson(first);
+        // Never replay create/join on a reconnect: without a token there is no seat to get back.
+        const token = readToken();
+        if (token) conn?.sendJson({ t: 'resume', token });
+        else leaveToOnline('unreachable');
       },
       onMessage: m => { if (id === generation) onMessage(m); },
       onSnapshot: () => {},
