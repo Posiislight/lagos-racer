@@ -18,7 +18,7 @@ export interface Peer {
   close(): void;
 }
 
-type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' }>;
+type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' }>;
 
 type Conn = {
   peer: Peer;
@@ -64,6 +64,10 @@ function parse(raw: string): Handled | null {
     }
     case 'leave':
       return { t: 'leave' };
+    case 'start':
+      return { t: 'start' };
+    case 'loaded':
+      return { t: 'loaded' };
     default:
       return null;
   }
@@ -113,6 +117,8 @@ export class RoomServer {
     room.lastActivity = this.now();
     if (m.t === 'leave') this.leave(c, room);
     else if (m.t === 'lobby') this.lobby(conn, c, room, m);
+    else if (m.t === 'start') this.start(conn, c, room);
+    else if (m.t === 'loaded') room.markLoaded(c.slot, this.now());
   }
 
   close(conn: number) {
@@ -130,7 +136,10 @@ export class RoomServer {
       const changed = room.expire(now);
       if (room.size === 0) this.rooms.delete(code);
       else if (now - room.lastActivity >= ROOM_IDLE_MS) this.dispose(code, room);
-      else if (changed) room.broadcastRoom();
+      else {
+        if (changed) room.broadcastRoom();
+        room.advance(now);
+      }
     }
   }
 
@@ -232,6 +241,11 @@ export class RoomServer {
     const error = room.lobby(c.slot, m);
     if (error) this.fail(conn, error);
     else room.broadcastRoom();
+  }
+
+  private start(conn: number, c: Conn, room: Room) {
+    const error = room.startRace(c.slot, this.now(), this.random);
+    if (error) this.fail(conn, error);
   }
 
   /** Closes everyone still connected and forgets the room. */

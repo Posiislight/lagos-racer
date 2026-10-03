@@ -1,13 +1,18 @@
 import {
+  LOAD_TIMEOUT_MS,
   MAX_HUMANS,
   RECONNECT_GRACE_MS,
+  START_LEAD_MS,
   type ErrorCode,
+  type GridEntry,
   type PlayerInfo,
   type RoomPhase,
   type RoomView,
   type ServerMessage,
 } from '../src/net/protocol';
+import { trackById } from '../src/config/tracks';
 import type { VehicleId } from '../src/config/vehicles';
+import { buildGrid } from './grid';
 
 export type Send = (conn: number, msg: ServerMessage) => void;
 
@@ -32,6 +37,10 @@ export class Room {
   raceSeq = 0;
   lastActivity: number;
   private members = new Map<number, Member>();
+  private grid: GridEntry[] = [];
+  private loaded = new Set<number>();
+  private gridAt = 0;
+  private startAt = 0;
 
   constructor(
     readonly code: string,
@@ -119,6 +128,50 @@ export class Room {
     if (change.ready !== undefined) m.ready = change.ready;
     if (change.fillAI !== undefined) this.fillAI = change.fillAI;
     return null;
+  }
+
+  /** Host starts the race: lines up the connected humans and tells them to load. */
+  startRace(slot: number, now: number, random: () => number): ErrorCode | null {
+    if (this.phase !== 'lobby') return null;
+    if (slot !== this.hostSlot) return 'not-host';
+    const here = [...this.members.values()].filter(m => m.conn !== null);
+    if (here.length < 2 || here.some(m => !m.ready)) return 'not-ready';
+
+    this.raceSeq++;
+    this.grid = buildGrid(here);
+    this.loaded.clear();
+    this.gridAt = now;
+    this.phase = 'loading';
+    this.broadcast({
+      t: 'grid',
+      raceSeq: this.raceSeq,
+      grid: this.grid,
+      seed: Math.floor(random() * 2 ** 32),
+      trackId: this.trackId,
+      laps: trackById(this.trackId).laps,
+    });
+    return null;
+  }
+
+  /** A grid human finished loading the track. Anyone else, or a repeat, is ignored. */
+  markLoaded(slot: number, now: number) {
+    if (this.phase !== 'loading' || !this.grid.some(g => g.slot === slot)) return;
+    this.loaded.add(slot);
+    this.advance(now);
+  }
+
+  /** Moves loading to countdown and countdown to racing as their conditions are met. */
+  advance(now: number) {
+    if (this.phase === 'loading') {
+      // Anyone who is gone never holds up the start.
+      const waiting = this.grid.some(g => !this.loaded.has(g.slot) && this.connOf(g.slot) !== null);
+      if (waiting && now - this.gridAt < LOAD_TIMEOUT_MS) return;
+      this.startAt = now + START_LEAD_MS;
+      this.phase = 'countdown';
+      this.broadcast({ t: 'start', raceSeq: this.raceSeq, at: this.startAt });
+    } else if (this.phase === 'countdown' && now >= this.startAt) {
+      this.phase = 'racing';
+    }
   }
 
   view(): RoomView {

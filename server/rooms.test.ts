@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
-import { RECONNECT_GRACE_MS, ROOM_IDLE_MS, type ServerMessage } from '../src/net/protocol';
+import { LOAD_TIMEOUT_MS, RECONNECT_GRACE_MS, ROOM_IDLE_MS, START_LEAD_MS, type ServerMessage } from '../src/net/protocol';
 
 class FakePeer implements Peer {
   sent: (string | ArrayBuffer)[] = [];
@@ -286,5 +286,143 @@ describe('RoomServer', () => {
     send(a.conn, { t: 'join', code: a.welcome.code, name: 'Again', vehicle: 'okada' });
     expect(server.rooms.size).toBe(1);
     expect(lastRoom(a.peer).players).toHaveLength(1);
+  });
+});
+
+describe('race start', () => {
+  /** A host and a second human, both ready to go. */
+  function pair() {
+    const a = create();
+    const b = join(a.welcome.code);
+    send(a.conn, { t: 'lobby', ready: true });
+    send(b.conn, { t: 'lobby', ready: true });
+    return { a, b, room: server.rooms.get(a.welcome.code)! };
+  }
+
+  it('start needs the host, two humans and everyone ready', () => {
+    const solo = create();
+    send(solo.conn, { t: 'lobby', ready: true });
+    send(solo.conn, { t: 'start' });
+    expect(msgs(solo.peer, 'error')[0].error).toBe('not-ready');
+
+    const a = create();
+    const b = join(a.welcome.code);
+    send(b.conn, { t: 'start' });
+    expect(msgs(b.peer, 'error')[0].error).toBe('not-host');
+
+    send(a.conn, { t: 'lobby', ready: true });
+    send(a.conn, { t: 'start' });
+    expect(msgs(a.peer, 'error')[0].error).toBe('not-ready');
+    expect(msgs(a.peer, 'grid')).toHaveLength(0);
+    expect(server.rooms.get(a.welcome.code)!.phase).toBe('lobby');
+  });
+
+  it('broadcasts grid with a new raceSeq and seed, and phase loading', () => {
+    const { a, b, room } = pair();
+    send(a.conn, { t: 'start' });
+    expect(room.phase).toBe('loading');
+    expect(room.raceSeq).toBe(1);
+    for (const p of [a.peer, b.peer]) {
+      const [g] = msgs(p, 'grid');
+      expect(g).toMatchObject({ t: 'grid', raceSeq: 1, trackId: 'ojuelegba', laps: 3 });
+      expect(Number.isInteger(g.seed) && g.seed >= 0 && g.seed < 2 ** 32).toBe(true);
+      expect(g.grid).toEqual([
+        { netId: 0, slot: 1, name: 'Ade', vehicle: 'okada', ai: false },
+        { netId: 1, slot: 2, name: 'Bola', vehicle: 'keke', ai: false },
+      ]);
+    }
+    expect(msgs(a.peer, 'grid')[0].seed).toBe(msgs(b.peer, 'grid')[0].seed);
+  });
+
+  it('ignores a second start once the race has begun', () => {
+    const { a } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'start' });
+    expect(msgs(a.peer, 'grid')).toHaveLength(1);
+  });
+
+  it('sends start 3.5 s ahead once everyone has loaded', () => {
+    const { a, b, room } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded' });
+    send(a.conn, { t: 'loaded' });
+    expect(msgs(a.peer, 'start')).toHaveLength(0);
+    now += 400;
+    send(b.conn, { t: 'loaded' });
+    for (const p of [a.peer, b.peer]) {
+      expect(msgs(p, 'start')).toEqual([{ t: 'start', raceSeq: 1, at: now + START_LEAD_MS }]);
+    }
+    expect(room.phase).toBe('countdown');
+    send(a.conn, { t: 'loaded' });
+    expect(msgs(a.peer, 'start')).toHaveLength(1);
+  });
+
+  it('sends start after 20 s even if someone never loads', () => {
+    const { a, room } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded' });
+    now += LOAD_TIMEOUT_MS - 1;
+    server.tick();
+    expect(msgs(a.peer, 'start')).toHaveLength(0);
+    now += 1;
+    server.tick();
+    expect(msgs(a.peer, 'start')).toEqual([{ t: 'start', raceSeq: 1, at: now + START_LEAD_MS }]);
+    expect(room.phase).toBe('countdown');
+  });
+
+  it('leaves a reconnecting player out of the grid', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    const c = join(a.welcome.code, 'Chidi');
+    for (const p of [a, b, c]) send(p.conn, { t: 'lobby', ready: true });
+    server.close(b.conn);
+    send(a.conn, { t: 'start' });
+    expect(msgs(a.peer, 'grid')[0].grid.map(e => e.slot)).toEqual([1, 3]);
+
+    // The absent player never blocks the start, and resuming later does not add them.
+    send(a.conn, { t: 'loaded' });
+    send(c.conn, { t: 'loaded' });
+    expect(msgs(a.peer, 'start')).toHaveLength(1);
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    send(b2.conn, { t: 'loaded' });
+    expect(msgs(b2.peer, 'start')).toHaveLength(0);
+  });
+
+  it('does not wait for a grid player who drops while loading', () => {
+    const { a, b } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded' });
+    server.close(b.conn);
+    server.tick();
+    expect(msgs(a.peer, 'start')).toHaveLength(1);
+  });
+
+  it('ignores loaded outside the loading phase', () => {
+    const { a, b } = pair();
+    send(a.conn, { t: 'loaded' });
+    send(b.conn, { t: 'loaded' });
+    send(a.conn, { t: 'start' });
+    server.tick();
+    expect(msgs(a.peer, 'start')).toHaveLength(0);
+  });
+
+  it('moves to racing when the start time passes', () => {
+    const { a, b, room } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded' });
+    send(b.conn, { t: 'loaded' });
+    now += START_LEAD_MS - 1;
+    server.tick();
+    expect(room.phase).toBe('countdown');
+    now += 1;
+    server.tick();
+    expect(room.phase).toBe('racing');
+  });
+
+  it('refuses new joiners once loading has begun', () => {
+    const { a } = pair();
+    send(a.conn, { t: 'start' });
+    expect(msgs(join(a.welcome.code).peer, 'error')[0].error).toBe('started');
   });
 });
