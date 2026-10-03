@@ -5,6 +5,7 @@ import { RECONNECT_GRACE_MS, type ServerMessage } from './protocol';
 class FakeSocket {
   static all: FakeSocket[] = [];
   binaryType = '';
+  closeCalls = 0;
   sent: unknown[] = [];
   onopen: (() => void) | null = null;
   onclose: (() => void) | null = null;
@@ -17,6 +18,7 @@ class FakeSocket {
     this.sent.push(d);
   }
   close() {
+    this.closeCalls++;
     this.onclose?.();
   }
   open() {
@@ -108,8 +110,13 @@ describe('Connection', () => {
     last().open();
     last().drop();
     vi.advanceTimersByTime(RECONNECT_GRACE_MS - 1);
+    const pending = last(); // attempt started at 11.5 s, still handshaking
     expect(log.status.at(-1)).toBe('reconnecting');
     vi.advanceTimersByTime(1);
+    expect(log.status.at(-1)).toBe('closed');
+    expect(pending.closeCalls).toBe(1);
+    pending.open(); // a late open must not revive a connection already reported closed
+    expect(log.opens).toEqual([false]);
     expect(log.status.at(-1)).toBe('closed');
     const n = FakeSocket.all.length;
     vi.advanceTimersByTime(60_000);

@@ -75,6 +75,10 @@ export class Connection implements NetLink {
 
   /** Intentional close: no reconnect. */
   close() {
+    this.shutDown();
+  }
+
+  private shutDown() {
     this.intentional = true;
     this.clearTimers();
     const ws = this.ws;
@@ -124,23 +128,18 @@ export class Connection implements NetLink {
     if (this.status !== 'reconnecting') {
       this.droppedAt = this.now();
       this.setStatus('reconnecting');
-      this.giveUpTimer = this.setTimer(() => this.giveUp(), RECONNECT_GRACE_MS);
+      this.giveUpTimer = this.setTimer(() => this.shutDown(), RECONNECT_GRACE_MS);
     }
     const wait = BACKOFF_MS[Math.min(this.attempt, BACKOFF_MS.length - 1)];
     this.attempt++;
     this.retryTimer = this.setTimer(() => {
       this.retryTimer = null;
-      if (this.now() - this.droppedAt >= RECONNECT_GRACE_MS) this.giveUp();
+      if (this.now() - this.droppedAt >= RECONNECT_GRACE_MS) this.shutDown();
       else this.connect();
     }, wait);
   }
 
-  private giveUp() {
-    this.intentional = true;
-    this.clearTimers();
-    this.setStatus('closed');
-  }
-
+  // setTimer is only injected to fake time in tests, where the global clear works on the same fake clock.
   private clearTimers() {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     if (this.giveUpTimer) clearTimeout(this.giveUpTimer);
