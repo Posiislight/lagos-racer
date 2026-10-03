@@ -1,4 +1,4 @@
-import { project, wrapDelta, type Track } from './track';
+import { project, wrapDelta, type Track } from './track.ts';
 
 /**
  * Out-and-back tracks along a real road: race one way on one carriageway, U-turn, come back on the

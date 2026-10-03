@@ -36,7 +36,7 @@ function rivals(player: VehicleId): VehicleId[] {
 
 export function makeRace(trackId: string, playerVehicle: VehicleId): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
   const config = trackById(trackId);
-  const track = buildTrack(config.control, 2, config.hills);
+  const track = buildTrack(config.control, 2, config.hills, config.hillsAxis);
   const lineup = [...rivals(playerVehicle), playerVehicle];
   const names = [...AI_NAMES].sort(() => Math.random() - 0.5);
   const spawns: { x: number; y: number; z: number; yaw: number }[] = [];

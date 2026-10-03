@@ -3,7 +3,8 @@ import {
   Mesh, MeshStandardMaterial, PlaneGeometry, SphereGeometry, Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { TrackConfig } from '../config/tracks';
+import type { SceneryZone, TrackConfig } from '../config/tracks';
+import { roadToS } from '../game/outAndBack';
 import { distanceToCentre, heightAt, sampleAt, type Track } from '../game/track';
 import { mergeStatic } from '../models/optimize';
 import { canvasTex, rng } from './trackGeometry';
@@ -88,7 +89,22 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number): G
   const FRONT = hw + PAVEMENT + 0.6;
   // Keep scenery off every stretch of road (other parts of the loop pass close by too).
   const clearOf = (x: number, z: number, radius: number) => distanceToCentre(track, x, z) > FRONT - 0.3 + radius;
-  const nearBridge = (s: number) => cfg.bridges.some(b => Math.abs(wrap(s - b.s, track.length)) < 9);
+  // Along a real road, zones and bridges are given by distance along its axis; find them on the lap.
+  const gap = 2 * hw + (cfg.median?.width ?? 0);
+  const onLap = (d: number, street: 'north' | 'south') => roadToS(track, cfg.axis!, d, street, gap);
+  const zoneRange = (z: SceneryZone): { s0: number; s1: number; sides: number[] } => {
+    if (!('road' in z)) return { s0: z.from * track.length, s1: z.to * track.length, sides: z.side === 0 ? [-1, 1] : [z.side] };
+    // The north leg runs with the axis, the south leg against it. A zone may straddle the start line,
+    // so s1 can run past the lap length (sampleAt wraps).
+    const a = onLap(z.road[0], z.street), b = onLap(z.road[1], z.street);
+    const s0 = z.street === 'north' ? a : b, s1 = z.street === 'north' ? b : a;
+    return { s0, s1: s1 < s0 ? s1 + track.length : s1, sides: [1] };
+  };
+  // A bridge over an out-and-back road crosses both legs.
+  const bridgeAt = cfg.bridges.map(b => b.road === undefined
+    ? { ...b, s: b.s ?? 0, also: [] as number[] }
+    : { ...b, s: onLap(b.road, 'north'), also: [onLap(b.road, 'south')] });
+  const nearBridge = (s: number) => bridgeAt.some(b => [b.s, ...b.also].some(bs => Math.abs(wrap(s - bs, track.length)) < (b.width ?? 13) / 2 + 2.5));
   const zinc = new MeshStandardMaterial({ map: zincTexture(), roughness: 0.7, metalness: 0.3 });
   zinc.userData.castShadow = true;
   const clothes = new MeshStandardMaterial({ map: clothesTexture(), alphaTest: 0.5, side: DoubleSide, roughness: 0.9 });
@@ -266,8 +282,7 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number): G
 
   const mixed = (): FacadeKind => { const k = r(); return k < 0.42 ? 'concrete' : k < 0.68 ? 'house' : k < 0.86 ? 'shops' : 'plaza'; };
   for (const zone of cfg.zones) {
-    const sides = zone.side === 0 ? [-1, 1] : [zone.side];
-    const s0 = zone.from * track.length, s1 = zone.to * track.length;
+    const { s0, s1, sides } = zoneRange(zone);
     for (const side of sides) {
       if (zone.kind === 'buildings') street(s0, s1, side, mixed, { rows: 3, sideStreets: true });
       else if (zone.kind === 'billboards') street(s0, s1, side, () => (r() < 0.6 ? 'concrete' : 'plaza'), { rows: 2, ads: 0.45 });
@@ -366,7 +381,7 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number): G
   }
 
   // Flyovers, the start gantry, and a ring of buildings in front of the painted skyline.
-  cfg.bridges.forEach(b => root.add(bridge(track, cfg, b.s, b.name, m)));
+  bridgeAt.forEach(b => root.add(bridge(track, cfg, b.s, b.name, m)));
   root.add(gantry(track, cfg, m));
   const ring = horizonRing(track);
   const nRing = Math.round(70 * density);

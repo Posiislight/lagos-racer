@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
 import { createProgress, updateProgress, standings, currentLap, formatTime } from './race';
+import { TRACKS } from '../config/tracks';
 
 // A 100 x 60 rounded rectangle, driven anticlockwise from (0, 0) heading +x.
 const control: [number, number][] = [[0, 0], [50, 0], [70, 15], [70, 45], [50, 60], [-50, 60], [-70, 45], [-70, 15], [-50, 0]];
@@ -97,5 +98,37 @@ describe('standings', () => {
   it('formats times as m:ss.cc', () => {
     expect(formatTime(65.432)).toBe('1:05.43');
     expect(formatTime(null)).toBe('--:--.--');
+  });
+});
+
+describe('ojuelegba track', () => {
+  const cfg = TRACKS.find(t => t.id === 'ojuelegba')!;
+  const oj = buildTrack(cfg.control, 2, cfg.hills, cfg.hillsAxis);
+
+  it('is a lap of about 750 m with no bend tighter than the U-turns', () => {
+    expect(oj.length).toBeGreaterThan(700);
+    expect(oj.length).toBeLessThan(850);
+    const minRadius = Math.min(...oj.points.map(p => 1 / Math.max(1e-6, Math.abs(p.curvature))));
+    expect(minRadius).toBeGreaterThanOrEqual(11);
+  });
+
+  it('starts on the north leg heading west', () => {
+    expect(oj.points[0].tangent.x).toBeLessThan(-0.5);
+  });
+
+  it('puts every grid slot on its own leg (createProgress on the grid)', () => {
+    for (let k = 0; k < 6; k++) {
+      const row = Math.floor(k / 2), right = k % 2 === 1;
+      const s = -8 - row * 12 - (right ? 5 : 0), lane = (right ? 1 : -1) * cfg.halfWidth * 0.42;
+      const at = sampleAt(oj, s);
+      const r = createProgress(oj, at.pos.x + at.right.x * lane, at.pos.z + at.right.z * lane);
+      expect(Math.abs(r.distance - s)).toBeLessThan(1);
+    }
+  });
+
+  it('has gentle hills', () => {
+    const ys = oj.points.map(p => p.pos.y), range = Math.max(...ys) - Math.min(...ys);
+    expect(range).toBeGreaterThan(0.8);
+    expect(range).toBeLessThan(2);
   });
 });

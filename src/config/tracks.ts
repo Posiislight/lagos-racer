@@ -1,30 +1,40 @@
 import type { Hills } from '../game/track';
+import { outAndBack } from '../game/outAndBack.ts';
+import { OJUELEGBA_AXIS, OJUELEGBA_START } from './ojuelegbaAxis.ts';
+
+export type ZoneKind =
+  | 'market' | 'buildings' | 'danfoPark' | 'palms' | 'billboards'
+  | 'tejuosho' | 'petrol' | 'danfoRow' | 'church' | 'sportsShops';
 
 /**
- * Hand-built tracks. Each track is a closed loop through control points ([x, z] in metres,
- * driven in the listed order, starting at the first point). The road, kerbs, barriers,
- * colliders, racing line and scenery are all generated from this.
+ * A stretch of scenery. Either by lap fraction (0..1) with a side of the road (-1 left, 1 right,
+ * 0 both), or, on tracks laid along a real road, by distance along the road's axis (metres from its
+ * east end) and which side of the street it is on.
  */
-export type SceneryZone = {
-  /** Where along the lap (0..1) the zone starts and ends. */
-  from: number;
-  to: number;
-  kind: 'market' | 'buildings' | 'danfoPark' | 'palms' | 'billboards';
-  /** Which side of the road: -1 left, 1 right, 0 both. */
-  side: -1 | 0 | 1;
-};
+export type SceneryZone =
+  | { kind: ZoneKind; from: number; to: number; side: -1 | 0 | 1 }
+  | { kind: ZoneKind; road: [number, number]; street: 'north' | 'south' };
 
 export type TrackConfig = {
   id: string;
   name: string;
   blurb: string;
+  /** Closed loop of [x, z] points (metres), driven in order from the start line. */
   control: [number, number][];
+  /** For tracks along a real road: its centreline, east to west (see outAndBack). */
+  axis?: [number, number][];
+  /** Two legs side by side with a median between them. redWhite: axis range where its kerb is red and white. */
+  median?: { width: number; redWhite?: [number, number] };
   hills?: Hills;
+  /** What the hills follow: lap distance (default) or world x (out-and-back roads). */
+  hillsAxis?: 'lap' | 'x';
   /** Road half width, metres. */
   halfWidth: number;
   laps: number;
-  /** Track distances (m) where a flyover crosses the road. */
-  bridges: { s: number; name: string }[];
+  /** Flyovers crossing the road, by lap distance (s) or axis distance (road); width is the deck's depth along the road. */
+  bridges: { s?: number; road?: number; name: string; width?: number }[];
+  /** Green direction signs over the outbound leg, by axis distance. */
+  signs?: { road: number; text: string }[];
   /** Track distances (m) for item pickups (rows across the road). */
   items: number[];
   /** Goat and chicken crossing points: track distance, animal, how many. */
@@ -34,39 +44,39 @@ export type TrackConfig = {
   ground: string;
 };
 
+const HALF_WIDTH = 6.5, MEDIAN = 1.6;
+const north = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'north' });
+const south = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'south' });
+
 export const TRACKS: TrackConfig[] = [
   {
     id: 'ojuelegba',
     name: 'Ojuelegba',
-    blurb: 'Under the bridge, round the market, past the danfo park. Mind the agberos.',
-    // A tight loop: Ojuelegba streets are narrow and crowded.
-    control: [
-      [-29, 0], [29, 0], [79, 0], [115, 6], [138, 26], [143, 56], [130, 81],
-      [101, 92], [72, 85], [50, 95], [37, 117], [12, 130], [-22, 127],
-      [-45, 108], [-53, 81], [-76, 66], [-101, 60], [-115, 42], [-108, 16], [-79, 3],
-    ],
-    // Rolling ups and downs, plus shorter humps and a ripple you feel through the suspension.
-    hills: [[1.5, 1, 0.4], [0.85, 3, 1.3], [0.42, 7, 2.1], [0.2, 13, 0.7], [0.09, 23, 1.9], [0.045, 70, 0.3], [0.03, 113, 1.1]],
-    halfWidth: 6.5,
+    blurb: 'The real Ojuelegba Road: Tejuosho market to under the bridge and back. Mind the agberos.',
+    // West along the north carriageway, U-turn under the Western Avenue bridge, back east on the south one.
+    control: outAndBack(OJUELEGBA_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 12, startAt: OJUELEGBA_START }),
+    axis: OJUELEGBA_AXIS,
+    median: { width: MEDIAN, redWhite: [80, 118] },
+    // The real road is flat; keep gentle rolling and a ripple you feel in the suspension.
+    hills: [[0.45, 2, 0.4], [0.25, 5, 1.3], [0.08, 13, 2.1]],
+    hillsAxis: 'x',
+    halfWidth: HALF_WIDTH,
     laps: 3,
-    bridges: [{ s: 52, name: 'OJUELEGBA' }],
-    items: [110, 300, 500],
+    bridges: [{ road: 352, name: 'OJUELEGBA', width: 30 }],
+    signs: [{ road: 327, text: 'SURULERE  ·  OSHODI  ·  YABA' }],
+    items: [90, 260, 450, 620],
     critters: [
-      { s: 238, kind: 'goat', count: 3 },
-      { s: 328, kind: 'chicken', count: 5 },
-      { s: 405, kind: 'goat', count: 2 },
-      { s: 548, kind: 'chicken', count: 4 },
-      { s: 610, kind: 'goat', count: 2 },
+      { s: 180, kind: 'goat', count: 3 },
+      { s: 330, kind: 'chicken', count: 5 },
+      { s: 520, kind: 'goat', count: 2 },
+      { s: 690, kind: 'chicken', count: 4 },
     ],
+    // What's really there (Street View walk, 3 October), converted to axis metres at 0.38 scale.
     zones: [
-      { from: 0.0, to: 0.12, kind: 'buildings', side: 0 },
-      { from: 0.12, to: 0.3, kind: 'billboards', side: -1 },
-      { from: 0.12, to: 0.32, kind: 'palms', side: 1 },
-      { from: 0.32, to: 0.55, kind: 'market', side: 0 },
-      { from: 0.55, to: 0.7, kind: 'buildings', side: 0 },
-      { from: 0.7, to: 0.86, kind: 'danfoPark', side: 1 },
-      { from: 0.7, to: 0.9, kind: 'palms', side: -1 },
-      { from: 0.86, to: 1.0, kind: 'buildings', side: 0 },
+      north('buildings', 20, 80), north('petrol', 82, 100), north('market', 100, 118), north('buildings', 118, 187),
+      north('church', 190, 205), north('buildings', 205, 240), north('sportsShops', 240, 324), north('market', 331, 356),
+      south('tejuosho', 20, 80), south('danfoRow', 80, 118), south('buildings', 118, 187), south('market', 187, 240),
+      south('buildings', 240, 324), south('market', 331, 356),
     ],
     ground: '#a87d5c',
   },

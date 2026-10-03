@@ -4,12 +4,16 @@
 import { writeFileSync } from 'node:fs';
 import { buildTrack } from '../src/game/track.ts';
 import { TRACKS } from '../src/config/tracks.ts';
+import { medianMask } from '../src/game/outAndBack.ts';
 
 const id = process.argv[2] || 'ojuelegba';
 const out = process.argv[3] || `track-${id}.svg`;
 const cfg = TRACKS.find(t => t.id === id)!;
-const track = buildTrack(cfg.control, 2, cfg.hills);
+const track = buildTrack(cfg.control, 2, cfg.hills, cfg.hillsAxis);
 const pts = track.points, n = pts.length;
+// Out-and-back roads: the two legs run a median apart on purpose; only report them if closer than that.
+const mask = cfg.median ? medianMask(track, cfg.halfWidth, cfg.median.width) : pts.map(() => false);
+const medianGap = 2 * cfg.halfWidth + (cfg.median?.width ?? 0) - 0.5;
 
 const minRadius = Math.min(...pts.map(p => 1 / Math.max(1e-6, Math.abs(p.curvature))));
 const grades = pts.map((p, i) => Math.abs(pts[(i + 1) % n].pos.y - p.pos.y) / track.spacing);
@@ -19,9 +23,10 @@ for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
   const along = Math.min(Math.abs(pts[i].s - pts[j].s), track.length - Math.abs(pts[i].s - pts[j].s));
   if (along < 60) continue;
   const d = pts[i].pos.distanceTo(pts[j].pos);
+  if (mask[i] && mask[j] && d >= medianGap) continue;
   if (d < closest.d) closest = { d, a: pts[i].s, b: pts[j].s };
 }
-console.log(JSON.stringify({ id, length: +track.length.toFixed(1), samples: n, minRadius: +minRadius.toFixed(1), maxGradePct: +(maxGrade * 100).toFixed(1), heightRange: [+Math.min(...heights).toFixed(1), +Math.max(...heights).toFixed(1)],
+console.log(JSON.stringify({ id, length: +track.length.toFixed(1), samples: n, minRadius: +minRadius.toFixed(1), maxGradePct: +(maxGrade * 100).toFixed(1), medianSamples: mask.filter(Boolean).length, heightRange: [+Math.min(...heights).toFixed(1), +Math.max(...heights).toFixed(1)],
   closestSections: { gap: +closest.d.toFixed(1), atS: [+closest.a.toFixed(0), +closest.b.toFixed(0)] } }, null, 2));
 
 const xs = pts.map(p => p.pos.x), zs = pts.map(p => p.pos.z), pad = 30;
