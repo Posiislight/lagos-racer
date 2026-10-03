@@ -154,6 +154,15 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 /* ---------- race ---------- */
 .race { position: absolute; inset: 0; background: #f3e4c8; touch-action: none; }
 .race-canvas { position: absolute !important; inset: 0; }
+/* Power-up screen effects: between the 3D view and the HUD, never in the way of a touch. */
+.screen-fx { position: absolute; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
+.fx-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fx-juju { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(156, 39, 255, .6)); }
+.fx-oil { position: absolute; inset: 0; transition: opacity .2s; background: radial-gradient(ellipse at center, transparent 58%, rgba(18, 14, 10, .55)); }
+.fx-oil .blob { position: absolute; width: 52vmin; height: 52vmin; }
+.fx-oil .b0 { left: -26vmin; top: 22%; } .fx-oil .b1 { left: 24%; bottom: -30vmin; transform: rotate(40deg); }
+.fx-oil .b2 { right: -26vmin; top: 6%; transform: rotate(110deg); } .fx-oil .b3 { right: -22vmin; bottom: 4%; transform: rotate(200deg); }
+.fx-fly { position: absolute; width: 64px; height: 64px; pointer-events: none; }
 .hud { position: absolute; inset: 0; pointer-events: none; z-index: 12; font-family: Bungee, Impact, sans-serif; color: #fff; }
 .hud > * { position: absolute; }
 .hud-pos {
@@ -208,6 +217,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
 }
+.hud-msg.long { white-space: normal; width: min(82vw, 640px); text-align: center; animation-duration: 3.2s; }
+.hud-msg.long b { display: block; font-weight: 400; }
+.hud-msg.long small { display: block; font-size: clamp(14px, 2.6vw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }
 .hud-wrong {
   top: 45%; left: 50%; transform: translateX(-50%); background: var(--red); padding: 8px 18px; border-radius: 10px; font-size: 24px;
   animation: blink .5s steps(2) infinite;

@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { MathUtils, PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { getRace } from '../game/runtime';
 import { project } from '../game/track';
+import { fx } from '../game/fx';
 
 const _pos = new Vector3(), _q = new Quaternion(), _fwd = new Vector3(), _want = new Vector3(), _look = new Vector3();
 
@@ -14,6 +15,7 @@ export function ChaseCamera() {
   const camera = useThree(s => s.camera) as PerspectiveCamera;
   const heading = useRef<Vector3 | null>(null);
   const look = useRef(new Vector3());
+  const base = useRef<Vector3 | null>(null);
 
   useFrame((_, dtRaw) => {
     const race = getRace();
@@ -44,13 +46,21 @@ export function ChaseCamera() {
       const at = race.track.points[p.index], push = p.lateral - Math.sign(p.lateral) * limit;
       _want.x -= at.right.x * push; _want.z -= at.right.z * push;
     }
-    camera.position.lerp(_want, 1 - Math.exp(-10 * dt));
+    if (!base.current) base.current = camera.position.clone();
+    base.current.lerp(_want, 1 - Math.exp(-10 * dt));
+    camera.position.copy(base.current);
+    // Fuel boost: a small shake (not on low quality, where it would just look like a stutter).
+    if (fx.boost > 0 && fx.quality !== 'low') {
+      const t = performance.now() / 1000, k = 0.06 * fx.boost;
+      camera.position.x += Math.sin(t * 31) * k; camera.position.y += Math.sin(t * 27 + 1) * k;
+    }
 
     _look.set(_pos.x + h.x * cam.lookAhead, _pos.y + cam.height * 0.35, _pos.z + h.z * cam.lookAhead);
     look.current.lerp(_look, 1 - Math.exp(-14 * dt));
     camera.lookAt(look.current);
 
-    const fov = MathUtils.lerp(62, 74, Math.min(1, speed / 32));
+    // Wider view with speed, and a kick wider still on a fuel boost.
+    const fov = MathUtils.lerp(62, 74, Math.min(1, speed / 32)) + 10 * fx.boost;
     if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 3); camera.updateProjectionMatrix(); }
   });
   return null;

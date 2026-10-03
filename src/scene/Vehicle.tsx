@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, RoundCuboidCollider, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Quaternion, SphereGeometry, Vector3,
+  AdditiveBlending, BufferAttribute, BufferGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Points, PointsMaterial, Quaternion, SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
 import { getRace, type Racer } from '../game/runtime';
@@ -215,8 +215,15 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       tilt.current.position.y = lay.originY * 0.4 + (racer.wobble > 0 ? Math.abs(Math.sin(tt * 31)) * 0.06 : 0);
     }
     // Fuel flame out the back and the purple juju aura.
-    fx.flame.visible = racer.boost > 0;
-    if (fx.flame.visible) fx.flame.scale.set(1, 0.8 + Math.random() * 0.5, 1);
+    fx.flame.visible = fx.sparks.visible = racer.boost > 0;
+    if (fx.flame.visible) {
+      // A longer flame than the exhaust glow, flickering, with sparks flying out behind it.
+      const th = 0.8 + Math.random() * 0.5;
+      fx.flame.scale.set(1.4, th, th);
+      const pos = fx.sparks.geometry.attributes.position as BufferAttribute, sp = fx.sparkSpread;
+      for (let i = 0; i < SPARKS; i++) pos.setXYZ(i, -(sp.from + Math.random() * (sp.to - sp.from)), (Math.random() - 0.5) * sp.w * 2, (Math.random() - 0.5) * sp.w * 2);
+      pos.needsUpdate = true;
+    }
     fx.aura.visible = racer.curse > 0;
     if (fx.aura.visible) {
       const p = 1 + Math.sin(tt * 9) * 0.08;
@@ -271,6 +278,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           </group>
           <primitive object={fx.flame} />
           <primitive object={fx.aura} />
+          <primitive object={fx.sparks} />
         </group>
       </group>
     </RigidBody>
@@ -310,5 +318,12 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
   );
   aura.position.set(0, lay.originY, 0);
   aura.visible = false;
-  return { flame, aura };
+  // Sparks spitting out behind the flame on a boost, scattered afresh every frame.
+  const sparkGeo = new BufferGeometry().setAttribute('position', new BufferAttribute(new Float32Array(SPARKS * 3), 3));
+  const sparks = new Points(sparkGeo, new PointsMaterial({ color: '#ffd27a', size: 0.12, transparent: true, blending: AdditiveBlending, depthWrite: false }));
+  sparks.position.copy(flame.position);
+  sparks.frustumCulled = false;
+  sparks.visible = false;
+  return { flame, aura, sparks, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
 }
+const SPARKS = 12;

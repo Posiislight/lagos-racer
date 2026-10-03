@@ -28,10 +28,17 @@ export function Hud({ onPause }: { onPause: () => void }) {
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>
       {hud.countdown && <div className={`hud-count${hud.countdown.length > 1 ? ' go' : ''}`} key={`count-${hud.countdown}`}>{hud.countdown}</div>}
-      {hud.message && <div className="hud-msg" key={`msg-${hud.messageKey}`}>{hud.message}</div>}
+      {hud.message && <Message text={hud.message} key={`msg-${hud.messageKey}`} />}
       {hud.wrongWay && <div className="hud-wrong">WRONG WAY! TURN AM!</div>}
     </div>
   );
+}
+
+/** A flashed message. "JUJU! Press Space to…" shows the shout big and the how-to underneath, smaller. */
+function Message({ text }: { text: string }) {
+  const i = text.indexOf('! ');
+  if (i < 0 || text.length <= 16) return <div className="hud-msg">{text}</div>;
+  return <div className="hud-msg long"><b>{text.slice(0, i + 1)}</b><small>{text.slice(i + 2)}</small></div>;
 }
 
 /**

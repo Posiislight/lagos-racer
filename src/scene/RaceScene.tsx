@@ -18,6 +18,7 @@ import { resetPlayerInput } from '../game/input';
 import { Track } from './Track';
 import { Vehicle } from './Vehicle';
 import { ChaseCamera } from './ChaseCamera';
+import { FxBridge } from './FxBridge';
 import { RaceLogic } from './RaceLogic';
 import { Effects } from './Effects';
 import { makeSkyline } from './art/skyline';
@@ -89,6 +90,7 @@ export function RaceScene() {
       <Critters />
       <RaceLogic key={raceId} />
       <ChaseCamera />
+      <FxBridge quality={quality} />
     </>
   );
 }
