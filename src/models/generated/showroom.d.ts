@@ -3,8 +3,8 @@ import type { Group, Material, Texture, Mesh, BufferGeometry, Object3D } from 't
 
 type Vec = [number, number, number];
 export function buildOkada(body?: string): Group;
-export function buildKeke(): Group;
-export function buildDanfo(): Group;
+export function buildKeke(bodyColor?: string): Group;
+export function buildDanfo(bodyColor?: string): Group;
 export function buildBRT(lowerColor: string, number: string): Group;
 export function person(o?: Record<string, unknown>): Group;
 export function fixedChild(parent: Object3D, child: Object3D, x: number, y: number, z: number, ry?: number, lean?: number): Group;

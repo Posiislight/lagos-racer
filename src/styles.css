@@ -90,6 +90,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side .row { flex-wrap: nowrap; gap: 8px; }
 .menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
 .track-line { margin: 8px 0 0; font-size: 14px; }
+.credit { margin: 4px 0 0; font-size: 11px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
 @media (pointer: coarse) { .keys { display: none; } }
 @media (max-width: 720px) and (orientation: portrait) {
@@ -114,6 +115,10 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .garage-preview { position: relative; height: 100%; min-height: 160px; }
 .garage-card { color: var(--ink); }
 .stats { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 14px; margin: 10px 0 14px; }
+.paints { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(20, 18, 16, .25); cursor: pointer; padding: 0; }
+.swatch.on { border-color: var(--ink); box-shadow: 0 0 0 3px var(--yellow); }
+.paint-name { font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; margin-left: 4px; }
 .stats span { color: var(--muted); }
 .bar { height: 10px; border-radius: 5px; background: rgba(35, 31, 27, .12); overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--yellow); border-right: 2px solid var(--ink); transition: width .35s ease; }
@@ -189,7 +194,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 /* ---------- race ---------- */
 .race { position: absolute; inset: 0; background: #f3e4c8; touch-action: none; }
 .race-canvas { position: absolute !important; inset: 0; }
-.hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; font-family: Bungee, Impact, sans-serif; color: #fff; }
+/* Power-up screen effects: between the 3D view and the HUD, never in the way of a touch. */
+.screen-fx { position: absolute; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
+.fx-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fx-juju { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(156, 39, 255, .6)); }
+.fx-oil { position: absolute; inset: 0; transition: opacity .2s; background: radial-gradient(ellipse at center, transparent 58%, rgba(18, 14, 10, .55)); }
+.fx-oil .blob { position: absolute; width: 52vmin; height: 52vmin; }
+.fx-oil .b0 { left: -26vmin; top: 22%; } .fx-oil .b1 { left: 24%; bottom: -30vmin; transform: rotate(40deg); }
+.fx-oil .b2 { right: -26vmin; top: 6%; transform: rotate(110deg); } .fx-oil .b3 { right: -22vmin; bottom: 4%; transform: rotate(200deg); }
+.fx-fly { position: absolute; width: 64px; height: 64px; pointer-events: none; }
+.hud { position: absolute; inset: 0; pointer-events: none; z-index: 12; font-family: Bungee, Impact, sans-serif; color: #fff; }
 .hud > * { position: absolute; }
 .hud-pos {
   top: calc(10px + var(--safe-t)); left: calc(12px + var(--safe-l)); background: var(--board); color: var(--led);
@@ -202,30 +216,33 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: calc(10px + var(--safe-t)); right: calc(64px + var(--safe-r)); text-align: right;
   display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
-.hud-lap .lap { background: var(--yellow); color: var(--ink); border-radius: 8px; padding: 3px 10px; font-size: 18px; }
-.hud-lap .lap b { font-weight: 400; font-size: 22px; }
+/* The lap as a straight line across the top middle, a dot per racer. */
+.hud-progress { top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); width: min(46vw, 420px); display: flex; align-items: center; gap: 10px; }
+.hud-progress .lap { background: var(--yellow); color: var(--ink); border-radius: 8px; padding: 3px 10px; font-size: 16px; white-space: nowrap; }
+.hud-progress .lap b { font-weight: 400; font-size: 20px; }
+.hud-progress .line { position: relative; flex: 1; height: 8px; border-radius: 4px; background: rgba(243, 239, 228, .92); box-shadow: 0 0 0 3px rgba(20, 18, 16, .75); }
+.hud-progress .flag { position: absolute; right: -4px; top: -6px; width: 10px; height: 20px; background: repeating-linear-gradient(#141210 0 5px, #f3efe4 5px 10px); border-radius: 2px; }
+.hud-progress i { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 3px solid #141210; }
+.hud-progress i.me { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 4px; }
 .hud-lap .time, .hud-lap .best { font-family: Archivo, sans-serif; font-weight: 900; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; }
 .hud-lap .time { font-size: 20px; }
 .hud-lap .best { font-size: 12px; opacity: .9; }
-.minimap { width: 128px; height: 100px; margin-top: 4px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4)); }
 .hud-pause {
   pointer-events: auto; top: calc(10px + var(--safe-t)); right: calc(12px + var(--safe-r)); width: 44px; height: 44px;
   border-radius: 50%; border: 2px solid var(--ink); background: var(--chip); color: var(--ink); font-family: Archivo, sans-serif; font-weight: 900; cursor: pointer;
 }
 .hud-item {
-  pointer-events: auto; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%);
+  pointer-events: auto; top: 50%; right: calc(14px + var(--safe-r)); transform: translateY(-50%);
   width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--ink); background: rgba(255, 250, 240, .85);
   display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--ink);
 }
 .hud-item .icon { font-size: 32px; line-height: 1; font-family: system-ui, sans-serif; }
 .hud-item .icon-img { width: 64px; height: 64px; }
-.pad.use { width: 84px; height: 84px; border-radius: 50%; background: rgba(245, 180, 0, .85); font-size: 16px; }
-.pad.use img { width: 70px; height: 70px; }
-.pad.use.empty { opacity: .45; }
-.hud-item .icon.dim { opacity: .3; font-family: Bungee, sans-serif; }
+.hud-item .icon.dim { opacity: .35; font-family: Bungee, sans-serif; font-size: 18px; }
 .hud-item small { font-family: Archivo, sans-serif; font-weight: 900; font-size: 9px; text-transform: uppercase; }
 .hud-item.full { background: var(--yellow); animation: pulse 1s ease-in-out infinite; }
-@keyframes pulse { 50% { transform: translateX(-50%) scale(1.08); } }
+@keyframes pulse { 50% { transform: translateY(-50%) scale(1.08); } }
+@media (pointer: coarse) { .hud-item { width: 88px; height: 88px; } .hud-item .icon-img { width: 74px; height: 74px; } }
 .hud-speed {
   bottom: calc(12px + var(--safe-b)); left: 50%; transform: translateX(-50%); font-family: Archivo, sans-serif; font-weight: 800;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-size: 14px;
@@ -241,6 +258,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
 }
+.hud-msg.long { white-space: normal; width: min(82vw, 640px); text-align: center; animation-duration: 3.2s; }
+.hud-msg.long b { display: block; font-weight: 400; }
+.hud-msg.long small { display: block; font-size: clamp(14px, 2.6vw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }
 .net-badge {
   position: absolute; z-index: 11; pointer-events: none; top: calc(76px + var(--safe-t)); left: calc(12px + var(--safe-l));
   background: var(--red); color: #fff; border-radius: 999px; padding: 3px 10px; font: 800 12px Archivo, sans-serif;
@@ -265,7 +285,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .touch-left, .touch-right { position: absolute; bottom: calc(14px + var(--safe-b)); display: flex; gap: 12px; pointer-events: auto; }
 .touch-left { left: calc(14px + var(--safe-l)); }
 .touch-right { right: calc(14px + var(--safe-r)); flex-direction: column; align-items: flex-end; gap: 10px; }
+.touch-right.above-steer { bottom: calc(112px + var(--safe-b)); }
 .touch-row { display: flex; gap: 12px; align-items: flex-end; }
+/* Each half of the screen (below the top HUD) is a steer zone; the button follows your thumb. */
+.touch-zone { position: absolute; top: calc(100px + var(--safe-t)); bottom: 0; width: 50%; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+.touch-zone.left { left: 0; }
+.touch-zone.right { right: 0; }
+.pad.steer.floating { position: absolute; pointer-events: none; transform: translate(-50%, -50%); top: calc(100% - 58px - var(--safe-b)); }
+.pad.steer.floating.left { left: calc(58px + var(--safe-l)); }
+.pad.steer.floating.right { left: calc(100% - 58px - var(--safe-r)); }
+.pad.steer.floating.down { transform: translate(-50%, -50%) scale(.96); }
 .pad {
   border: 3px solid var(--ink); background: rgba(255, 250, 240, .72); color: var(--ink); border-radius: 20px;
   font-family: Bungee, Impact, sans-serif; touch-action: none; cursor: pointer; display: grid; place-items: center;
@@ -284,6 +313,5 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .pad.gas { width: 84px; height: 96px; }
   .pad.brake { width: 72px; height: 72px; }
   .hud-pos b { font-size: 34px; }
-  .minimap { width: 96px; height: 76px; }
-  .hud-item { width: 62px; height: 62px; }
+  .hud-item { width: 78px; height: 78px; }
 }

@@ -9,6 +9,37 @@ export function cornerSpeed(k: number, grip: number) {
   return Math.sqrt(grip / Math.max(Math.abs(k), 1e-4));
 }
 
+/** Where a racer is on the road and how much of it it takes up (metres). */
+export type Footprint = { lateral: number; distance: number; halfLength: number; halfWidth: number };
+
+const CLEARANCE = 1; // m of daylight to leave between two vehicles side by side
+
+/**
+ * A lane that gets us clear of whoever is right alongside (overlapping along the road and closer
+ * than CLEARANCE across it), or null if nobody is. Without this two AI vehicles side by side keep
+ * steering back into their own lanes and rub along together for seconds.
+ */
+export function sideStep(me: Footprint, others: Footprint[], hw: number): number | null {
+  const limit = hw * 0.6;
+  let worst: Footprint | null = null, worstGap = Infinity;
+  for (const o of others) {
+    if (Math.abs(o.distance - me.distance) > me.halfLength + o.halfLength + 0.5) continue;
+    const need = me.halfWidth + o.halfWidth + CLEARANCE, gap = Math.abs(o.lateral - me.lateral);
+    if (gap < need && gap < worstGap) { worst = o; worstGap = gap; }
+  }
+  if (!worst) return null;
+  const need = me.halfWidth + worst.halfWidth + CLEARANCE, away = me.lateral <= worst.lateral ? -1 : 1;
+  const lane = worst.lateral + away * need;
+  // No room on that side (the kerb or the median): go round the other side instead.
+  if (Math.abs(lane) > limit) return MathUtils.clamp(worst.lateral - away * need, -limit, limit);
+  return lane;
+}
+
+const footprint = (r: Racer): Footprint => ({
+  lateral: r.progress.lateral, distance: r.progress.distance,
+  halfLength: r.vehicle.chassis.length * r.vehicle.scale / 2, halfWidth: r.vehicle.chassis.width * r.vehicle.scale / 2,
+});
+
 export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: number) {
   const ai = r.ai, b = r.body;
   if (!ai || !b) return;
@@ -40,7 +71,10 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
     const dx = cr.x - pos.x, dz = cr.z - pos.z, along = dx * fx + dz * fz, side = dx * rx + dz * rz;
     if (along > 4 && along < 28 && Math.abs(side) < 3 && Math.random() < 0.85) ai.laneTarget = MathUtils.clamp(r.progress.lateral - Math.sign(side || 1) * 4.5, -hw * 0.75, hw * 0.75);
   }
-  ai.lane += (ai.laneTarget - ai.lane) * Math.min(1, dt * 0.8);
+  // Someone right alongside: move over to clear them, briskly.
+  const step = sideStep(footprint(r), race.racers.filter(o => o !== r && o.body).map(footprint), hw);
+  if (step !== null) ai.laneTarget = step;
+  ai.lane += (ai.laneTarget - ai.lane) * Math.min(1, dt * (step !== null ? 3 : 0.8));
 
   // Aim at a point ahead on our lane; look further ahead the faster we go.
   const look = 7 + Math.abs(v) * 0.55;
@@ -86,7 +120,8 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
   c.horn = Math.random() < dt * 0.04;
 
   // Items: fuel on a straight, juju when there's someone ahead to send it at, oil when someone
-  // is right behind; otherwise use it before long anyway.
+  // is right behind, odeshi when a juju is flying at you or someone is close behind to throw one;
+  // otherwise use it before long anyway.
   c.useItem = false;
   if (r.item) {
     ai.itemDelay -= dt;
@@ -95,11 +130,12 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
       const k = Math.abs(track.points[sampleAt(track, r.progress.s + 25).index].curvature);
       use ||= ai.itemDelay < 0 && k < 0.02;
     }
+    if (r.item === 'odeshi' && race.hazards.some(h => h.kind === 'juju' && h.target === r.id)) use = true;
     for (const o of race.racers) {
       if (o === r) continue;
       const gap = o.progress.distance - r.progress.distance;
       if (r.item === 'juju' && gap > 5 && gap < 120) use ||= ai.itemDelay < 0;
-      if (r.item === 'oil' && gap < -3 && gap > -25) use ||= ai.itemDelay < 0;
+      if ((r.item === 'oil' || r.item === 'odeshi') && gap < -3 && gap > -25) use ||= ai.itemDelay < 0;
     }
     if (use) { c.useItem = true; ai.itemDelay = 1 + Math.random() * 3; }
   }

@@ -14,9 +14,8 @@ import {
   type ServerMessage,
   type Snapshot,
 } from '../src/net/protocol';
-import { trackById } from '../src/config/tracks';
-import type { VehicleId } from '../src/config/vehicles';
-import { buildTrack } from '../src/game/track';
+import { trackById, trackFor } from '../src/config/tracks';
+import { paintOf, vehicleById, type VehicleId } from '../src/config/vehicles';
 import { buildGrid } from './grid';
 import { Referee } from './referee';
 
@@ -26,6 +25,8 @@ type Member = {
   slot: number;
   name: string;
   vehicle: VehicleId;
+  /** Always one of the vehicle's own paint ids. */
+  paint: string;
   ready: boolean;
   token: string;
   /** Null while disconnected and waiting out the reconnect grace. */
@@ -35,7 +36,10 @@ type Member = {
   grace: number;
 };
 
-export type LobbyChange = { vehicle?: VehicleId; ready?: boolean; fillAI?: boolean };
+export type LobbyChange = { vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean };
+
+/** The paint id if the vehicle has it, else the vehicle's usual colour. */
+const paintFor = (vehicle: VehicleId, paint: string | undefined) => paintOf(vehicleById(vehicle), paint).id;
 
 /** One room: who is in it, who hosts, and the lobby state shared with everyone. */
 export class Room {
@@ -77,10 +81,10 @@ export class Room {
   }
 
   /** Seats a new human in the lowest free slot; the first one in becomes host. */
-  add(conn: number, name: string, vehicle: VehicleId, token: string): number {
+  add(conn: number, name: string, vehicle: VehicleId, paint: string, token: string): number {
     let slot = 1;
     while (this.members.has(slot)) slot++;
-    this.members.set(slot, { slot, name, vehicle, ready: false, token, conn, leftAt: null, grace: RECONNECT_GRACE_MS });
+    this.members.set(slot, { slot, name, vehicle, paint: paintFor(vehicle, paint), ready: false, token, conn, leftAt: null, grace: RECONNECT_GRACE_MS });
     if (this.members.size === 1) this.hostSlot = slot;
     return slot;
   }
@@ -188,7 +192,10 @@ export class Room {
     const m = this.members.get(slot);
     if (!m) return null;
     if (change.fillAI !== undefined && slot !== this.hostSlot) return 'not-host';
-    if (change.vehicle !== undefined) m.vehicle = change.vehicle;
+    if (change.vehicle !== undefined || change.paint !== undefined) {
+      m.vehicle = change.vehicle ?? m.vehicle;
+      m.paint = paintFor(m.vehicle, change.paint ?? m.paint);
+    }
     if (change.ready !== undefined) m.ready = change.ready;
     if (change.fillAI !== undefined) this.fillAI = change.fillAI;
     return null;
@@ -204,7 +211,7 @@ export class Room {
     const config = trackById(this.trackId);
     this.raceSeq++;
     this.grid = buildGrid(here, this.fillAI, this.hostSlot, random);
-    this.referee = new Referee(buildTrack(config.control, 2, config.hills), config.laps, this.grid);
+    this.referee = new Referee(trackFor(config), config.laps, this.grid);
     this.cutoffAt = null;
     this.resultsMsg = null;
     this.dropped.clear();
@@ -353,7 +360,7 @@ export class Room {
   view(): RoomView {
     const players: PlayerInfo[] = [...this.members.values()]
       .sort((a, b) => a.slot - b.slot)
-      .map(m => ({ slot: m.slot, name: m.name, vehicle: m.vehicle, ready: m.ready, connected: m.conn !== null }));
+      .map(m => ({ slot: m.slot, name: m.name, vehicle: m.vehicle, paint: m.paint, ready: m.ready, connected: m.conn !== null }));
     return { code: this.code, phase: this.phase, hostSlot: this.hostSlot, fillAI: this.fillAI, raceSeq: this.raceSeq, players };
   }
 

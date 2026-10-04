@@ -10,7 +10,7 @@ import { canvasTex } from './trackGeometry';
 
 const MAX = 32, TRAIL = 10;
 const _o = new Object3D(), _c = new Color();
-const PUFF: Record<'juju' | 'fuel', Color> = { juju: new Color('#b04dff'), fuel: new Color('#ffb347') };
+const PUFF: Record<'juju' | 'fuel' | 'odeshi', Color> = { juju: new Color('#b04dff'), fuel: new Color('#ffb347'), odeshi: new Color('#37b6ff') };
 
 /**
  * Glowing item orbs on the road, flying juju with its trail, crude-oil slicks, and puffs where

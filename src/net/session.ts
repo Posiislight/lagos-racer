@@ -79,7 +79,8 @@ export class NetSession implements NetHooks {
         netId: r.id, x: p.x, y: p.y, z: p.z, qx: q.x, qy: q.y, qz: q.z, qw: q.w, vx: v.x, vy: v.y, vz: v.z,
         distance: r.progress.distance, laps: r.progress.lapsDone,
         flags: (r.boost > 0 ? FLAG.boost : 0) | (r.slip > 0 ? FLAG.slip : 0) | (r.curse > 0 ? FLAG.curse : 0)
-          | (r.wobble > 0 ? FLAG.wobble : 0) | (this.hornSince.has(r.id) ? FLAG.horn : 0) | (r.progress.finishTime !== null ? FLAG.finished : 0),
+          | (r.wobble > 0 ? FLAG.wobble : 0) | (this.hornSince.has(r.id) ? FLAG.horn : 0) | (r.progress.finishTime !== null ? FLAG.finished : 0)
+          | (r.shield > 0 ? FLAG.shield : 0),
       });
     }
     this.hornSince.clear();
@@ -103,6 +104,8 @@ export class NetSession implements NetHooks {
       r.slip = car.flags & FLAG.slip ? 1 : 0;
       r.curse = car.flags & FLAG.curse ? 1 : 0;
       r.wobble = car.flags & FLAG.wobble ? 1 : 0;
+      // The odeshi bubble: enough to draw it and keep oil off; the phone that drives it times it out.
+      r.shield = car.flags & FLAG.shield ? 3 : 0;
       r.controls.horn = (car.flags & FLAG.horn) !== 0;
     }
   }
@@ -134,10 +137,12 @@ export class NetSession implements NetHooks {
       const h = race.hazards.find(x => x.id === m.hazard);
       if (!h) return;
       if (h.kind === 'juju') {
-        race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: 'juju' });
+        // A shielded victim's phone reports the juju fizzling out against the odeshi.
+        const blocked = (race.racers.find(r => r.id === m.netId)?.shield ?? 0) > 0;
+        race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: blocked ? 'odeshi' : 'juju' });
         h.life = 0;
         // You hear your own juju land, as offline.
-        if (race.racers.find(r => r.id === h.owner)?.isPlayer) sfx('juju');
+        if (race.racers.find(r => r.id === h.owner)?.isPlayer) sfx(blocked ? 'odeshi' : 'juju');
       } else h.life = Math.min(h.life, 8);
     } else if (m.t === 'finished') {
       // The referee accepted another phone's finish: it stops being a juju target and ranks by time.

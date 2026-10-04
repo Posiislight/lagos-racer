@@ -1,6 +1,6 @@
 import type { RapierRigidBody } from '@react-three/rapier';
 import type { Object3D } from 'three';
-import type { VehicleConfig } from '../config/vehicles';
+import type { Paint, VehicleConfig } from '../config/vehicles';
 import type { TrackConfig } from '../config/tracks';
 import type { Track } from './track';
 import { emptyControls, type Controls } from './input';
@@ -12,9 +12,10 @@ import type { SnapshotBuffer } from '../net/interpolation';
  * Power-ups from the glowing orbs:
  * - fuel: a burst of speed for you;
  * - oil: crude oil dropped behind you, whoever drives over it goes slippery;
- * - juju: flies to the racer ahead of you and slows them down.
+ * - juju: flies to the racer ahead of you and slows them down;
+ * - odeshi: a protective charm that blocks crude oil and juju for a few seconds.
  */
-export type ItemKind = 'fuel' | 'oil' | 'juju';
+export type ItemKind = 'fuel' | 'oil' | 'juju' | 'odeshi';
 
 export type AIState = {
   /** Preferred lateral offset from the centre line (m), drifts slowly for variety. */
@@ -37,6 +38,7 @@ export type Racer = {
   id: number;
   name: string;
   vehicle: VehicleConfig;
+  paint: Paint;
   isPlayer: boolean;
   /** Who drives it: this phone's player, this phone's AI, or another phone. */
   kind: 'local' | 'ai' | 'remote';
@@ -59,6 +61,8 @@ export type Racer = {
   slip: number;
   /** Seconds of juju slowdown left. */
   curse: number;
+  /** Seconds of odeshi left: oil and juju do nothing to you while it lasts. */
+  shield: number;
   /** Seconds of shaky handling left after running over a goat or chicken. */
   wobble: number;
   /** Seconds of immunity to oil, so a car that slows down in a slick can drive out of it. */
@@ -67,8 +71,16 @@ export type Racer = {
   scraping: boolean;
   /** Set by collisions this step: a knock that costs speed (0..1 of speed to lose). */
   knock: number;
+  /** Sideways shove from bumping another vehicle (m/s); fades quickly, exempt from the arcade grip. */
+  bump: { x: number; z: number };
+  /** Ids of the racers this one is touching right now. */
+  touching: Set<number>;
+  /** Contact normal (horizontal) for each racer in `touching`, from the collision that started the contact. */
+  contactNormal: Map<number, { x: number; z: number }>;
   /** Seconds the car has been stuck; used to back it out or put it back on the road. */
   trouble: number;
+  /** How many times this racer has been put back on the road (play-test metric). */
+  respawns: number;
   /** Request a respawn on the track at the next physics step. */
   respawn: boolean;
   ai: AIState | null;
@@ -93,7 +105,7 @@ export type Hazard = {
 export type Pickup = { id: number; kind: ItemKind; x: number; y: number; z: number; s: number; respawn: number };
 
 /** A short-lived puff where something hit: juju's purple smoke, oil splashes. */
-export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' };
+export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' | 'odeshi' };
 
 export type RaceRuntime = {
   config: TrackConfig;
@@ -132,10 +144,10 @@ let current: RaceRuntime | null = null;
 export const getRace = () => current;
 export const setRace = (r: RaceRuntime | null) => { current = r; };
 
-export function makeRacer(id: number, name: string, vehicle: VehicleConfig, isPlayer: boolean, progress: RacerProgress): Racer {
+export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress): Racer {
   return {
-    id, name, vehicle, isPlayer, kind: isPlayer ? 'local' : 'ai', owner: 0, remote: null, controls: emptyControls(), body: null, visual: null, progress,
-    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
-    trouble: 0, respawn: false, ai: null,
+    id, name, vehicle, paint, isPlayer, kind: isPlayer ? 'local' : 'ai', owner: 0, remote: null, controls: emptyControls(), body: null, visual: null, progress,
+    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, shield: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
+    bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false, ai: null,
   };
 }

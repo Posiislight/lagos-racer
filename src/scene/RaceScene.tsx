@@ -4,7 +4,8 @@ import { Physics } from '@react-three/rapier';
 import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
-import { VEHICLES } from '../config/vehicles';
+import { TRACKS } from '../config/tracks';
+import { paintOf, vehicleById } from '../config/vehicles';
 import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
 import { useGame, type Quality } from '../game/store';
@@ -13,6 +14,7 @@ import { getSession, useNet } from '../net/store';
 import { Track } from './Track';
 import { Vehicle } from './Vehicle';
 import { ChaseCamera } from './ChaseCamera';
+import { FxBridge } from './FxBridge';
 import { RaceLogic } from './RaceLogic';
 import { Effects } from './Effects';
 import { makeSkyline } from './art/skyline';
@@ -29,6 +31,7 @@ export function RaceScene() {
   const raceId = useGame(s => s.raceId);
   const trackId = useGame(s => s.track);
   const vehicle = useGame(s => s.vehicle);
+  const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
   const online = useGame(s => s.online);
@@ -37,10 +40,11 @@ export function RaceScene() {
   // A fresh race whenever a new one is started; a room race is laid out from the server's grid.
   const { setup, session } = useMemo(() => {
     const session = online ? getSession() : null;
-    const v = VEHICLES.some(x => x.id === vehicle) ? vehicle : 'okada';
-    const track = session ? useNet.getState().pendingGrid?.trackId ?? trackId : trackId;
-    return { setup: makeRace(track, v, session?.setup), session };
-  }, [raceId, trackId, vehicle, online]);
+    // The room's track, if this build has it.
+    const roomTrack = session ? useNet.getState().pendingGrid?.trackId : undefined;
+    const track = roomTrack && TRACKS.some(t => t.id === roomTrack) ? roomTrack : trackId;
+    return { setup: makeRace(track, { vehicle: vehicleById(vehicle).id, paint }, session?.setup), session };
+  }, [raceId, trackId, vehicle, paint, online]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {
@@ -62,6 +66,7 @@ export function RaceScene() {
       <Critters />
       <RaceLogic key={raceId} />
       <ChaseCamera />
+      <FxBridge quality={quality} />
     </>
   );
 }

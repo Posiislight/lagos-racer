@@ -17,14 +17,19 @@ export const touch = { left: false, right: false, gas: false, brake: false, drif
 
 const keys = new Set<string>();
 let itemQueued = false;
+
+/** Keys the page should swallow: arrows and Space would scroll it. Browser shortcuts are left alone. */
+export function swallowKey(e: { key: string }): boolean {
+  return ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key);
+}
 let listening = false;
 
 export function startKeyboard() {
   if (listening) return;
   listening = true;
   window.addEventListener('keydown', e => {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-    if (!e.repeat && (e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyF')) itemQueued = true;
+    if (swallowKey(e)) e.preventDefault();
+    if (!e.repeat && ['Space', 'KeyE', 'KeyF', 'ShiftLeft', 'ShiftRight'].includes(e.code)) itemQueued = true;
     keys.add(e.code);
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -68,7 +73,7 @@ export function readPlayer(out: Controls, dt: number, opts: { tilt: boolean; inv
   const braking = k('ArrowDown', 'KeyS') || touch.brake;
   out.throttle = braking ? 0 : 1;
   out.brake = braking ? 1 : 0;
-  out.handbrake = k('Space') || touch.drift;
+  out.handbrake = k('KeyC') || touch.drift;
   out.horn = k('KeyH') || touch.horn;
   out.useItem = itemQueued || touch.item;
   itemQueued = false;

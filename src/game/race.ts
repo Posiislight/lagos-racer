@@ -64,8 +64,19 @@ export function resyncProgress(track: Track, r: RacerProgress, x: number, z: num
   r.index = p.index; r.s = p.s; r.lateral = p.lateral;
 }
 
+/**
+ * Project onto the track searching only near lap distance `distance` (any lap, negative on the grid), the way
+ * updateProgress searches near the last spot. Where two legs of a road run side by side across a median, a car
+ * is never put on the other leg. For when there is no last spot to search from (the room's referee).
+ */
+export function projectNear(track: Track, x: number, z: number, distance: number) {
+  const s = ((distance % track.length) + track.length) % track.length;
+  return project(track, x, z, Math.min(track.points.length - 1, Math.floor(s / track.spacing)));
+}
+
 /** Another phone owns this car's distance and laps; we only keep the track-relative position fresh. */
 export function trackRemote(track: Track, r: RacerProgress, x: number, z: number) {
+  // Searched near the last spot, as updateProgress does, so it never jumps to the other leg of the road.
   const p = project(track, x, z, r.index);
   r.index = p.index; r.s = p.s; r.lateral = p.lateral;
 }

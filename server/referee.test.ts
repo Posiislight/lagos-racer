@@ -11,7 +11,7 @@ const LAPS = 3;
 // Okada top speed is 33 m/s, so no lap may be quicker than L / 52.8.
 const MIN_LAP = L / (33 * 1.6);
 
-const entry = (netId: number): GridEntry => ({ netId, slot: netId + 1, name: `P${netId}`, vehicle: 'okada', ai: false });
+const entry = (netId: number): GridEntry => ({ netId, slot: netId + 1, name: `P${netId}`, vehicle: 'okada', paint: 'red', ai: false });
 const grid = (n: number) => Array.from({ length: n }, (_, i) => entry(i));
 
 /** A car on the centre line at this track distance, reporting that distance. */
@@ -41,7 +41,7 @@ describe('Referee', () => {
     // A repeat changes nothing and does not DNF the car.
     expect(ref.finish(0, lapsAt(20), time + 5, time)).toBe(false);
     expect(ref.results(time)).toEqual([
-      { netId: 0, slot: 1, ai: false, name: 'P0', vehicle: 'okada', place: 1, time, projected: false, best: L / 25, dnf: false },
+      { netId: 0, slot: 1, ai: false, name: 'P0', vehicle: 'okada', paint: 'red', place: 1, time, projected: false, best: L / 25, dnf: false },
     ]);
   });
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../game/store';
-import { VEHICLES, vehicleById } from '../config/vehicles';
+import { VEHICLES, paintOf, vehicleById } from '../config/vehicles';
 import { ERROR_TEXT, useNet } from '../net/store';
 
 async function shareLink(code: string): Promise<'shared' | 'copied' | 'failed'> {
@@ -23,6 +23,7 @@ async function shareLink(code: string): Promise<'shared' | 'copied' | 'failed'> 
 
 export function Lobby() {
   const unlocked = useGame(s => s.unlocked);
+  const paints = useGame(s => s.paint);
   const { status, code, mySlot, room, error, setVehicle, setReady, setFillAI, start, leave } = useNet();
   const [copied, setCopied] = useState(false);
   if (!room || !code) return null;
@@ -60,7 +61,7 @@ export function Lobby() {
               return (
                 <tr key={p.slot} className={p.slot === mySlot ? 'me' : ''}>
                   <td>{p.name}{p.slot === room.hostSlot && ' (host)'}{!p.connected && <span className="muted"> · reconnecting</span>}</td>
-                  <td><span className="dot" style={{ background: v.color }} /> {v.name}</td>
+                  <td><span className="dot" style={{ background: paintOf(v, p.paint).color }} /> {v.name}</td>
                   <td>{p.ready ? <span className="tick" role="img" aria-label="ready">✓</span> : <span className="muted" aria-label="not ready">–</span>}</td>
                 </tr>
               );
@@ -71,11 +72,15 @@ export function Lobby() {
       <div className="card lobby-controls">
         <p className="eyebrow">Your ride</p>
         <div className="stops lobby-picks" role="tablist" aria-label="Vehicles">
-          {VEHICLES.filter(v => !v.locked || unlocked.includes(v.id)).map(v => (
-            <button key={v.id} role="tab" aria-selected={me?.vehicle === v.id} onClick={() => setVehicle(v.id)}>
-              <span className="dot" style={{ background: v.color }} />{v.name}
-            </button>
-          ))}
+          {VEHICLES.filter(v => !v.locked || unlocked.includes(v.id)).map(v => {
+            // Each ride in the paint picked for it in the garage.
+            const paint = paintOf(v, paints[v.id]);
+            return (
+              <button key={v.id} role="tab" aria-selected={me?.vehicle === v.id} onClick={() => setVehicle(v.id, paint.id)}>
+                <span className="dot" style={{ background: paint.color }} />{v.name}
+              </button>
+            );
+          })}
         </div>
         <button className={`btn${me?.ready ? ' ready' : ' primary'}`} aria-pressed={!!me?.ready} disabled={inRace} onClick={() => setReady(!me?.ready)}>
           Ready

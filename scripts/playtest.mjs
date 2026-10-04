@@ -8,13 +8,15 @@
 //   --shots=2,6,12                 screenshot times (s) after the race starts
 //   --out=dir                      where to save screenshots (default: scratch dir)
 //   --gpu                          try the real GPU instead of SwiftShader
-//   --vehicle=okada --quality=high --unlock
+//   --vehicle=okada --paint=blue --quality=high --unlock
+//   --eval="js"                    run once the race is ready and print the result
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v ?? true]; }));
+// Split on the first '=' only, so values (like --eval JavaScript) may contain '='.
+const args = Object.fromEntries(process.argv.slice(2).map(a => { const s = a.replace(/^--/, ''), i = s.indexOf('='); return i < 0 ? [s, true] : [s.slice(0, i), s.slice(i + 1)]; }));
 const base = args.url || 'http://localhost:5173/';
 const [W, H] = (args.size || '1280x720').split('x').map(Number);
 const seconds = +(args.seconds || 20);
@@ -57,17 +59,40 @@ const params = new URLSearchParams();
 if (args.autopilot) params.set('autopilot', '1');
 if (args.unlock) params.set('unlock', 'all');
 // Seed settings before the app loads.
-const settings = { settings: { quality: args.quality || 'high', sound: false, autoGas: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt-blue', 'brt-red'], accountPromptDismissed: false };
-await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v1', ${JSON.stringify(JSON.stringify(settings))});` });
+const settings = { settings: { quality: args.quality || 'high', sound: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt'], accountPromptDismissed: false, paint: args.paint ? { [args.vehicle || 'okada']: args.paint } : {}, itemHints: 0 };
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v2', ${JSON.stringify(JSON.stringify(settings))});` });
 await send('Page.navigate', { url: base + (params.toString() ? '?' + params : '') });
-await sleep(2500);
+// Wait for the menu (a busy machine can take well over a few seconds), not a fixed time.
+for (let i = 0; i < 300; i++) { if (await evaluate(`!![...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent))`)) break; await sleep(100); }
 const files = [await shot('menu')];
 
 // Start the race.
 await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent)).click()`);
 let ready = false;
-for (let i = 0; i < 300 && !ready; i++) { await sleep(100); ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))'); }
-if (!ready) { console.log(JSON.stringify({ error: 'race never became ready', errors, logs: logs.slice(-10) }, null, 2)); done(1); }
+let clickedAgain = false;
+for (let i = 0; i < 300 && !ready; i++) {
+  await sleep(100);
+  ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))');
+  // Still on the menu after 3 s: the click was lost, so press the button once more (and say so).
+  if (!ready && i === 30 && await evaluate(`!!document.querySelector('.menu')`)) { clickedAgain = true; await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent)).click()`); }
+}
+if (clickedAgain) console.log('note: the first RACE click did not start the race; clicked again');
+if (!ready) {
+  // Where it got stuck: no canvas yet, no race yet, or some racers without a physics body.
+  const state = await evaluate(`(() => { const lr = window.__lr; const r = lr && lr.getRace(); return { screen: lr ? lr.useGame.getState().screen : document.querySelector('.menu') ? 'menu (no __lr)' : 'unknown', race: !!r, bodies: r ? r.racers.map(c => !!c.body) : null, buttons: [...document.querySelectorAll('button')].map(b => b.textContent).slice(0, 5) }; })()`);
+  console.log(JSON.stringify({ error: 'race never became ready', state, errors, logs: logs.slice(-10) }, null, 2)); done(1);
+}
+// Contact monitor: the longest time any two racers stay touching while both are moving (> 3 m/s).
+// Vehicles that jam together show up here; bumps that push apart keep it short.
+await evaluate(`(() => { const run = {}; window.__contact = { max: 0, pair: '' }; let last = performance.now();
+  (function f(now) { const r = window.__lr.getRace(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (r && r.phase === 'racing') for (const a of r.racers) for (const id of a.touching) { if (id <= a.id) continue; const b = r.racers.find(x => x.id === id);
+      const k = a.id + '-' + id; run[k] = Math.abs(a.speed) > 3 && b && Math.abs(b.speed) > 3 ? (run[k] || 0) + dt : 0;
+      if (run[k] > window.__contact.max) window.__contact = { max: +run[k].toFixed(2), pair: a.vehicle.id + '/' + b.vehicle.id }; }
+    if (r) for (const k of Object.keys(run)) { const [x, y] = k.split('-').map(Number); if (!r.racers[x]?.touching.has(y)) run[k] = 0; }
+    requestAnimationFrame(f); })(last); })()`);
+// --eval="<js>": run once the race is ready (window.__lr has getRace, useGame, state) and print the result.
+if (args.eval) console.log('eval:', JSON.stringify(await evaluate(args.eval)));
 
 const keyHold = String(args.keys || '').split(',').filter(Boolean).map(s => { const [k, r] = s.split(':'); const [a, b] = r.split('-').map(Number); return { k, a, b, down: false }; });
 const codeOf = k => ({ ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Space: 'Space', ' ': 'Space' })[k] || ('Key' + k.toUpperCase());
@@ -101,5 +126,7 @@ console.log("errors:", JSON.stringify([...new Set(errors)].slice(0, 10)));
 const every = Math.max(1, Math.floor(samples.length / (+args.lines || 12)));
 samples.forEach((s, i) => { if (i % every === 0 || i === samples.length - 1) console.log(typeof s.racers === "object" ? line(s) : JSON.stringify(s)); });
 console.log("results:", JSON.stringify(results));
+const metrics = await evaluate(`({ contact: window.__contact, episodes: window.__episodes, open: window.__openEpisodes, respawnLog: window.__respawnLog, respawns: window.__lr.getRace().racers.map(c => ({ v: c.vehicle.id, player: c.isPlayer, respawns: c.respawns, laps: c.progress.lapsDone })) })`);
+console.log("metrics:", JSON.stringify(metrics));
 console.log("files:", files.join(" "));
 ws.close(); done(errors.length ? 2 : 0);

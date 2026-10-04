@@ -43,8 +43,15 @@ export function hillHeight(hills: Hills | undefined, s: number, length: number) 
   return at(s) - at(0);
 }
 
+/**
+ * What hills follow: the lap distance ('lap'), world x ('x'), or any position along a road, given as
+ * a function of (x, z) such as the distance along an out-and-back road's axis. The last two keep both
+ * legs of an out-and-back road at the same height wherever they run side by side.
+ */
+export type HillsAlong = 'lap' | 'x' | ((x: number, z: number) => number);
+
 /** Build an evenly sampled closed track from control points given as [x, z] pairs. */
-export function buildTrack(control: [number, number][], spacing = 2, hills?: Hills): Track {
+export function buildTrack(control: [number, number][], spacing = 2, hills?: Hills, hillsAxis: HillsAlong = 'lap'): Track {
   const curve = new CatmullRomCurve3(control.map(([x, z]) => new Vector3(x, 0, z)), true, 'centripetal');
   const approx = curve.getLength();
   const n = Math.max(16, Math.round(approx / spacing));
@@ -60,7 +67,13 @@ export function buildTrack(control: [number, number][], spacing = 2, hills?: Hil
     return p;
   });
   const step = length / n;
-  if (hills?.length) points.forEach(p => { p.pos.y = hillHeight(hills, p.s, length); });
+  if (hills?.length && hillsAxis !== 'lap') {
+    const along = hillsAxis === 'x' ? (x: number) => x : hillsAxis;
+    const u = points.map(p => along(p.pos.x, p.pos.z)), min = Math.min(...u), span = Math.max(...u) - min || 1;
+    const at = (v: number) => hills.reduce((y, [a, k, ph]) => y + a * Math.sin(((v - min) / span) * Math.PI * 2 * k + ph), 0);
+    const y0 = at(u[0]);
+    points.forEach((p, i) => { p.pos.y = at(u[i]) - y0; });
+  } else if (hills?.length) points.forEach(p => { p.pos.y = hillHeight(hills, p.s, length); });
   points.forEach((p, i) => {
     const a = points[(i - 1 + n) % n].tangent, b = points[(i + 1) % n].tangent;
     // Right is +z when heading +x, so a left bend turns towards -z and makes this angle negative.

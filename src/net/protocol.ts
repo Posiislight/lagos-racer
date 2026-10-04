@@ -24,16 +24,17 @@ export const LOBBY_GRACE_MS = 120000;
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const NICK_MAX = 16;
 
-export const FLAG = { boost: 1, slip: 2, curse: 4, wobble: 8, horn: 16, finished: 32 } as const;
+export const FLAG = { boost: 1, slip: 2, curse: 4, wobble: 8, horn: 16, finished: 32, shield: 64 } as const;
 
 export type RoomPhase = 'lobby' | 'loading' | 'countdown' | 'racing';
 export type ErrorCode = 'not-found' | 'full' | 'started' | 'bad-name' | 'bad-code' | 'expired' | 'not-host' | 'not-ready';
 
-export type PlayerInfo = { slot: number; name: string; vehicle: VehicleId; ready: boolean; connected: boolean };
+/** paint is one of the vehicle's paint ids (see paintOf). */
+export type PlayerInfo = { slot: number; name: string; vehicle: VehicleId; paint: string; ready: boolean; connected: boolean };
 export type RoomView = { code: string; phase: RoomPhase; hostSlot: number; fillAI: boolean; raceSeq: number; players: PlayerInfo[] };
 
 /** slot is the owning human's slot; netId is the grid index, front to back. */
-export type GridEntry = { netId: number; slot: number; name: string; vehicle: VehicleId; ai: boolean };
+export type GridEntry = { netId: number; slot: number; name: string; vehicle: VehicleId; paint: string; ai: boolean };
 
 export type NetResult = {
   netId: number;
@@ -41,6 +42,7 @@ export type NetResult = {
   ai: boolean;
   name: string;
   vehicle: VehicleId;
+  paint: string;
   place: number;
   time: number | null;
   projected: boolean;
@@ -49,11 +51,11 @@ export type NetResult = {
 };
 
 export type ClientMessage =
-  | { t: 'create'; name: string; vehicle: VehicleId }
-  | { t: 'join'; code: string; name: string; vehicle: VehicleId }
+  | { t: 'create'; name: string; vehicle: VehicleId; paint: string }
+  | { t: 'join'; code: string; name: string; vehicle: VehicleId; paint: string }
   | { t: 'resume'; token: string }
   | { t: 'ping'; c: number }
-  | { t: 'lobby'; vehicle?: VehicleId; ready?: boolean; fillAI?: boolean }
+  | { t: 'lobby'; vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }
   | { t: 'start' }
   | { t: 'loaded' }
   | { t: 'pickup'; orb: number }

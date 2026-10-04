@@ -42,21 +42,24 @@ Most players will be on budget Android phones (Tecno, Infinix) on mobile data.
 | Okada | 9 | 9 | 2 | Rider in union vest, side-saddle passenger |
 | Keke Marwa | 5 | 6 | 4 | Tips on corners, overloaded with passengers |
 | Danfo | 6 | 5 | 7 | Conductor fires the power-ups |
-| Blue BRT | 4 | 3 | 10 | Slow tank, unlockable "boss" vehicle |
-| Red BRT | 5 | 3 | 9 | Same body, red livery |
+| BRT | 4 | 3 | 10 | Slow tank, unlockable "boss" vehicle |
 
-Danfo and BRTs have conductors hanging out of the door; on those vehicles the conductor throws the power-ups.
+Colours are paint options, not separate vehicles: each vehicle has six paints in the garage (see `src/config/vehicles.ts`).
+
+Danfo and BRT have conductors hanging out of the door; on those vehicles the conductor throws the power-ups.
 
 ## Power-ups
 
 - Juju: bomb
 - Crude oil: grease slick that makes others skid
-- Coconut: shield / extra toughness
+- Odeshi: protective charm, blocks crude oil and juju for 8 seconds
 - Projectile: pure water sachet or a flying slipper (not a baby)
 
 ## Tracks (stylised, hand-built, not Street View)
 
 Ojuelegba, Third Mainland Bridge, Oshodi under the bridge, flooded Lekki in rainy season, Balogun market. Hazards: LASTMA ambush, goats crossing, danfos cutting in, open gutters, potholes.
+
+Ojuelegba is laid out on the real road from OpenStreetMap (`scripts/osm-track.mjs`, credit "© OpenStreetMap contributors" in the menu); the buildings and props stay stylised and hand-built. Never derive layouts or models from Google Maps or Street View imagery (their terms forbid it); Street View is only for looking.
 
 ## Accounts
 

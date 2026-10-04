@@ -1,4 +1,5 @@
-import { project, wrapDelta, type Track } from '../src/game/track';
+import { wrapDelta, type Track } from '../src/game/track';
+import { projectNear } from '../src/game/race';
 import { vehicleById } from '../src/config/vehicles';
 import type { CarState, GridEntry, NetResult } from '../src/net/protocol';
 
@@ -56,7 +57,8 @@ export class Referee {
     const car = this.cars.get(state.netId);
     if (!car || car.finishTime !== null || car.dnf) return;
     const L = this.track.length;
-    const s = project(this.track, state.x, state.z).s;
+    // Searched near the claimed distance, so a car beside the other leg of the road is never put on that leg.
+    const s = projectNear(this.track, state.x, state.z, state.distance).s;
     if (Math.abs(wrapDelta(this.track, ((state.distance % L) + L) % L, s)) > POSE_TOLERANCE) return;
     const reach = car.topSpeed * SPEED_MARGIN * Math.max(0, time - car.lastTime) + JUMP_SLACK;
     // The step slack alone would add up over a burst of same-time snapshots.
@@ -131,9 +133,9 @@ export class Referee {
         const avg = c.distance > 0 && now > 0 ? c.distance / now : 0;
         time = avg > 1 ? now + (total - c.distance) / avg : null;
       }
-      const { netId, slot, ai, name, vehicle } = c.entry;
+      const { netId, slot, ai, name, vehicle, paint } = c.entry;
       return {
-        netId, slot, ai, name, vehicle, place: i + 1, time, projected: c.finishTime === null && !c.dnf,
+        netId, slot, ai, name, vehicle, paint, place: i + 1, time, projected: c.finishTime === null && !c.dnf,
         best: c.laps.length ? Math.min(...c.laps) : null, dnf: c.dnf,
       };
     });

@@ -49,8 +49,8 @@ function danfoWingTex(){
   });
 }
 
-function buildDanfo(){
-  const g=new THREE.Group(), Y=paint('#f7b500'), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
+function buildDanfo(bodyColor='#f7b500'){
+  const g=new THREE.Group(), Y=paint(bodyColor), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
   const WX=1.5, WR=.42, WZ=.92, BOT=.40, AR=.55, HW=.88, TOP=1.64; // wheel x/radius/track, body bottom, arch radius (shape), half width, roof (shape)
   const add=o=>{ g.add(o); return o; };
 

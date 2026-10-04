@@ -3,12 +3,13 @@ import { heightAt, sampleAt } from './track';
 import { standings } from './race';
 import { sfx } from './audio';
 
-export const ITEM_LABEL: Record<ItemKind, string> = { fuel: 'Fuel', oil: 'Crude oil', juju: 'Juju' };
+export const ITEM_LABEL: Record<ItemKind, string> = { fuel: 'Fuel', oil: 'Crude oil', juju: 'Juju', odeshi: 'Odeshi' };
 
 const PICKUP_RADIUS = 1.6;
 const OIL_RADIUS = 2.6;
 const JUJU_SPEED = 46;
 const JUJU_HIT = 2.2;
+const ODESHI_TIME = 8;
 
 /** How long an effect lasts: flimsy vehicles suffer longer, tough ones shrug it off. */
 const lasting = (r: Racer, base: number) => base * (1.25 - r.vehicle.stats.toughness * 0.055);
@@ -16,13 +17,13 @@ const lasting = (r: Racer, base: number) => base * (1.25 - r.vehicle.stats.tough
 /** Rows of glowing orbs across the road at the track's item distances. */
 export function makePickups(race: Pick<RaceRuntime, 'config' | 'track'>, nextId: () => number): Pickup[] {
   const out: Pickup[] = [];
-  const kinds: ItemKind[] = ['fuel', 'oil', 'juju'];
+  const kinds: ItemKind[] = ['fuel', 'oil', 'juju', 'odeshi'];
   race.config.items.forEach((s, row) => {
     const at = sampleAt(race.track, s);
-    // Every row mixes all three, shifted per row, so there's always a choice to steer for.
+    // Every row mixes all four, shifted per row, so there's always a choice to steer for.
     [-0.6, -0.2, 0.2, 0.6].forEach((lane, i) => {
       const o = lane * race.config.halfWidth;
-      out.push({ id: nextId(), kind: kinds[(i + row) % 3], x: at.pos.x + at.right.x * o, y: at.pos.y, z: at.pos.z + at.right.z * o, s, respawn: 0 });
+      out.push({ id: nextId(), kind: kinds[(i + row) % kinds.length], x: at.pos.x + at.right.x * o, y: at.pos.y, z: at.pos.z + at.right.z * o, s, respawn: 0 });
     });
   });
   return out;
@@ -73,6 +74,9 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
       race.hazards.push(h);
       race.net?.use(h);
       if (r.isPlayer) sfx('oil');
+    } else if (r.item === 'odeshi') {
+      r.shield = ODESHI_TIME;
+      if (r.isPlayer) sfx('odeshi');
     } else {
       // The conductor (or rider) sends the juju flying at the racer ahead.
       const target = jujuTarget(race, r);
@@ -91,6 +95,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
     r.boost = Math.max(0, r.boost - dt);
     r.slip = Math.max(0, r.slip - dt);
     r.curse = Math.max(0, r.curse - dt);
+    r.shield = Math.max(0, r.shield - dt);
     r.wobble = Math.max(0, r.wobble - dt);
   }
 
@@ -100,7 +105,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
     else {
       // Each phone decides only for the cars it drives; a remote car's slip arrives in its snapshots.
       for (const r of race.racers) {
-        if (!r.body || r.kind === 'remote' || r.immune > 0 || (h.armed > 0 && r.id === h.owner)) continue;
+        if (!r.body || r.kind === 'remote' || r.immune > 0 || r.shield > 0 || (h.armed > 0 && r.id === h.owner)) continue;
         const t = r.body.translation();
         if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 < OIL_RADIUS * OIL_RADIUS) {
           r.slip = Math.max(r.slip, lasting(r, 2.6));
@@ -137,6 +142,14 @@ function updateJuju(race: RaceRuntime, h: Hazard, dt: number, flash: (m: string)
     if (!r.body || r.kind === 'remote' || r.id === h.owner) continue;
     const t = r.body.translation(), reach = JUJU_HIT + r.vehicle.chassis.width * r.vehicle.scale * 0.5;
     if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 > reach * reach) continue;
+    if (r.shield > 0) {
+      // Odeshi: the juju fizzles out against the charm.
+      race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: 'odeshi' });
+      if (r.isPlayer) { sfx('odeshi'); flash('ODESHI!'); }
+      else if (race.racers.find(o => o.id === h.owner)?.isPlayer) sfx('odeshi');
+      h.life = 0;
+      return;
+    }
     // Cursed: lose most of your speed now, and struggle to pick it up again for a while.
     const lv = r.body.linvel(), keep = 0.45 + r.vehicle.stats.toughness * 0.03;
     r.body.setLinvel({ x: lv.x * keep, y: lv.y, z: lv.z * keep }, true);

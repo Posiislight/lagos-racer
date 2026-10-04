@@ -19,7 +19,7 @@ const goat = (): Critter => ({
 
 /** Another phone's car facing +x at this spot. */
 function remoteAt(x: number, y: number, z: number, dnf: boolean): Racer {
-  const r = makeRacer(1, 'r1', vehicleById('okada'), false, createProgress(track, x, z));
+  const r = makeRacer(1, 'r1', vehicleById('okada'), vehicleById('okada').paints[0], false, createProgress(track, x, z));
   r.kind = 'remote';
   r.remote = { buffer: new SnapshotBuffer(), dnf };
   r.body = {

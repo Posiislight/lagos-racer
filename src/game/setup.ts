@@ -1,31 +1,27 @@
-import { trackById } from '../config/tracks';
-import { VEHICLES, vehicleById, type VehicleId } from '../config/vehicles';
+import { trackById, trackFor } from '../config/tracks';
+import { paintOf, vehicleById } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
 import { SnapshotBuffer } from '../net/interpolation';
-import { buildTrack, sampleAt } from './track';
+import { sampleAt } from './track';
 import { createProgress } from './race';
 import { makeRacer, type AIState, type RaceRuntime, type Racer } from './runtime';
 import { makePickups } from './items';
 import { makeCritters } from './critters';
 import { AI_NAMES } from './ai';
 import { seededRandom } from './random';
+import { pickRivals, type Pick } from './lineup';
 
 export type Spawn = { x: number; y: number; z: number; yaw: number };
 
 /** A room race: the server's grid, which slot is this phone, and the seed every phone shares. */
 export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number };
 
-/** Everyone else on the grid: one of each vehicle except the one you picked, in a random order. */
-function rivals(player: VehicleId): VehicleId[] {
-  return VEHICLES.map(v => v.id).filter(v => v !== player).sort(() => Math.random() - 0.5);
-}
-
 const aiState = (lane: number, k: number, rand: () => number): AIState =>
   ({ lane, laneTarget: lane, skill: 0.9 + k * 0.035 + rand() * 0.03, itemDelay: 2, stuck: 0, reverseTime: 0 });
 
-export function makeRace(trackId: string, playerVehicle: VehicleId, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
+export function makeRace(trackId: string, player: Pick, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
   const config = trackById(trackId);
-  const track = buildTrack(config.control, 2, config.hills);
+  const track = trackFor(config);
   const spawns: Spawn[] = [];
   /** Two lanes, three rows, staggered; grid position 0 is the front of the left lane. */
   const place = (k: number) => {
@@ -45,7 +41,8 @@ export function makeRace(trackId: string, playerVehicle: VehicleId, online?: Onl
       const { lane, progress } = place(g.netId);
       const mine = g.slot === online.mySlot;
       const kind = !mine ? 'remote' : g.ai ? 'ai' : 'local';
-      const r = makeRacer(g.netId, g.name, vehicleById(g.vehicle), kind === 'local', progress);
+      const v = vehicleById(g.vehicle);
+      const r = makeRacer(g.netId, g.name, v, paintOf(v, g.paint), kind === 'local', progress);
       r.kind = kind;
       r.owner = g.slot;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
@@ -54,13 +51,14 @@ export function makeRace(trackId: string, playerVehicle: VehicleId, online?: Onl
       return r;
     });
   } else {
-    // The player is last, at the back of the right lane.
-    const lineup = [...rivals(playerVehicle), playerVehicle];
+    // Five rivals (every vehicle at least once, all in different paints), then you at the back of the right lane.
+    const lineup = [...pickRivals(player, 5), player];
     const names = [...AI_NAMES].sort(() => Math.random() - 0.5);
-    racers = lineup.map((vid, k) => {
+    racers = lineup.map(({ vehicle: vid, paint }, k) => {
       const { lane, progress } = place(k);
       const isPlayer = k === lineup.length - 1;
-      const r = makeRacer(k, isPlayer ? 'You' : names[k], vehicleById(vid), isPlayer, progress);
+      const v = vehicleById(vid);
+      const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, progress);
       if (!isPlayer) r.ai = aiState(lane, k, Math.random);
       return r;
     });

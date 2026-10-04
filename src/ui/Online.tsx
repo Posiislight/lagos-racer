@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGame } from '../game/store';
+import { paintOf, vehicleById } from '../config/vehicles';
 import { ERROR_TEXT, useNet } from '../net/store';
 import { CODE_ALPHABET, NICK_MAX, normalizeCode } from '../net/protocol';
 
@@ -27,6 +28,8 @@ const onlyCodeLetters = (raw: string) => normalizeCode(raw).split('').filter(c =
 
 export function Online() {
   const vehicle = useGame(s => s.vehicle);
+  // Your ride goes to the room in the paint you picked for it in the garage.
+  const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const { status, error, cut, nickname, create, join, leave } = useNet();
   const [name, setName] = useState(nickname);
   const [code, setCode] = useState(codeFromUrl);
@@ -40,9 +43,9 @@ export function Online() {
           <span>Your nickname</span>
           <input value={name} maxLength={NICK_MAX} autoComplete="nickname" placeholder="Odogwu Rider" onChange={e => setName(e.target.value)} />
         </label>
-        <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle)}>Create room</button>
+        <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
         <p className="or" aria-hidden="true">or</p>
-        <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle); }}>
+        <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
           <label className="field">
             <span>Room code</span>
             <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}

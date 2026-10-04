@@ -78,7 +78,7 @@ const send = (method, params = {}, sessionId) => new Promise(res => { const i = 
 for (let i = 0; i < 100 && !/listen/i.test(serverLog); i++) await sleep(100);
 if (!/listen/i.test(serverLog)) await fail(`room server did not start:\n${serverLog}`);
 
-const settings = { settings: { quality: 'low', sound: false, autoGas: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false };
+const settings = { settings: { quality: 'low', sound: false, steering: 'buttons', invertTilt: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 99 };
 const query = new URLSearchParams(['autopilot=1', ...lagParams].join('&')).toString();
 const players = [];
 for (let i = 0; i < tabs; i++) {
@@ -88,7 +88,7 @@ for (let i = 0; i < tabs; i++) {
   const p = { name: `P${i + 1}`, sid, ev: async expr => { const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, sid); return r.result?.result?.value ?? r.result?.exceptionDetails?.exception?.description; } };
   await send('Runtime.enable', {}, sid); await send('Page.enable', {}, sid);
   await send('Emulation.setFocusEmulationEnabled', { enabled: true }, sid);
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v1', ${JSON.stringify(JSON.stringify(settings))});` }, sid);
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v2', ${JSON.stringify(JSON.stringify(settings))});` }, sid);
   await send('Page.navigate', { url: `${base}?${query}` }, sid);
   players.push(p);
 }

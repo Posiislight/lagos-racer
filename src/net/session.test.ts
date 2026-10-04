@@ -83,7 +83,7 @@ describe('NetSession', () => {
     }) as unknown as Racer['body'];
 
     function racer(id: number, kind: Racer['kind'], owner: number): Racer {
-      const r = makeRacer(id, `r${id}`, vehicleById('okada'), kind === 'local', progress());
+      const r = makeRacer(id, `r${id}`, vehicleById('okada'), vehicleById('okada').paints[0], kind === 'local', progress());
       r.kind = kind;
       r.owner = owner;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };

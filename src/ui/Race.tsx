@@ -5,6 +5,7 @@ import { useGame } from '../game/store';
 import { getRace } from '../game/runtime';
 import { RaceScene } from '../scene/RaceScene';
 import { Hud } from './Hud';
+import { ScreenFx } from './ScreenFx';
 import { TouchControls, useIsTouch } from './TouchControls';
 import { Results } from './Results';
 import { PauseMenu } from './PauseMenu';
@@ -56,6 +57,7 @@ export default function Race() {
         </Suspense>
       </Canvas>
       {!ready && <Loading />}
+      <ScreenFx />
       <Hud onPause={() => setPaused(true)} />
       {online && reconnecting && <div className="net-badge" role="status">Reconnecting…</div>}
       {touch && !results && !cut && <TouchControls />}

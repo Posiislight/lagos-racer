@@ -1,6 +1,7 @@
 import type { Result } from '../game/store';
 import { coinsForPlace } from '../game/race';
 import type { NetResult } from './protocol';
+import { paintOf, vehicleById } from '../config/vehicles';
 
 export const DNF_COINS = 20;
 
@@ -12,6 +13,7 @@ export function toResults(net: NetResult[], mySlot: number): Result[] {
   return [...net].sort((a, b) => a.place - b.place).map(r => ({
     name: r.name,
     vehicle: r.vehicle,
+    color: paintOf(vehicleById(r.vehicle), r.paint).color,
     time: r.dnf ? null : r.time,
     projected: r.projected,
     best: r.best,

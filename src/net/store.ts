@@ -21,9 +21,9 @@ type NetState = {
   cut: boolean;
   nickname: string;
   pendingGrid: PendingGrid | null;
-  create: (name: string, vehicle: VehicleId) => void;
-  join: (code: string, name: string, vehicle: VehicleId) => void;
-  setVehicle: (v: VehicleId) => void;
+  create: (name: string, vehicle: VehicleId, paint: string) => void;
+  join: (code: string, name: string, vehicle: VehicleId, paint: string) => void;
+  setVehicle: (v: VehicleId, paint: string) => void;
   setReady: (ready: boolean) => void;
   setFillAI: (fillAI: boolean) => void;
   start: () => void;
@@ -261,7 +261,7 @@ export const useNet = create<NetState>((set, get) => {
     }, STRANDED_MS);
   }
 
-  const sendLobby = (change: { vehicle?: VehicleId; ready?: boolean; fillAI?: boolean }) => {
+  const sendLobby = (change: { vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }) => {
     set({ error: null });
     conn?.sendJson({ t: 'lobby', ...change });
   };
@@ -278,19 +278,19 @@ export const useNet = create<NetState>((set, get) => {
     ...idle,
     error: null,
     nickname: readNick(),
-    create: (name, vehicle) => {
+    create: (name, vehicle, paint) => {
       const nick = rememberNick(name);
       if (nick === null) return set({ error: 'bad-name' });
-      open({ t: 'create', name: nick, vehicle });
+      open({ t: 'create', name: nick, vehicle, paint });
     },
-    join: (code, name, vehicle) => {
+    join: (code, name, vehicle, paint) => {
       const nick = rememberNick(name);
       if (nick === null) return set({ error: 'bad-name' });
       const clean = normalizeCode(code);
       if (!/^[A-Z]{4}$/.test(clean)) return set({ error: 'bad-code' });
-      open({ t: 'join', code: clean, name: nick, vehicle });
+      open({ t: 'join', code: clean, name: nick, vehicle, paint });
     },
-    setVehicle: vehicle => sendLobby({ vehicle }),
+    setVehicle: (vehicle, paint) => sendLobby({ vehicle, paint }),
     setReady: ready => sendLobby({ ready }),
     setFillAI: fillAI => sendLobby({ fillAI }),
     start: () => {

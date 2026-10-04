@@ -3,7 +3,7 @@ import type { NetResult } from './protocol';
 import { coinsFor, toResults } from './results';
 
 const row = (over: Partial<NetResult>): NetResult => ({
-  netId: 0, slot: 1, ai: false, name: 'Ade', vehicle: 'okada', place: 1, time: 90.5, projected: false, best: 29.8, dnf: false, ...over,
+  netId: 0, slot: 1, ai: false, name: 'Ade', vehicle: 'okada', paint: 'red', place: 1, time: 90.5, projected: false, best: 29.8, dnf: false, ...over,
 });
 
 describe('toResults', () => {
@@ -15,9 +15,9 @@ describe('toResults', () => {
       row({ netId: 2, slot: 2, ai: true, name: 'Odogwu', place: 3, time: 95, projected: true, best: null }),
     ];
     expect(toResults(net, 2)).toEqual([
-      { name: 'Ade', vehicle: 'okada', time: 90.5, projected: false, best: 29.8, isPlayer: false, dnf: false },
-      { name: 'Ade', vehicle: 'okada', time: 92, projected: false, best: 29.8, isPlayer: true, dnf: false },
-      { name: 'Odogwu', vehicle: 'okada', time: 95, projected: true, best: null, isPlayer: false, dnf: false },
+      { name: 'Ade', vehicle: 'okada', color: '#d0141a', time: 90.5, projected: false, best: 29.8, isPlayer: false, dnf: false },
+      { name: 'Ade', vehicle: 'okada', color: '#d0141a', time: 92, projected: false, best: 29.8, isPlayer: true, dnf: false },
+      { name: 'Odogwu', vehicle: 'okada', color: '#d0141a', time: 95, projected: true, best: null, isPlayer: false, dnf: false },
     ]);
   });
 

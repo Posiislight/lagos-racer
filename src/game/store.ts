@@ -1,17 +1,16 @@
 import { create } from 'zustand';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
 import type { ItemKind } from './runtime';
+import { loadSave, writeSave, type Saved, type Settings } from './save';
 
-export type Quality = 'low' | 'medium' | 'high';
+export type { Quality, Settings } from './save';
 export type Screen = 'menu' | 'garage' | 'online' | 'lobby' | 'race';
-
-export type Settings = { quality: Quality; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
 
 /**
  * time is the finish time, or a projection from average speed (projected: true) for racers still on track.
- * dnf is only set in a room race, for a car the referee threw out or that dropped.
+ * color: their paint. dnf is only set in a room race, for a car the referee threw out or that dropped.
  */
-export type Result = { name: string; vehicle: VehicleId; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; dnf?: boolean };
+export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; dnf?: boolean };
 
 /** HUD values, refreshed a few times a second by the race loop (not every frame). */
 export type Hud = {
@@ -31,36 +30,9 @@ export type Hud = {
   wrongWay: boolean;
 };
 
-type Saved = { settings: Settings; coins: number; best: Record<string, number>; races: number; vehicle: VehicleId; unlocked: VehicleId[]; accountPromptDismissed: boolean };
-
-const SAVE_KEY = 'lagos-racer:v1';
-
-function detectQuality(): Quality {
-  if (typeof navigator === 'undefined') return 'medium';
-  const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
-  const cores = navigator.hardwareConcurrency || 4;
-  if (mobile && cores <= 6) return 'low';
-  return mobile ? 'medium' : 'high';
-}
-
-function load(): Saved {
-  const fallback: Saved = {
-    settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-    coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false,
-  };
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return fallback;
-    const s = JSON.parse(raw) as Partial<Saved>;
-    return { ...fallback, ...s, settings: { ...fallback.settings, ...s.settings } };
-  } catch {
-    return fallback;
-  }
-}
-
-const initial = load();
+const initial = loadSave();
 // Reviewer shortcut: ?unlock=all opens every vehicle without grinding coins.
-if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('unlock') === 'all') initial.unlocked = ['brt-blue', 'brt-red'];
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('unlock') === 'all') initial.unlocked = ['brt'];
 
 export type State = Saved & {
   screen: Screen;
@@ -75,6 +47,9 @@ export type State = Saved & {
   showAccountPrompt: boolean;
   setScreen: (s: Screen) => void;
   setVehicle: (v: VehicleId) => void;
+  setPaint: (v: VehicleId, paint: string) => void;
+  /** One more pickup has shown its how-to hint. */
+  countItemHint: () => void;
   unlock: (v: VehicleId) => void;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   startRace: () => void;
@@ -105,6 +80,8 @@ export const useGame = create<State>((set, get) => ({
   showAccountPrompt: false,
   setScreen: screen => set({ screen }),
   setVehicle: vehicle => { set({ vehicle }); save(); },
+  setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
+  countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), price = VEHICLES.find(x => x.id === v)?.locked?.coins ?? 0;
     if (s.unlocked.includes(v) || s.coins < price) return;
@@ -133,6 +110,8 @@ export const useGame = create<State>((set, get) => ({
 
 function save() {
   const s = useGame.getState();
-  const data: Saved = { settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, accountPromptDismissed: s.accountPromptDismissed };
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* private mode: progress just isn't kept */ }
+  writeSave({
+    settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
+    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints,
+  });
 }

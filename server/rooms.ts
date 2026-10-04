@@ -16,6 +16,7 @@ import {
 } from '../src/net/protocol';
 import type { Hazard } from '../src/game/runtime';
 import type { VehicleId } from '../src/config/vehicles';
+import { TRACKS } from '../src/config/tracks';
 import { Room, type LobbyChange } from './room';
 
 export interface Peer {
@@ -49,11 +50,16 @@ type Conn = {
 };
 
 // Record keeps this list exhaustive when a vehicle is added.
-const VEHICLE_IDS: Record<VehicleId, true> = { okada: true, 'okada-blue': true, keke: true, danfo: true, 'brt-blue': true, 'brt-red': true };
+const VEHICLE_IDS: Record<VehicleId, true> = { okada: true, keke: true, danfo: true, brt: true };
 
 const CODE_SPACE = CODE_ALPHABET.length ** 4;
 
 const isVehicle = (v: unknown): v is VehicleId => typeof v === 'string' && Object.hasOwn(VEHICLE_IDS, v);
+// A paint the vehicle doesn't have is swapped for its usual colour by the room, so only the shape is checked here.
+const PAINT_MAX = 24;
+const isPaint = (v: unknown): v is string => typeof v === 'string' && v.length <= PAINT_MAX;
+/** Missing (an older client) means the usual colour; anything else malformed refuses the message. */
+const paintIn = (v: unknown): string | null => (v === undefined ? '' : isPaint(v) ? v : null);
 
 const HAZARD_NUMBERS = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'armed', 'ground'] as const;
 // A relayed hazard may not outlive or out-wait these (s), nor sit or fly outside these (m, m/s).
@@ -92,22 +98,27 @@ function parse(raw: string): Handled | null {
   if (typeof m !== 'object' || m === null || Array.isArray(m)) return null;
   const o = m as Record<string, unknown>;
   switch (o.t) {
-    case 'create':
-      return typeof o.name === 'string' && isVehicle(o.vehicle) ? { t: 'create', name: o.name, vehicle: o.vehicle } : null;
-    case 'join':
-      return typeof o.code === 'string' && typeof o.name === 'string' && isVehicle(o.vehicle)
-        ? { t: 'join', code: o.code, name: o.name, vehicle: o.vehicle }
+    case 'create': {
+      const paint = paintIn(o.paint);
+      return typeof o.name === 'string' && isVehicle(o.vehicle) && paint !== null ? { t: 'create', name: o.name, vehicle: o.vehicle, paint } : null;
+    }
+    case 'join': {
+      const paint = paintIn(o.paint);
+      return typeof o.code === 'string' && typeof o.name === 'string' && isVehicle(o.vehicle) && paint !== null
+        ? { t: 'join', code: o.code, name: o.name, vehicle: o.vehicle, paint }
         : null;
+    }
     case 'resume':
       return typeof o.token === 'string' ? { t: 'resume', token: o.token } : null;
     case 'ping':
       return typeof o.c === 'number' && Number.isFinite(o.c) ? { t: 'ping', c: o.c } : null;
     case 'lobby': {
-      const { vehicle, ready, fillAI } = o;
+      const { vehicle, paint, ready, fillAI } = o;
       if (vehicle !== undefined && !isVehicle(vehicle)) return null;
+      if (paint !== undefined && !isPaint(paint)) return null;
       if (ready !== undefined && typeof ready !== 'boolean') return null;
       if (fillAI !== undefined && typeof fillAI !== 'boolean') return null;
-      return { t: 'lobby', vehicle, ready, fillAI };
+      return { t: 'lobby', vehicle, paint, ready, fillAI };
     }
     case 'leave':
       return { t: 'leave' };
@@ -148,7 +159,7 @@ export class RoomServer {
   constructor(opts: { now?: () => number; random?: () => number; trackId?: string; liveness?: boolean } = {}) {
     this.now = opts.now ?? Date.now;
     this.random = opts.random ?? Math.random;
-    this.trackId = opts.trackId ?? 'ojuelegba';
+    this.trackId = opts.trackId ?? TRACKS[0].id;
     this.liveness = opts.liveness ?? true;
   }
 
@@ -177,8 +188,8 @@ export class RoomServer {
     if (m.t === 'ping') return this.send(conn, { t: 'pong', c: m.c, s: this.now() });
     if (m.t === 'create' || m.t === 'join' || m.t === 'resume') {
       if (c.room) return;
-      if (m.t === 'create') this.create(conn, c, m.name, m.vehicle);
-      else if (m.t === 'join') this.join(conn, c, m.code, m.name, m.vehicle);
+      if (m.t === 'create') this.create(conn, c, m.name, m.vehicle, m.paint);
+      else if (m.t === 'join') this.join(conn, c, m.code, m.name, m.vehicle, m.paint);
       else this.resume(conn, c, m.token);
       return;
     }
@@ -294,24 +305,24 @@ export class RoomServer {
     return null;
   }
 
-  private seat(conn: number, c: Conn, room: Room, name: string, vehicle: VehicleId) {
+  private seat(conn: number, c: Conn, room: Room, name: string, vehicle: VehicleId, paint: string) {
     const token = randomBytes(18).toString('base64url');
     c.room = room;
     c.seated = true;
-    c.slot = room.add(conn, name, vehicle, token);
+    c.slot = room.add(conn, name, vehicle, paint, token);
     this.send(conn, { t: 'welcome', code: room.code, slot: c.slot, token });
     room.broadcastRoom();
   }
 
-  private create(conn: number, c: Conn, rawName: string, vehicle: VehicleId) {
+  private create(conn: number, c: Conn, rawName: string, vehicle: VehicleId, paint: string) {
     const name = cleanNick(rawName);
     if (!name) return this.fail(conn, 'bad-name');
     const room = this.newRoom();
     if (!room) return;
-    this.seat(conn, c, room, name, vehicle);
+    this.seat(conn, c, room, name, vehicle, paint);
   }
 
-  private join(conn: number, c: Conn, rawCode: string, rawName: string, vehicle: VehicleId) {
+  private join(conn: number, c: Conn, rawCode: string, rawName: string, vehicle: VehicleId, paint: string) {
     const code = normalizeCode(rawCode);
     if (!/^[A-Z]{4}$/.test(code)) return this.fail(conn, 'bad-code');
     const room = this.rooms.get(code);
@@ -321,7 +332,7 @@ export class RoomServer {
     if (room.isFull) return this.fail(conn, 'full');
     if (room.phase !== 'lobby') return this.fail(conn, 'started');
     room.lastActivity = this.now();
-    this.seat(conn, c, room, name, vehicle);
+    this.seat(conn, c, room, name, vehicle, paint);
   }
 
   private resume(conn: number, c: Conn, token: string) {
