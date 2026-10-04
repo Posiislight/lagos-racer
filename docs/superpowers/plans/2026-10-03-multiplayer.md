@@ -50,7 +50,7 @@ plan touches. Execute this plan after that work lands, and check these points ag
 - Server limits: `MAX_MESSAGE_BYTES = 4096`, `RATE_LIMIT_PER_S = 30` messages per connection.
 - Referee:
   - finish distance must be at least `laps × track.length − 30` m;
-  - every lap must be at least `track.length / (topSpeed × 1.6)` s;
+  - every lap must be at least `track.length / (maxTopSpeed × 1.6)` s, where `maxTopSpeed` is the vehicle's top speed with all upgrades at level 5 (`applyUpgrades(base, { engine: 5, tyres: 5, body: 5 }).tuning.topSpeed`);
   - the lap times must sum to the finish time within 0.5 s.
 - Coins by place: `[150, 100, 60, 30]`, then 20.
 - Player-facing copy (verbatim):
@@ -672,7 +672,7 @@ it('relays item events with from, and drops forged hazard ids and hits on cars n
 - Produces:
   - **`class Referee`:**
     - `constructor(track: Track, laps: number, grid: GridEntry[])`;
-    - `observe(car: CarState, time: number): void`. If the projected track position disagrees with `car.distance mod length` by more than 30 m, ignore it. Otherwise set the referee distance to `clamp(car.distance, refDist − 50, refDist + topSpeed × 1.6 × (time − lastTime) + 10)`. This deliberately does not use `updateProgress`, whose 25 m step limit would wrongly reject a car's distance after a reconnect gap.
+    - `observe(car: CarState, time: number): void`. If the projected track position disagrees with `car.distance mod length` by more than 30 m, ignore it. Otherwise set the referee distance to `clamp(car.distance, refDist − 50, refDist + maxTopSpeed × 1.6 × (time − lastTime) + 10)`. This deliberately does not use `updateProgress`, whose 25 m step limit would wrongly reject a car's distance after a reconnect gap.
     - `finish(netId: number, laps: number[], time: number): boolean`. It accepts only if all the Global Constraints referee rules pass; a rejection marks the car DNF.
     - `dnf(netId: number): void`;
     - `get firstFinishAt(): number | null`;
@@ -696,7 +696,7 @@ it('relays item events with from, and drops forged hazard ids and hits on cars n
 ```ts
 // referee.test.ts (test track from race.test.ts; drive cars by feeding observe() along sampleAt)
 it('accepts a clean 3-lap finish')
-it('rejects a lap faster than length / (topSpeed × 1.6)')
+it('rejects a lap faster than length / (maxTopSpeed × 1.6), and accepts a maxed-upgrade lap')
 it('rejects a finish when the observed distance is 30 m+ short')
 it('rejects lap times that do not sum to the finish time')
 it('keeps up after a 10 s snapshot gap if the jump is physically possible')
