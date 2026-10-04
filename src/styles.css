@@ -127,6 +127,20 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   border: 2px solid var(--ink); border-radius: 10px; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;
 }
 .stops button[aria-selected='true'] { background: var(--yellow); box-shadow: 0 3px 0 var(--ink); }
+/* One card per driver, in a row that scrolls sideways when it doesn't fit. */
+.drivers { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.drivers::-webkit-scrollbar { display: none; }
+.drivers button {
+  flex: 1 0 min(300px, 78vw); scroll-snap-align: start; text-align: left; color: var(--ink); background: var(--chip);
+  border: 2px solid var(--ink); border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 2px; row-gap: 1px;
+}
+.drivers button[aria-selected='true'] { background: var(--yellow); box-shadow: 0 3px 0 var(--ink); }
+.drivers b { font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 16px; }
+.drivers .role { font-weight: 700; font-size: 13px; }
+.drivers .special { flex-basis: 100%; font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; }
+.drivers small { flex-basis: 100%; font-size: 12px; line-height: 1.25; opacity: .8; }
+.driver-line { margin: 0 0 4px; font-size: 14px; }
+@media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
 @media (max-width: 720px) and (orientation: portrait) { .garage-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
 @media (max-height: 480px) { .garage-card .muted { display: none; } .garage-card h2 { font-size: 20px; } }
 

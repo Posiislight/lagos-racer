@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { trackById } from '../config/tracks';
+import { driverById } from '../config/drivers';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
 import { enableTilt } from '../game/input';
@@ -19,9 +20,9 @@ export function goFullscreen() {
 }
 
 export function Menu() {
-  const { vehicle, coins, startRace, setScreen, best, track, paint } = useGame();
+  const { vehicle, coins, startRace, setScreen, best, track, paint, driver } = useGame();
   const [settings, setSettings] = useState(false);
-  const v = vehicleById(vehicle), t = trackById(track), p = paintOf(v, paint[v.id]);
+  const v = vehicleById(vehicle), t = trackById(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
@@ -39,6 +40,7 @@ export function Menu() {
         <div className="card">
           <p className="eyebrow">Your ride</p>
           <h2>{v.name}</h2>
+          <p className="driver-line"><b>{d.name}</b> at the wheel · {d.special.name}</p>
           <p className="muted">{v.blurb}</p>
           <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[track] ?? null)}</p>
           <p className="credit muted">Road layout © OpenStreetMap contributors</p>
