@@ -86,7 +86,8 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
   c.horn = Math.random() < dt * 0.04;
 
   // Items: fuel on a straight, juju when there's someone ahead to send it at, oil when someone
-  // is right behind; otherwise use it before long anyway.
+  // is right behind, odeshi when a juju is flying at you or someone is close behind to throw one;
+  // otherwise use it before long anyway.
   c.useItem = false;
   if (r.item) {
     ai.itemDelay -= dt;
@@ -95,11 +96,12 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
       const k = Math.abs(track.points[sampleAt(track, r.progress.s + 25).index].curvature);
       use ||= ai.itemDelay < 0 && k < 0.02;
     }
+    if (r.item === 'odeshi' && race.hazards.some(h => h.kind === 'juju' && h.target === r.id)) use = true;
     for (const o of race.racers) {
       if (o === r) continue;
       const gap = o.progress.distance - r.progress.distance;
       if (r.item === 'juju' && gap > 5 && gap < 120) use ||= ai.itemDelay < 0;
-      if (r.item === 'oil' && gap < -3 && gap > -25) use ||= ai.itemDelay < 0;
+      if ((r.item === 'oil' || r.item === 'odeshi') && gap < -3 && gap > -25) use ||= ai.itemDelay < 0;
     }
     if (use) { c.useItem = true; ai.itemDelay = 1 + Math.random() * 3; }
   }

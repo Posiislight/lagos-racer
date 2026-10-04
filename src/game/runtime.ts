@@ -11,9 +11,10 @@ import type { Critter } from './critters';
  * Power-ups from the glowing orbs:
  * - fuel: a burst of speed for you;
  * - oil: crude oil dropped behind you, whoever drives over it goes slippery;
- * - juju: flies to the racer ahead of you and slows them down.
+ * - juju: flies to the racer ahead of you and slows them down;
+ * - odeshi: a protective charm that blocks crude oil and juju for a few seconds.
  */
-export type ItemKind = 'fuel' | 'oil' | 'juju';
+export type ItemKind = 'fuel' | 'oil' | 'juju' | 'odeshi';
 
 export type AIState = {
   /** Preferred lateral offset from the centre line (m), drifts slowly for variety. */
@@ -49,6 +50,8 @@ export type Racer = {
   slip: number;
   /** Seconds of juju slowdown left. */
   curse: number;
+  /** Seconds of odeshi left: oil and juju do nothing to you while it lasts. */
+  shield: number;
   /** Seconds of shaky handling left after running over a goat or chicken. */
   wobble: number;
   /** Seconds of immunity to oil, so a car that slows down in a slick can drive out of it. */
@@ -83,7 +86,7 @@ export type Hazard = {
 export type Pickup = { id: number; kind: ItemKind; x: number; y: number; z: number; s: number; respawn: number };
 
 /** A short-lived puff where something hit: juju's purple smoke, oil splashes. */
-export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' };
+export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' | 'odeshi' };
 
 export type RaceRuntime = {
   config: TrackConfig;
@@ -109,7 +112,7 @@ export const setRace = (r: RaceRuntime | null) => { current = r; };
 export function makeRacer(id: number, name: string, vehicle: VehicleConfig, isPlayer: boolean, progress: RacerProgress): Racer {
   return {
     id, name, vehicle, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
-    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
+    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, shield: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
     trouble: 0, respawn: false, ai: null,
   };
 }

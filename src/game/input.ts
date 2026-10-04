@@ -24,7 +24,7 @@ export function startKeyboard() {
   listening = true;
   window.addEventListener('keydown', e => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
-    if (!e.repeat && (e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyF')) itemQueued = true;
+    if (!e.repeat && (e.code === 'Space' || e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyF')) itemQueued = true;
     keys.add(e.code);
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -68,7 +68,7 @@ export function readPlayer(out: Controls, dt: number, opts: { tilt: boolean; inv
   const braking = k('ArrowDown', 'KeyS') || touch.brake;
   out.throttle = braking ? 0 : 1;
   out.brake = braking ? 1 : 0;
-  out.handbrake = k('Space') || touch.drift;
+  out.handbrake = k('KeyC') || touch.drift;
   out.horn = k('KeyH') || touch.horn;
   out.useItem = itemQueued || touch.item;
   itemQueued = false;
