@@ -1,7 +1,7 @@
 import { MathUtils } from 'three';
 import type { RaceRuntime, Racer } from './runtime';
 import { sampleAt } from './track';
-import { driverById } from '../config/drivers';
+import { SPECIALS, driverById } from '../config/drivers';
 
 export const AI_NAMES = ['Odogwu Rider', 'Starboy-ish', 'Mama Danfo', 'Conductor Sule', 'Aunty Bisi', 'Area Fada', 'Oga Landlord'];
 
@@ -111,7 +111,8 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
 
   // Brake for the tightest bend within stopping distance.
   const grip = 8.5 * ai.skill * (0.8 + r.vehicle.stats.handling * 0.03);
-  let target = t.topSpeed * ai.skill;
+  // Push Squad lifts the engine cap, so the AI has to aim higher to use it.
+  let target = t.topSpeed * ai.skill * (r.push > 0 ? SPECIALS.push.topSpeed : 1);
   const horizon = 12 + (v * v) / (2 * 9);
   for (let d = 4; d < horizon; d += 4) {
     const k = track.points[sampleAt(track, r.progress.s + d).index].curvature;

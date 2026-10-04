@@ -87,4 +87,6 @@ export function readPlayer(out: Controls, dt: number, opts: { tilt: boolean; inv
   touch.special = false;
 }
 
-export function resetPlayerInput() { steerSmooth = 0; keys.clear(); Object.keys(touch).forEach(k => ((touch as Record<string, boolean>)[k] = false)); }
+/** Forget item and special presses made while the game wasn't reading input (paused), so they don't fire on resume. */
+export function clearQueuedPresses() { itemQueued = false; specialQueued = false; }
+export function resetPlayerInput() { steerSmooth = 0; clearQueuedPresses(); keys.clear(); Object.keys(touch).forEach(k => ((touch as Record<string, boolean>)[k] = false)); }

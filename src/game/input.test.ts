@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyControls, queueSpecial, readPlayer, resetPlayerInput, swallowKey, touch } from './input';
+import { clearQueuedPresses, emptyControls, queueSpecial, readPlayer, resetPlayerInput, swallowKey, touch } from './input';
 
 describe('swallowKey', () => {
   it('stops arrows and Space scrolling the page', () => {
@@ -34,6 +34,15 @@ describe('the special button', () => {
     queueSpecial();
     readPlayer(c, 0.016, opts);
     expect(c.special).toBe(true);
+    readPlayer(c, 0.016, opts);
+    expect(c.special).toBe(false);
+  });
+
+  it('forgets a press made while paused', () => {
+    resetPlayerInput();
+    const c = emptyControls();
+    queueSpecial();
+    clearQueuedPresses();
     readPlayer(c, 0.016, opts);
     expect(c.special).toBe(false);
   });

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { aiState, getRace, type Racer } from '../game/runtime';
 import { updateProgress, standings, currentLap } from '../game/race';
-import { readPlayer } from '../game/input';
+import { clearQueuedPresses, readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateSpecials } from '../game/specials';
@@ -53,6 +53,7 @@ export function RaceLogic() {
   useFrame((_, dtRaw) => {
     const race = getRace();
     const store = useGame.getState();
+    if (store.paused) clearQueuedPresses();
     if (!race || store.paused) return;
     const dt = Math.min(dtRaw, 0.05);
     const player = race.racers.find(r => r.isPlayer)!;

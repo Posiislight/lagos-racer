@@ -9,7 +9,7 @@ import { getRace } from '../game/runtime';
 import { SPECIALS } from '../config/drivers';
 import { canvasTex } from './trackGeometry';
 
-const MAX = 32, TRAIL = 10, MAX_SOUP = 160;
+const MAX = 32, TRAIL = 10, MAX_SOUP = 240;
 const _o = new Object3D(), _c = new Color();
 const PUFF: Record<'juju' | 'fuel' | 'odeshi' | 'steam', Color> = { juju: new Color('#b04dff'), fuel: new Color('#ffb347'), odeshi: new Color('#37b6ff'), steam: new Color('#fff1dc') };
 

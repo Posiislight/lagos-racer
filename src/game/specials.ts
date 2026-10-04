@@ -49,11 +49,15 @@ export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string)
 
   // Anyone who drives through a patch coughs: slower and swerving, with a second's grace afterwards.
   const reach2 = SPECIALS.soup.radius ** 2;
+  let spots: { x: number; z: number }[] | null = null;
   for (const h of race.hazards) {
     if (h.kind !== 'soup') continue;
-    for (const v of race.racers) {
+    // Read each body's position once a frame (the physics call allocates), not once per patch.
+    spots ??= race.racers.map(v => { const t = v.body?.translation(); return { x: t?.x ?? 0, z: t?.z ?? 0 }; });
+    for (let i = 0; i < race.racers.length; i++) {
+      const v = race.racers[i];
       if (!v.body || v.id === h.owner || v.shield > 0 || v.immune > 0) continue;
-      const t = v.body.translation();
+      const t = spots[i];
       if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 >= reach2) continue;
       v.cough = Math.max(v.cough, lasting(v, SPECIALS.soup.cough));
       v.immune = v.cough + SPECIALS.soup.immunity;
