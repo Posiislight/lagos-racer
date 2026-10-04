@@ -66,9 +66,11 @@ The driver is picked separately from the vehicle (Garage, saved) and sits in eve
 
 ## Tracks (stylised, hand-built, not Street View)
 
-Ojuelegba, Third Mainland Bridge, Oshodi under the bridge, flooded Lekki in rainy season, Balogun market. Hazards: LASTMA ambush, goats crossing, danfos cutting in, open gutters, potholes.
+Ojuelegba, Ikorodu Garage (built), Third Mainland Bridge, Oshodi under the bridge, flooded Lekki in rainy season, Balogun market. Hazards: LASTMA ambush, goats crossing, danfos cutting in, open gutters, potholes.
 
 Ojuelegba is laid out on the real road from OpenStreetMap (`scripts/osm-track.mjs`, credit "© OpenStreetMap contributors" in the menu); the buildings and props stay stylised and hand-built. Never derive layouts or models from Google Maps or Street View imagery (their terms forbid it); Street View is only for looking.
+
+**Exception, chosen by the user (4 October): the Ikorodu Garage track uses real business and place names as lettering on signs**, in brand colours, with no logo artwork (`src/config/signs/ikorodu.ts`; spec `docs/superpowers/specs/2026-10-04-ikorodu-garage-track-design.md`). Only names read off a sign are used, never names seen only on a map. This breaks the no-real-brand rule above and carries trademark risk for a deployed game with coins; the track's `signage: 'generic'` flag switches every real name off. The sign text was read in Street View, so before shipping, confirm it against the user's own photos or video.
 
 ## Accounts
 
