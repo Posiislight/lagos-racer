@@ -970,6 +970,59 @@ describe('finish and results', () => {
     expect(msgs(b.peer, 'finished')).toHaveLength(0);
   });
 
+  it('keeps the race going while the only racer left has a short blip', () => {
+    const { a, b, c, room } = racers();
+    send(b.conn, { t: 'leave' });
+    send(c.conn, { t: 'leave' });
+    server.close(a.conn);
+    now += 1000;
+    server.tick();
+    expect(room.phase).toBe('racing');
+    const a2 = connect();
+    send(a2.conn, { t: 'resume', token: a.welcome.token });
+    expect(msgs(a2.peer, 'grid')).toHaveLength(1);
+    expect(msgs(a2.peer, 'start')).toHaveLength(1);
+    expect(lastRoom(a2.peer).phase).toBe('racing');
+  });
+
+  it('re-sends the results to a racer who missed them and resumes in the lobby', () => {
+    const { a, b, c, d2, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const fast: Driver = { conn: b.conn, slot: 2, netId: 1, speed: 25 };
+    const rest: Driver[] = [
+      { conn: a.conn, slot: 1, netId: 0, speed: 24.8 },
+      { conn: c.conn, slot: 3, netId: 2, speed: 24.6 },
+    ];
+    const tB = half((LAPS * L) / 25);
+    drive(startAt, [fast, ...rest], 0, tB);
+    expect(msgs(a.peer, 'finished').map(m => m.netId)).toEqual([1]);
+    // b's phone drops just after its finish, and the race ends while it is away.
+    server.close(b.conn);
+    drive(startAt, rest, tB + 0.5, half((LAPS * L) / 24.6));
+    const [res] = msgs(a.peer, 'results');
+    expect(res).toBeDefined();
+    expect(msgs(b.peer, 'results')).toHaveLength(0);
+    expect(room.phase).toBe('lobby');
+
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    const kinds = b2.peer.sent.map(d => (JSON.parse(d as string) as ServerMessage).t);
+    expect(kinds).toEqual(['welcome', 'room', 'results']);
+    expect(msgs(b2.peer, 'results')).toEqual([res]);
+
+    // A member who was not on that grid gets no results, and a new race forgets them.
+    const late = join(a.welcome.code, 'Efe');
+    const lateToken = msgs(late.peer, 'welcome')[0].token;
+    server.close(late.conn);
+    const late2 = connect();
+    send(late2.conn, { t: 'resume', token: lateToken });
+    expect(msgs(late2.peer, 'results')).toHaveLength(0);
+    for (const p of [a, b2, c, d2, late2]) send(p.conn, { t: 'lobby', ready: true });
+    send(a.conn, { t: 'start' });
+    expect(room.phase).toBe('loading');
+    expect(room['resultsMsg']).toBeNull();
+  });
+
   it('ends a race nobody is left in: no results, back to the lobby', () => {
     for (const phase of ['loading', 'racing'] as const) {
       const a = create();
@@ -990,6 +1043,10 @@ describe('finish and results', () => {
       send(c2.conn, { t: 'resume', token: msgs(c.peer, 'welcome')[0].token });
       server.close(a.conn);
       send(b.conn, { t: 'leave' });
+      server.tick();
+      // a may still come back within the grace period, so the race waits for them.
+      expect(room.phase).not.toBe('lobby');
+      now += RECONNECT_GRACE_MS;
       server.tick();
       expect(room.phase).toBe('lobby');
       expect(lastRoom(c2.peer).phase).toBe('lobby');

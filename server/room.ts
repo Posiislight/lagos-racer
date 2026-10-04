@@ -45,6 +45,8 @@ export class Room {
   private grid: GridEntry[] = [];
   /** The current race's grid message, re-sent to a racer who resumes. */
   private gridMsg: Extract<ServerMessage, { t: 'grid' }> | null = null;
+  /** The last race's results, re-sent to a racer from its grid who missed them in a drop. */
+  private resultsMsg: Extract<ServerMessage, { t: 'results' }> | null = null;
   /** Cars out of the current race because their phone dropped or left. */
   private dropped = new Set<number>();
   private loaded = new Set<number>();
@@ -142,6 +144,12 @@ export class Room {
     return m.leftAt !== null && now - m.leftAt >= RECONNECT_GRACE_MS;
   }
 
+  /** Left the room, or away longer than the grace period. */
+  private gone(slot: number, now: number) {
+    const m = this.members.get(slot);
+    return !m || this.expired(m, now);
+  }
+
   /** Marks this slot's cars (its AI too) DNF in the race under way and tells the racers. */
   private dropOut(slot: number) {
     if (this.phase === 'lobby' || !this.referee) return;
@@ -154,10 +162,18 @@ export class Room {
     for (const conn of this.othersOnGrid(slot)) this.send(conn, { t: 'dnf', netIds });
   }
 
-  /** A racer back from a drop catches up on the race: its grid, the start time if set, and who dropped out. */
+  /**
+   * A racer back from a drop catches up on the race: its grid, the start time if set, and who dropped out. Back in
+   * the lobby, it gets the results it may have missed.
+   */
   resync(slot: number) {
     const conn = this.connOf(slot);
-    if (conn === null || this.phase === 'lobby' || !this.gridMsg || !this.grid.some(g => g.slot === slot)) return;
+    if (conn === null || !this.grid.some(g => g.slot === slot)) return;
+    if (this.phase === 'lobby') {
+      if (this.resultsMsg) this.send(conn, this.resultsMsg);
+      return;
+    }
+    if (!this.gridMsg) return;
     this.send(conn, this.gridMsg);
     if (this.phase !== 'loading') this.send(conn, { t: 'start', raceSeq: this.raceSeq, at: this.startAt });
     if (this.dropped.size) this.send(conn, { t: 'dnf', netIds: [...this.dropped] });
@@ -186,6 +202,7 @@ export class Room {
     this.grid = buildGrid(here, this.fillAI, this.hostSlot, random);
     this.referee = new Referee(buildTrack(config.control, 2, config.hills), config.laps, this.grid);
     this.cutoffAt = null;
+    this.resultsMsg = null;
     this.dropped.clear();
     this.loaded.clear();
     this.gridAt = now;
@@ -212,8 +229,9 @@ export class Room {
   /** Timers: the start, the finish cutoff, and a race everyone has walked away from. */
   tick(now: number) {
     if (this.phase === 'lobby') return;
-    // Nobody left to race or to tell: no results, just the lobby (and the room is reaped if it is empty).
-    if (this.grid.every(g => this.connOf(g.slot) === null)) return this.endRace(now, false);
+    // Nobody left to race or to tell: no results, just the lobby (and the room is reaped if it is empty). A racer
+    // still inside the reconnect grace may yet come back, so a blip never ends the race.
+    if (this.grid.every(g => this.gone(g.slot, now))) return this.endRace(now, false);
     this.advance(now);
     if (this.phase === 'racing' && (this.referee?.allDone() || (this.cutoffAt !== null && now >= this.cutoffAt))) this.endRace(now, true);
   }
@@ -297,8 +315,8 @@ export class Room {
    */
   private endRace(now: number, withResults: boolean) {
     if (withResults && this.referee) {
-      const results = this.referee.results(this.raceTime(now));
-      for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'results', raceSeq: this.raceSeq, results });
+      this.resultsMsg = { t: 'results', raceSeq: this.raceSeq, results: this.referee.results(this.raceTime(now)) };
+      for (const conn of this.othersOnGrid(0)) this.send(conn, this.resultsMsg);
     }
     this.phase = 'lobby';
     this.referee = null;
