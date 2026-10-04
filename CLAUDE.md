@@ -52,7 +52,7 @@ Danfo and BRT have conductors hanging out of the door; on those vehicles the con
 
 - Juju: bomb
 - Crude oil: grease slick that makes others skid
-- Coconut: shield / extra toughness
+- Odeshi: protective charm, blocks crude oil and juju for 8 seconds
 - Projectile: pure water sachet or a flying slipper (not a baby)
 
 ## Tracks (stylised, hand-built, not Street View)

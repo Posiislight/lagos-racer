@@ -37,7 +37,7 @@ backs itself out.
 | Steer | ← → or A D | ◀ (left thumb) and ▶ (right thumb), or tilt the phone (Settings) |
 | Use item | Space (or E, F, Shift) | The round item button, middle of the right-hand side |
 | Horn | H | PON PON |
-| Drift (optional) | Ctrl | – |
+| Drift (optional) | C | – |
 | Brake / reverse (optional) | ↓ or S | – |
 | Pause | Esc or P | II button |
 

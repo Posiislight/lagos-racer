@@ -230,6 +230,12 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       fx.aura.scale.set(p, p, p);
       (fx.aura.material as MeshBasicMaterial).opacity = 0.25 + 0.15 * Math.min(1, racer.curse);
     }
+    // The odeshi bubble flickers for its last two seconds as a warning.
+    fx.bubble.visible = racer.shield > 0 && (racer.shield > 2 || Math.sin(tt * 26) > -0.2);
+    if (fx.bubble.visible) {
+      const p = 1 + Math.sin(tt * 5) * 0.03;
+      fx.bubble.scale.set(p, p, p);
+    }
     model.anim?.(st.clock.elapsedTime);
     // Horn
     s.hornCooldown -= dt;
@@ -283,6 +289,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           <primitive object={fx.flame} />
           <primitive object={fx.aura} />
           <primitive object={fx.sparks} />
+          <primitive object={fx.bubble} />
         </group>
       </group>
     </RigidBody>
@@ -306,7 +313,7 @@ export function respawn(racer: Racer, b: RapierRigidBody) {
   resyncProgress(race.track, racer.progress, x, z);
 }
 
-/** Fuel flame out of the back and a purple juju aura, both hidden until needed. */
+/** Fuel flame out of the back, a purple juju aura and a blue odeshi bubble, all hidden until needed. */
 function effectMeshes(lay: ReturnType<typeof layout>) {
   const [len, h, w] = lay.half;
   const flame = new Mesh(
@@ -328,6 +335,13 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
   sparks.position.copy(flame.position);
   sparks.frustumCulled = false;
   sparks.visible = false;
-  return { flame, aura, sparks, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
+  const rb = r * 1.12;
+  const bubble = new Mesh(
+    new SphereGeometry(1, 20, 14).scale(rb, rb * 0.8, Math.max(w * 1.9, rb * 0.7)),
+    new MeshBasicMaterial({ color: '#37b6ff', transparent: true, opacity: 0.3, blending: AdditiveBlending, depthWrite: false }),
+  );
+  bubble.position.set(0, lay.originY, 0);
+  bubble.visible = false;
+  return { flame, aura, bubble, sparks, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
 }
 const SPARKS = 12;

@@ -18,14 +18,9 @@ export const touch = { left: false, right: false, gas: false, brake: false, drif
 const keys = new Set<string>();
 let itemQueued = false;
 
-const GAME_KEYS_WITH_CTRL = ['KeyA', 'KeyD', 'KeyS', 'KeyW', 'KeyE', 'KeyF', 'KeyH'];
-/**
- * Keys the page should swallow: arrows and Space (they scroll), and Ctrl with a game key, because Ctrl
- * is the drift and Ctrl+D, Ctrl+S, Ctrl+A would otherwise open the bookmark or save dialog mid-race.
- */
-export function swallowKey(e: { code: string; key: string; ctrlKey: boolean }): boolean {
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return true;
-  return e.ctrlKey && GAME_KEYS_WITH_CTRL.includes(e.code);
+/** Keys the page should swallow: arrows and Space would scroll it. Browser shortcuts are left alone. */
+export function swallowKey(e: { key: string }): boolean {
+  return ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key);
 }
 let listening = false;
 
@@ -78,7 +73,7 @@ export function readPlayer(out: Controls, dt: number, opts: { tilt: boolean; inv
   const braking = k('ArrowDown', 'KeyS') || touch.brake;
   out.throttle = braking ? 0 : 1;
   out.brake = braking ? 1 : 0;
-  out.handbrake = k('ControlLeft', 'ControlRight') || touch.drift;
+  out.handbrake = k('KeyC') || touch.drift;
   out.horn = k('KeyH') || touch.horn;
   out.useItem = itemQueued || touch.item;
   itemQueued = false;

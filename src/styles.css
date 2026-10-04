@@ -235,7 +235,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .touch-left, .touch-right { position: absolute; bottom: calc(14px + var(--safe-b)); display: flex; gap: 12px; pointer-events: auto; }
 .touch-left { left: calc(14px + var(--safe-l)); }
 .touch-right { right: calc(14px + var(--safe-r)); flex-direction: column; align-items: flex-end; gap: 10px; }
+.touch-right.above-steer { bottom: calc(112px + var(--safe-b)); }
 .touch-row { display: flex; gap: 12px; align-items: flex-end; }
+/* Each half of the screen (below the top HUD) is a steer zone; the button follows your thumb. */
+.touch-zone { position: absolute; top: calc(100px + var(--safe-t)); bottom: 0; width: 50%; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; }
+.touch-zone.left { left: 0; }
+.touch-zone.right { right: 0; }
+.pad.steer.floating { position: absolute; pointer-events: none; transform: translate(-50%, -50%); top: calc(100% - 58px - var(--safe-b)); }
+.pad.steer.floating.left { left: calc(58px + var(--safe-l)); }
+.pad.steer.floating.right { left: calc(100% - 58px - var(--safe-r)); }
+.pad.steer.floating.down { transform: translate(-50%, -50%) scale(.96); }
 .pad {
   border: 3px solid var(--ink); background: rgba(255, 250, 240, .72); color: var(--ink); border-radius: 20px;
   font-family: Bungee, Impact, sans-serif; touch-action: none; cursor: pointer; display: grid; place-items: center;

@@ -6,10 +6,11 @@ import type { ItemKind } from '../../game/runtime';
  * floating ahead is exactly what you get:
  * - fuel: a yellow jerrycan with a flame (speed boost),
  * - oil: a black crude oil drum, dripping (makes whoever hits it slippery),
- * - juju: a calabash tied with red cloth and cowries, glowing purple (slows the racer ahead).
+ * - juju: a calabash tied with red cloth and cowries, glowing purple (slows the racer ahead),
+ * - odeshi: a leather-wrapped amulet on a red cord with cowries, glowing blue (blocks oil and juju).
  */
-export const ITEM_COLOR: Record<ItemKind, string> = { fuel: '#ff9f1a', oil: '#2fd3c7', juju: '#b04dff' };
-export const ITEM_KINDS: ItemKind[] = ['fuel', 'oil', 'juju'];
+export const ITEM_COLOR: Record<ItemKind, string> = { fuel: '#ff9f1a', oil: '#2fd3c7', juju: '#b04dff', odeshi: '#37b6ff' };
+export const ITEM_KINDS: ItemKind[] = ['fuel', 'oil', 'juju', 'odeshi'];
 
 const S = 256;
 type Ctx = CanvasRenderingContext2D;
@@ -82,7 +83,31 @@ function juju(x: Ctx) {
   x.beginPath(); x.ellipse(S / 2 - 16, S / 2 + 30, 8, 5, 0, 0, 7); x.ellipse(S / 2 + 16, S / 2 + 30, 8, 5, 0, 0, 7); x.fill();
 }
 
-const PAINT: Record<ItemKind, (x: Ctx) => void> = { fuel, oil, juju };
+function odeshi(x: Ctx) {
+  badge(x, ITEM_COLOR.odeshi);
+  const glow = x.createRadialGradient(S / 2, S / 2, 10, S / 2, S / 2, 92);
+  glow.addColorStop(0, 'rgba(55,182,255,.7)'); glow.addColorStop(1, 'rgba(55,182,255,0)');
+  x.fillStyle = glow; x.beginPath(); x.arc(S / 2, S / 2, 94, 0, 7); x.fill();
+  x.save(); x.translate(S / 2, S / 2 + 6);
+  // Red cord looped over the top.
+  x.strokeStyle = '#d81b1b'; x.lineWidth = 9; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(-26, -34); x.quadraticCurveTo(-32, -92, 0, -92); x.quadraticCurveTo(32, -92, 26, -34); x.stroke();
+  // Leather-wrapped amulet, bound with bands.
+  x.fillStyle = '#8d5a24'; x.strokeStyle = '#231f1b'; x.lineWidth = 6;
+  x.beginPath(); x.moveTo(0, -48); x.quadraticCurveTo(46, -42, 46, 0); x.quadraticCurveTo(46, 40, 0, 56); x.quadraticCurveTo(-46, 40, -46, 0); x.quadraticCurveTo(-46, -42, 0, -48); x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = '#c98a3a';
+  x.beginPath(); x.ellipse(-14, -4, 10, 28, 0.15, 0, 7); x.fill();
+  x.strokeStyle = '#231f1b'; x.lineWidth = 4;
+  for (const y of [-22, 0, 22]) { x.beginPath(); x.moveTo(-44, y); x.quadraticCurveTo(0, y + 10, 44, y); x.stroke(); }
+  // Cowries across the middle band.
+  for (const cx of [-24, 0, 24]) {
+    x.fillStyle = '#fff6e0'; x.lineWidth = 3; x.beginPath(); x.ellipse(cx, 2, 8, 11, 0, 0, 7); x.fill(); x.stroke();
+    x.beginPath(); x.moveTo(cx, -4); x.lineTo(cx, 8); x.stroke();
+  }
+  x.restore();
+}
+
+const PAINT: Record<ItemKind, (x: Ctx) => void> = { fuel, oil, juju, odeshi };
 
 function canvasFor(kind: ItemKind) {
   const c = document.createElement('canvas');
@@ -93,11 +118,11 @@ function canvasFor(kind: ItemKind) {
 
 /** Data URLs for the HUD and touch buttons. */
 export const ITEM_ICON: Record<ItemKind, string> = typeof document === 'undefined'
-  ? { fuel: '', oil: '', juju: '' }
+  ? { fuel: '', oil: '', juju: '', odeshi: '' }
   : Object.fromEntries(ITEM_KINDS.map(k => [k, canvasFor(k).toDataURL()])) as Record<ItemKind, string>;
 
 let atlas: Texture | null = null;
-/** All three icons side by side (cells 0..2) for the pickups on the road. */
+/** All four icons side by side (cells 0..3) for the pickups on the road. */
 export function itemAtlas(): Texture {
   if (atlas) return atlas;
   const c = document.createElement('canvas');
