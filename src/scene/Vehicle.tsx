@@ -44,13 +44,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
   const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.paint.color, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, racer.paint, merge]);
   const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0 });
   /** Shove this racer away from another one it's touching. */
-  /** Contact normal per racer we are touching, from the collision that started the contact. */
-  const normals = useRef(new Map<number, { x: number; z: number }>());
   const shove = (other: Racer) => {
     const b = body.current, ob = other.body;
     if (!b || !ob) return;
     const t = b.translation(), lv = b.linvel(), ot = ob.translation(), ov = ob.linvel();
-    const s = bumpShove({ x: t.x, z: t.z, vx: lv.x, vz: lv.z, mass: racer.vehicle.tuning.mass }, { x: ot.x, z: ot.z, vx: ov.x, vz: ov.z, mass: other.vehicle.tuning.mass }, normals.current.get(other.id));
+    const s = bumpShove({ x: t.x, z: t.z, vx: lv.x, vz: lv.z, mass: racer.vehicle.tuning.mass }, { x: ot.x, z: ot.z, vx: ov.x, vz: ov.z, mass: other.vehicle.tuning.mass }, racer.contactNormal.get(other.id));
     racer.bump.x += s.x; racer.bump.z += s.z;
     state.current.bumpCooldown = 0.25;
   };
@@ -265,14 +263,14 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           racer.knock = Math.max(racer.knock, (0.03 + 0.12 * headOn) * share * 2);
           if (o) {
             // Push apart along the contact normal (shove() points it away from the other vehicle).
-            normals.current.set(o.id, { x: n.x, z: n.z });
+            racer.contactNormal.set(o.id, { x: n.x, z: n.z });
             racer.touching.add(o.id); shove(o);
           }
         }
       }}
       onCollisionExit={({ other }) => {
         const ud = other.rigidBody?.userData as { racer?: number } | undefined;
-        if (ud?.racer !== undefined) { racer.touching.delete(ud.racer); normals.current.delete(ud.racer); }
+        if (ud?.racer !== undefined) { racer.touching.delete(ud.racer); racer.contactNormal.delete(ud.racer); }
       }}
     >
       {/* Rounded edges let vehicles slide off each other instead of locking corners. */}

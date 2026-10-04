@@ -62,14 +62,26 @@ if (args.unlock) params.set('unlock', 'all');
 const settings = { settings: { quality: args.quality || 'high', sound: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt'], accountPromptDismissed: false, paint: args.paint ? { [args.vehicle || 'okada']: args.paint } : {}, itemHints: 0 };
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v2', ${JSON.stringify(JSON.stringify(settings))});` });
 await send('Page.navigate', { url: base + (params.toString() ? '?' + params : '') });
-await sleep(2500);
+// Wait for the menu (a busy machine can take well over a few seconds), not a fixed time.
+for (let i = 0; i < 300; i++) { if (await evaluate(`!![...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent))`)) break; await sleep(100); }
 const files = [await shot('menu')];
 
 // Start the race.
 await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent)).click()`);
 let ready = false;
-for (let i = 0; i < 300 && !ready; i++) { await sleep(100); ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))'); }
-if (!ready) { console.log(JSON.stringify({ error: 'race never became ready', errors, logs: logs.slice(-10) }, null, 2)); done(1); }
+let clickedAgain = false;
+for (let i = 0; i < 300 && !ready; i++) {
+  await sleep(100);
+  ready = await evaluate('!!(window.__lr && window.__lr.getRace() && window.__lr.getRace().racers.every(r => r.body))');
+  // Still on the menu after 3 s: the click was lost, so press the button once more (and say so).
+  if (!ready && i === 30 && await evaluate(`!!document.querySelector('.menu')`)) { clickedAgain = true; await evaluate(`[...document.querySelectorAll('button')].find(b => /RACE/.test(b.textContent)).click()`); }
+}
+if (clickedAgain) console.log('note: the first RACE click did not start the race; clicked again');
+if (!ready) {
+  // Where it got stuck: no canvas yet, no race yet, or some racers without a physics body.
+  const state = await evaluate(`(() => { const lr = window.__lr; const r = lr && lr.getRace(); return { screen: lr ? lr.useGame.getState().screen : document.querySelector('.menu') ? 'menu (no __lr)' : 'unknown', race: !!r, bodies: r ? r.racers.map(c => !!c.body) : null, buttons: [...document.querySelectorAll('button')].map(b => b.textContent).slice(0, 5) }; })()`);
+  console.log(JSON.stringify({ error: 'race never became ready', state, errors, logs: logs.slice(-10) }, null, 2)); done(1);
+}
 // Contact monitor: the longest time any two racers stay touching while both are moving (> 3 m/s).
 // Vehicles that jam together show up here; bumps that push apart keep it short.
 await evaluate(`(() => { const run = {}; window.__contact = { max: 0, pair: '' }; let last = performance.now();

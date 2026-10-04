@@ -62,6 +62,8 @@ export type Racer = {
   bump: { x: number; z: number };
   /** Ids of the racers this one is touching right now. */
   touching: Set<number>;
+  /** Contact normal (horizontal) for each racer in `touching`, from the collision that started the contact. */
+  contactNormal: Map<number, { x: number; z: number }>;
   /** Seconds the car has been stuck; used to back it out or put it back on the road. */
   trouble: number;
   /** How many times this racer has been put back on the road (play-test metric). */
@@ -116,7 +118,7 @@ export const setRace = (r: RaceRuntime | null) => { current = r; };
 export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress): Racer {
   return {
     id, name, vehicle, paint, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
-    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0, bump: { x: 0, z: 0 }, touching: new Set(),
+    speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, wobble: 0, immune: 0, scraping: false, knock: 0, bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(),
     trouble: 0, respawns: 0, respawn: false, ai: null,
   };
 }
