@@ -9,7 +9,7 @@ import { paintOf, vehicleById } from '../config/vehicles';
 import { pickRivals, type Pick } from '../game/lineup';
 import { sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
-import { makeRacer, setRace, getRace, type RaceRuntime } from '../game/runtime';
+import { aiState, makeRacer, setRace, getRace, type RaceRuntime } from '../game/runtime';
 import { makePickups } from '../game/items';
 import { makeCritters } from '../game/critters';
 import { AI_NAMES } from '../game/ai';
@@ -49,7 +49,7 @@ export function makeRace(trackId: string, player: Pick): { race: RaceRuntime; sp
     const isPlayer = k === lineup.length - 1;
     const v = vehicleById(vid);
     const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, createProgress(track, x, z));
-    if (!isPlayer) r.ai = { lane, laneTarget: lane, skill: 0.9 + k * 0.035 + Math.random() * 0.03, itemDelay: 2, stuck: 0, reverseTime: 0 };
+    if (!isPlayer) r.ai = aiState(lane, 0.9 + k * 0.035 + Math.random() * 0.03, 2);
     return r;
   });
   let id = 1;

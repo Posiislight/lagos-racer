@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { getRace, type Racer } from '../game/runtime';
+import { aiState, getRace, type Racer } from '../game/runtime';
 import { updateProgress, standings, currentLap } from '../game/race';
 import { readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
@@ -73,7 +73,7 @@ export function RaceLogic() {
         unstick(r, dt, race.phase === 'racing');
       }
       else {
-        if (!r.ai) r.ai = { lane: r.progress.lateral, laneTarget: 0, skill: 0.95, itemDelay: 3, stuck: 0, reverseTime: 0 };
+        if (!r.ai) r.ai = aiState(r.progress.lateral, 0.95, 3, 0);
         driveAI(r, race, dt, r.isPlayer ? 0 : r.progress.distance - player.progress.distance);
       }
     }

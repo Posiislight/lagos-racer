@@ -8,9 +8,11 @@ export type Controls = {
   horn: boolean;
   /** Set for one frame when the item button is pressed. */
   useItem: boolean;
+  /** Set for one frame when the special button is pressed. */
+  special: boolean;
 };
 
-export const emptyControls = (): Controls => ({ throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, useItem: false });
+export const emptyControls = (): Controls => ({ throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, useItem: false, special: false });
 
 /** Raw touch state written by the on-screen buttons. */
 export const touch = { left: false, right: false, gas: false, brake: false, drift: false, horn: false, item: false };
