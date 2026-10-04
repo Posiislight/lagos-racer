@@ -65,8 +65,9 @@ median. Screenshots: `docs/screenshots/ojuelegba-road/`.
 
 - **Vite + React + TypeScript**, **React Three Fiber** for 3D, **Rapier** (raycast vehicle controller) for physics, **zustand** for UI state.
 - `src/config/vehicles.ts` has every vehicle's stats, size and handling tuning in one place. `src/config/tracks.ts` defines tracks as a loop of control points (Ojuelegba's come from the real road via `src/game/outAndBack.ts`), gentle hills and scenery zones; the road, kerbs, pavements, colliders, racing line, pickups, goats and the street of buildings are all generated from that.
+- `src/config/drivers.ts` has the drivers (Moshood, Mama Put) and every number behind their special powers; `src/game/specials.ts` charges the meters and runs Push Squad and Pepper Soup Trail.
 - `src/scene/art/` paints the Lagos look into textures: building fronts, cut-out crowds, the skyline, pavements and zinc.
-- `src/models/` builds the vehicles from the procedural showroom code (`reference/sporty/`), merging static parts per material so each vehicle draws in a few dozen calls.
+- `src/models/` builds the vehicles from the procedural showroom code (`reference/sporty/`), merging static parts per material so each vehicle draws in a few dozen calls. `driverFigure` (in `reference/sporty/core.js`) builds the driver characters, and each vehicle builder seats whichever one you pick.
 - `src/game/` is plain logic: track maths, lap counting, AI, items, input, audio (all sound is synthesised, so there are no audio downloads).
 - `src/scene/` holds the 3D pieces: vehicle physics, track, scenery, chase camera, effects, race loop.
 - `src/ui/` holds the menus, garage, HUD and touch controls.

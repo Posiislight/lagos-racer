@@ -103,8 +103,8 @@ These are failure modes the spec implies that no feature test would naturally co
 ClientMessage:
 - `{t:'create', name, vehicle}`, `{t:'join', code, name, vehicle}`, `{t:'resume', token}`
 - `{t:'ping', c}`
-- `{t:'lobby', vehicle?, ready?, fillAI?}`, `{t:'start'}`, `{t:'loaded'}`
-- `{t:'pickup', orb}`, `{t:'use', hazard: Hazard}`, `{t:'hit', hazard: number, netId}`
+- `{t:'lobby', vehicle?, driver?, ready?, fillAI?}`, `{t:'start'}`, `{t:'loaded'}` (note: `GridEntry` also carries `driverId: DriverId`, and the `create`/`join` messages carry the chosen `driver` next to `vehicle`)
+- `{t:'pickup', orb}`, `{t:'use', hazard: Hazard}`, `{t:'hit', hazard: number, netId}` (`use` also takes the driver-special kinds `'push'` and `'soup'`; see the Items task)
 - `{t:'finish', netId, laps: number[], time}`
 - `{t:'leave'}`
 
@@ -120,7 +120,7 @@ ServerMessage:
 
 Binary layout, little-endian:
 - header, 8 bytes: u8 version (=1), u8 slot, u8 raceSeq (mod 256), u8 car count, f32 time;
-- per car, 33 bytes: u8 netId, f32 x, y, z, i16 quaternion ×4 (scaled by 32767), i16 velocity ×3 (cm/s, clamped to the i16 range), f32 distance, u8 laps, u8 flags.
+- per car, 33 bytes: u8 netId, f32 x, y, z, i16 quaternion ×4 (scaled by 32767), i16 velocity ×3 (cm/s, clamped to the i16 range), f32 distance, u8 laps, u8 flags. The flags byte gains `push` and `cough` bits for the driver specials, so all 8 bits are used.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -224,7 +224,7 @@ Behaviour:
   - `close` marks them disconnected (`leftAt = now`) and keeps the slot until `tick()` sees `RECONNECT_GRACE_MS` pass;
   - if the host goes, `hostSlot` becomes the lowest connected slot;
   - a room with no members is deleted.
-- **lobby:** sets vehicle and ready; `fillAI` only from the host, otherwise `not-host`. Every change broadcasts `room` to all connected members.
+- **lobby:** sets vehicle, driver (`moshood` or `mamaput`, unknown values become the default) and ready; `fillAI` only from the host, otherwise `not-host`. Every change broadcasts `room` to all connected members.
 - **ping:** replies `pong {c, s: now()}`.
 - **Limits:**
   - over 4096 bytes, or more than 30 messages in any 1 s window → dropped silently;
@@ -631,6 +631,7 @@ Vehicle changes for `racer.kind === 'remote'`:
     - `use` → push the hazard if its id isn't present yet;
     - `hit` → juju: puff at the hazard and `life = 0`; oil: `life = min(life, 8)`. The victim's effects come from snapshot flags.
   - `pickup`, `use` and `hit` hooks send the matching ClientMessage.
+  - Driver specials: `use` with kind `'push'` just sets the owner's `push` flag; `'soup'` makes each phone drop patches along the owner's car (no per-patch messages), and a victim's owner sends `hit`. `updateSpecials` must skip remote racers (it only charges and fires for cars this phone owns); a remote racer's `push` and `cough` come from the snapshot flags.
   - **Server:** relays `pickup`, `use` and `hit` with `from` added, to every other grid member, only in `racing`. It drops a `use` whose `hazard.id` is outside `[slot×100000, (slot+1)×100000)`, and a `hit` whose `netId` isn't owned by the sender.
 
 - [ ] **Step 1: Write the failing tests** (`items.test.ts` builds a race on the test track from `race.test.ts` with fake bodies)

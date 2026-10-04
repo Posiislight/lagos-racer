@@ -48,12 +48,21 @@ Colours are paint options, not separate vehicles: each vehicle has six paints in
 
 Danfo and BRT have conductors hanging out of the door; on those vehicles the conductor throws the power-ups.
 
+### Drivers
+
+The driver is picked separately from the vehicle (Garage, saved) and sits in every vehicle (`driverFigure` in `reference/sporty/core.js`). Each has a special power on a charge meter (30 s) and a button (Q on keyboard). Config in `src/config/drivers.ts`; logic in `src/game/specials.ts`.
+
+- **Moshood** (angry agbero): Push Squad.
+- **Mama Put** (stern food seller): Pepper Soup Trail.
+
 ## Power-ups
 
 - Juju: bomb
 - Crude oil: grease slick that makes others skid
 - Odeshi: protective charm, blocks crude oil and juju for 8 seconds
 - Projectile: pure water sachet or a flying slipper (not a baby)
+- Push Squad (driver special): Moshood's boys shove from behind for about 4 seconds
+- Pepper Soup Trail (driver special): a trail of scalding soup patches for about 5 seconds; anyone who drives through slows down and coughs
 
 ## Tracks (stylised, hand-built, not Street View)
 
