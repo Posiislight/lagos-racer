@@ -101,8 +101,8 @@ export const TRACKS: TrackConfig[] = [
     name: 'Ikorodu Garage',
     blurb: 'From the General Hospital to the garage roundabout and back. Mind the okadas.',
     // Axis runs hospital to roundabout, so street 'north' is the right-hand (outbound) side going to the roundabout.
-    // U-turns 13 m round the centre line: the BRT needs at least 12 m.
-    control: outAndBack(IKORODU_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 13, splay: 30, startAt: IKORODU_START }),
+    // U-turns 16 m round the centre line (the BRT needs 12 m at the very least, but AI BRTs and kekes got stuck at 13 m).
+    control: outAndBack(IKORODU_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 16, splay: 40, startAt: IKORODU_START }),
     axis: IKORODU_AXIS,
     // The last 390 real metres to the roundabout are a dual carriageway with a concrete barrier down the middle.
     median: { width: MEDIAN, barrier: [IKORODU_LENGTH - 117, IKORODU_LENGTH] },
@@ -129,10 +129,10 @@ export const TRACKS: TrackConfig[] = [
       south('tanker', 176, 190), south('lowrise', 190, 288), south('yellowBlock', 288, 302),
       south('lowrise', 302, IKORODU_LENGTH - 75), south('petrol', IKORODU_LENGTH - 75, IKORODU_LENGTH - 45), south('lowrise', IKORODU_LENGTH - 45, IKORODU_LENGTH - 12),
     ],
-    // The real ring is about 5.4 m in radius at this scale, too tight for the BRT; the road round it is 13 m.
+    // The real ring is about 5.4 m in radius at this scale, too tight for the BRT; the road round it is 16 m.
     signage: 'real',
-    islands: [{ road: IKORODU_LENGTH, radius: 6.2, statue: true, backdrop: true }],
-    invented: [{ road: [0, 20], why: 'OSM shows only a 34 m service road inside the hospital gate; the U-turn there is a constructed 13 m turning circle in the forecourt' }],
+    islands: [{ road: IKORODU_LENGTH, radius: 9.2, statue: true, backdrop: true }],
+    invented: [{ road: [0, 20], why: 'OSM shows only a 34 m service road inside the hospital gate; the U-turn there is a constructed 16 m turning circle in the forecourt' }],
     ground: '#a87d5c',
   },
 ];

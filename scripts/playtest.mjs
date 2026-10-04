@@ -126,7 +126,7 @@ console.log("errors:", JSON.stringify([...new Set(errors)].slice(0, 10)));
 const every = Math.max(1, Math.floor(samples.length / (+args.lines || 12)));
 samples.forEach((s, i) => { if (i % every === 0 || i === samples.length - 1) console.log(typeof s.racers === "object" ? line(s) : JSON.stringify(s)); });
 console.log("results:", JSON.stringify(results));
-const metrics = await evaluate(`({ contact: window.__contact, episodes: window.__episodes, open: window.__openEpisodes, respawnLog: window.__respawnLog, respawns: window.__lr.getRace().racers.map(c => ({ v: c.vehicle.id, player: c.isPlayer, respawns: c.respawns, laps: c.progress.lapsDone })) })`);
+const metrics = await evaluate(`({ contact: window.__contact, episodes: window.__episodes, open: window.__openEpisodes, respawnLog: window.__respawnLog, rlog: window.__rl, respawns: window.__lr.getRace().racers.map(c => ({ v: c.vehicle.id, player: c.isPlayer, respawns: c.respawns, laps: c.progress.lapsDone })) })`);
 console.log("metrics:", JSON.stringify(metrics));
 console.log("files:", files.join(" "));
 ws.close(); done(errors.length ? 2 : 0);

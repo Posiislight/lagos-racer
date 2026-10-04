@@ -15,7 +15,7 @@ const out = path.join(root, 'src', 'config', 'ikoroduAxis.ts');
 const REAL = [[-503, 1289], [-385, 1094], [-265, 881], [-207, 754], [-126, 519], [-95, 402], [-50, 262], [-37, 219], [-8, 70], [-5, 22]];
 const SCALE = 0.3;
 const STEP = 20; // game metres between axis vertices
-const START = 70; // game metres along the axis to the start line
+const START = 85; // game metres along the axis to the start line
 
 const pts = REAL.map(([x, z]) => [x * SCALE, z * SCALE]);
 const cum = [0];
