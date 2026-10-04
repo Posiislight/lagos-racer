@@ -356,7 +356,50 @@ describe('race start', () => {
     expect(grid.filter(e => !e.ai).map(e => e.slot)).toEqual([1, 2]);
   });
 
-  it.todo('when the host drops for 15 s mid-race, their AI cars are DNF too');
+  it('when the host drops for 15 s mid-race, their AI cars are DNF too', () => {
+    const { a, b } = pair();
+    send(a.conn, { t: 'lobby', fillAI: true });
+    send(a.conn, { t: 'start' });
+    for (const p of [a, b]) send(p.conn, { t: 'loaded' });
+    now += START_LEAD_MS;
+    server.tick();
+    server.close(a.conn);
+    now += RECONNECT_GRACE_MS;
+    server.tick();
+    // AI cars 0-3 and the host's own car 4; the guest (5) races on.
+    expect(msgs(b.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [0, 1, 2, 3, 4] }]);
+  });
+
+  it('re-sends grid and start to a grid player who resumes, after welcome and room', () => {
+    const { a, b, room } = pair();
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded' });
+    // b drops while loading, so the start goes out without them.
+    server.close(b.conn);
+    server.tick();
+    const [start] = msgs(a.peer, 'start');
+    expect(start).toBeDefined();
+    expect(msgs(b.peer, 'start')).toHaveLength(0);
+
+    now += 2000;
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    const kinds = b2.peer.sent.map(d => (JSON.parse(d as string) as ServerMessage).t);
+    expect(kinds).toEqual(['welcome', 'room', 'grid', 'start']);
+    expect(msgs(b2.peer, 'grid')).toEqual(msgs(b.peer, 'grid'));
+    expect(msgs(b2.peer, 'start')).toEqual([start]);
+    expect(room.phase).toBe('countdown');
+  });
+
+  it('re-sends only the grid to a grid player who resumes while still loading', () => {
+    const { a, b } = pair();
+    send(a.conn, { t: 'start' });
+    server.close(b.conn);
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    expect(msgs(b2.peer, 'grid')).toEqual(msgs(b.peer, 'grid'));
+    expect(msgs(b2.peer, 'start')).toHaveLength(0);
+  });
 
   it('ignores a second start once the race has begun', () => {
     const { a } = pair();
@@ -824,7 +867,93 @@ describe('finish and results', () => {
     expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + 33 * 1.6 + 10);
   });
 
-  it('refuses (DNF) a finish whose time is more than 2 s off the room clock, and does not count it as activity', () => {
+  it('accepts a finish re-sent after a reconnect, claiming the time the car really crossed the line', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    // The finish went out while the socket was down; the phone resumes 8 s later and sends it again.
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, half(time));
+    now += 8000;
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+  });
+
+  it('refuses a finish claimed from the future', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, half(time));
+    // Laps that add up to a time 1.5 s past the room's race time.
+    const ahead = (now - startAt) / 1000 + 1.5;
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(LAPS * L / ahead), time: ahead });
+    expect(msgs(b.peer, 'finished')).toHaveLength(0);
+  });
+
+  it('a racer gone for 15 s is DNF and dnf is broadcast', () => {
+    const { a, b, c, d2, room } = racers();
+    const token = msgs(b.peer, 'welcome')[0].token;
+    server.close(b.conn);
+    now += RECONNECT_GRACE_MS - 1;
+    server.tick();
+    expect(msgs(a.peer, 'dnf')).toHaveLength(0);
+    now += 1;
+    server.tick();
+    for (const p of [a, c]) expect(msgs(p.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [1] }]);
+    // Only the racers hear it, and only once.
+    expect(msgs(d2.peer, 'dnf')).toHaveLength(0);
+    server.tick();
+    expect(msgs(a.peer, 'dnf')).toHaveLength(1);
+    // Too late to come back to this race.
+    const late = connect();
+    send(late.conn, { t: 'resume', token });
+    expect(msgs(late.peer, 'error')[0].error).toBe('expired');
+    expect(room['referee']!.results(1).find(r => r.netId === 1)!.dnf).toBe(true);
+  });
+
+  it('leave during a race DNFs at once', () => {
+    const { a, b, c } = racers();
+    send(b.conn, { t: 'leave' });
+    for (const p of [a, c]) expect(msgs(p.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [1] }]);
+  });
+
+  it('a player resuming during a race they are not in gets the room in racing phase', () => {
+    const { d2 } = racers();
+    expect(msgs(d2.peer, 'welcome')).toHaveLength(1);
+    expect(lastRoom(d2.peer).phase).toBe('racing');
+    expect(msgs(d2.peer, 'grid')).toHaveLength(0);
+    expect(msgs(d2.peer, 'start')).toHaveLength(0);
+  });
+
+  it('tells a racer who resumes about the cars that dropped out while they were away', () => {
+    const { a, b, c } = racers();
+    server.close(b.conn);
+    send(c.conn, { t: 'leave' });
+    const b2 = connect();
+    send(b2.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    expect(msgs(b2.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [2] }]);
+    expect(msgs(a.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [2] }]);
+  });
+
+  it('expired members are removed when the room returns to the lobby', () => {
+    const { a, b, c, d2, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    server.close(b.conn);
+    now += RECONNECT_GRACE_MS;
+    server.tick();
+    // Kept (as gone) for the rest of the race.
+    expect(lastRoom(a.peer).players.map(p => [p.slot, p.connected])).toEqual([[1, true], [2, false], [3, true], [4, true]]);
+    const drivers: Driver[] = [
+      { conn: a.conn, slot: 1, netId: 0, speed: 25 },
+      { conn: c.conn, slot: 3, netId: 2, speed: 24 },
+    ];
+    drive(startAt, drivers, (now - startAt) / 1000, half((LAPS * L) / 24));
+    const [res] = msgs(a.peer, 'results');
+    expect(res.results.map(r => [r.netId, r.dnf])).toEqual([[0, false], [2, false], [1, true]]);
+    expect(room.phase).toBe('lobby');
+    for (const p of [a, c, d2]) expect(lastRoom(p.peer).players.map(pl => pl.slot)).toEqual([1, 3, 4]);
+  });
+
+  it('refuses (DNF) a finish claimed well before the car was last seen short of the line, and does not count it as activity', () => {
     const { a, b, room } = racers();
     const startAt = msgs(a.peer, 'start')[0].at;
     const time = (LAPS * L) / 25;

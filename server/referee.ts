@@ -15,7 +15,9 @@ const SUM_SLACK = 0.5;
 // However many snapshots arrive, nobody is further on than full speed from the back of the grid allows.
 const GRID_DEPTH = 50;
 const DISTANCE_SLACK = 30;
-// A finish is claimed the moment the car crosses the line, so its time must be close to the server's race time.
+// A finish claim may come late (a phone that dropped re-sends it on resume) but never from the future, and never
+// from well before the server last saw the car still short of the line.
+const FUTURE_SLACK = 1;
 const CLOCK_SLACK = 2;
 
 type Car = {
@@ -24,6 +26,8 @@ type Car = {
   /** The referee's own idea of the distance driven, only ever moved as far as the car could have gone. */
   distance: number;
   lastTime: number;
+  /** Server race time (s) of the last snapshot that had the car short of the line. */
+  lastShortAt: number;
   finishTime: number | null;
   laps: number[];
   dnf: boolean;
@@ -40,12 +44,15 @@ export class Referee {
   constructor(private readonly track: Track, private readonly laps: number, grid: GridEntry[]) {
     for (const entry of grid) {
       const topSpeed = vehicleById(entry.vehicle).tuning.topSpeed;
-      this.cars.set(entry.netId, { entry, topSpeed, distance: 0, lastTime: 0, finishTime: null, laps: [], dnf: false });
+      this.cars.set(entry.netId, { entry, topSpeed, distance: 0, lastTime: 0, lastShortAt: 0, finishTime: null, laps: [], dnf: false });
     }
   }
 
-  /** A car's pose from a snapshot at race time `time` (s), which the room keeps from running ahead of its own clock. */
-  observe(state: CarState, time: number) {
+  /**
+   * A car's pose from a snapshot at race time `time` (s), which the room keeps from running ahead of its own clock,
+   * received at server race time `at`.
+   */
+  observe(state: CarState, time: number, at = time) {
     const car = this.cars.get(state.netId);
     if (!car || car.finishTime !== null || car.dnf) return;
     const L = this.track.length;
@@ -56,6 +63,7 @@ export class Referee {
     const cap = car.topSpeed * SPEED_MARGIN * Math.max(0, time) + GRID_DEPTH + DISTANCE_SLACK;
     car.distance = Math.min(car.distance + reach, cap, Math.max(car.distance - MAX_BACK, state.distance));
     car.lastTime = Math.max(car.lastTime, time);
+    if (state.distance < this.laps * L) car.lastShortAt = Math.max(car.lastShortAt, at);
   }
 
   /**
@@ -71,7 +79,8 @@ export class Referee {
       && car.distance >= this.laps * L - FINISH_SLACK
       && laps.every(t => Number.isFinite(t) && t >= minLap)
       && Number.isFinite(time)
-      && Math.abs(time - now) <= CLOCK_SLACK
+      && time <= now + FUTURE_SLACK
+      && time >= car.lastShortAt - CLOCK_SLACK
       && Math.abs(laps.reduce((a, b) => a + b, 0) - time) <= SUM_SLACK;
     if (!ok) {
       car.dnf = true;

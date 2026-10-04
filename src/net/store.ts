@@ -17,6 +17,8 @@ type NetState = {
   mySlot: number | null;
   room: RoomView | null;
   error: NetError | null;
+  /** True once a room we were in is out of reach for good: the "Connection don cut" screen. */
+  cut: boolean;
   nickname: string;
   pendingGrid: PendingGrid | null;
   create: (name: string, vehicle: VehicleId) => void;
@@ -104,7 +106,7 @@ function drop() {
   old?.close();
 }
 
-const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, pendingGrid: null };
+const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, pendingGrid: null, cut: false };
 
 export const useNet = create<NetState>((set, get) => {
   /** Opens a fresh socket; `first` (create or join) goes out as soon as it is open. */
@@ -138,20 +140,21 @@ export const useNet = create<NetState>((set, get) => {
     }
     if (s === 'closed') {
       // The connection gave up: the room is out of reach.
-      leaveToOnline('unreachable');
+      leaveToOnline('unreachable', get().code !== null);
       return;
     }
     set({ status: s });
   }
 
-  function reset(error: NetError | null) {
+  function reset(error: NetError | null, cut = false) {
     drop();
     writeToken(null);
-    set({ ...idle, error });
+    set({ ...idle, error, cut });
   }
 
-  function leaveToOnline(error: NetError | null) {
-    reset(error);
+  /** Back to the online screen (a race in progress stays up, under the cut modal if `cut`). */
+  function leaveToOnline(error: NetError | null, cut = false) {
+    reset(error, cut);
     const game = useGame.getState();
     if (game.screen === 'lobby') game.setScreen('online');
   }
@@ -162,6 +165,8 @@ export const useNet = create<NetState>((set, get) => {
         writeToken(m.token);
         set({ code: m.code, mySlot: m.slot, error: null });
         startPings();
+        // Back from a drop mid-race: a finish claimed while the socket was down never got there.
+        session?.resendFinishes();
         const game = useGame.getState();
         if (game.screen === 'online') game.setScreen('lobby');
         break;
@@ -171,7 +176,7 @@ export const useNet = create<NetState>((set, get) => {
         break;
       case 'error':
         // Before we are seated, or when a resume is refused, there is no room to stay in.
-        if (m.error === 'expired' || get().code === null) leaveToOnline(m.error);
+        if (m.error === 'expired' || get().code === null) leaveToOnline(m.error, get().code !== null);
         else set({ error: m.error });
         break;
       case 'pong':
@@ -182,7 +187,7 @@ export const useNet = create<NetState>((set, get) => {
         const mySlot = get().mySlot;
         if (!conn || mySlot === null || session?.raceSeq === m.raceSeq) break;
         set({ pendingGrid: { raceSeq: m.raceSeq, grid: m.grid, seed: m.seed, trackId: m.trackId, laps: m.laps } });
-        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq });
+        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq }, msg => useGame.getState().flash(msg));
         useGame.getState().startOnlineRace();
         break;
       }
@@ -193,6 +198,7 @@ export const useNet = create<NetState>((set, get) => {
       case 'use':
       case 'hit':
       case 'finished':
+      case 'dnf':
         session?.onEvent(m);
         break;
       case 'results': {

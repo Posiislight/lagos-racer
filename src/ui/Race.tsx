@@ -8,6 +8,8 @@ import { Hud } from './Hud';
 import { TouchControls, useIsTouch } from './TouchControls';
 import { Results } from './Results';
 import { PauseMenu } from './PauseMenu';
+import { ConnectionCut } from './Online';
+import { useNet } from '../net/store';
 import { Loading } from '../App';
 
 const DPR = { low: [0.75, 1], medium: [1, 1.5], high: [1, 2] } as const;
@@ -17,6 +19,10 @@ export default function Race() {
   const paused = useGame(s => s.paused);
   const results = useGame(s => s.results);
   const setPaused = useGame(s => s.setPaused);
+  const online = useGame(s => s.online);
+  const reconnecting = useNet(s => s.status === 'reconnecting');
+  // The room is gone: no point racing on against nobody.
+  const cut = useNet(s => s.cut) && online;
   const touch = useIsTouch();
   const [ready, setReady] = useState(false);
 
@@ -51,9 +57,11 @@ export default function Race() {
       </Canvas>
       {!ready && <Loading />}
       <Hud onPause={() => setPaused(true)} />
-      {touch && !results && <TouchControls />}
-      {paused && !results && <PauseMenu />}
-      {results && <Results />}
+      {online && reconnecting && <div className="net-badge" role="status">Reconnecting…</div>}
+      {touch && !results && !cut && <TouchControls />}
+      {paused && !results && !cut && <PauseMenu />}
+      {results && !cut && <Results />}
+      {cut && <ConnectionCut />}
     </div>
   );
 }

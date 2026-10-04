@@ -109,7 +109,8 @@ export function updateCritters(race: RaceRuntime, dt: number) {
 
 function checkHits(race: RaceRuntime, c: Critter) {
   for (const r of race.racers) {
-    if (!r.body) continue;
+    // A car out of the race is parked under its grid spot, not driving into goats.
+    if (!r.body || r.remote?.dnf) continue;
     const t = r.body.translation(), q = r.body.rotation();
     const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
     const fx = Math.cos(yaw), fz = -Math.sin(yaw);

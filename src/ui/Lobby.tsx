@@ -32,6 +32,8 @@ export function Lobby() {
   const here = room.players.filter(p => p.connected);
   const canStart = isHost && here.length >= 2 && here.every(p => p.ready);
   const away = status === 'reconnecting';
+  // Back from a drop while the others race on without us.
+  const inRace = room.phase !== 'lobby';
 
   const share = async () => {
     const result = await shareLink(code);
@@ -85,7 +87,11 @@ export function Lobby() {
           </div>
         )}
         <p className={`net-note${error || away ? ' bad' : ''}`} role="status">
-          {error ? ERROR_TEXT[error] : away ? 'Reconnecting…' : isHost && !canStart ? 'Need two players, everybody ready' : !isHost ? 'Waiting for the host to start' : ''}
+          {error ? ERROR_TEXT[error]
+            : away ? 'Reconnecting…'
+            : inRace ? 'Race in progress, you go join the next one.'
+            : isHost && !canStart ? 'Need two players, everybody ready'
+            : !isHost ? 'Waiting for the host to start' : ''}
         </p>
       </div>
     </div>

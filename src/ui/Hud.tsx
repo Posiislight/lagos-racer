@@ -55,6 +55,9 @@ function Minimap() {
         r.racers.forEach((c, i) => {
           const dot = el.querySelector<SVGCircleElement>(`[data-i="${i}"]`);
           if (!dot || !c.body) return;
+          // A car out of the race is parked off the map.
+          dot.style.display = c.remote?.dnf ? 'none' : '';
+          if (c.remote?.dnf) return;
           const t = c.body.translation();
           dot.setAttribute('cx', (t.x - shape.minX).toFixed(1));
           dot.setAttribute('cy', (t.z - shape.minZ).toFixed(1));

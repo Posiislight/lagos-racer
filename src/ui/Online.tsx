@@ -9,11 +9,25 @@ function codeFromUrl(): string {
   return /^[A-Z]{4}$/.test(code) ? code : '';
 }
 
+/** The room is gone for good (the server went away, or we were away too long): only the menu is left. */
+export function ConnectionCut() {
+  const backToMenu = () => { useNet.getState().leave(); useGame.getState().quitRace(); };
+  return (
+    <div className="modal" role="alertdialog" aria-modal="true" aria-labelledby="cut-title">
+      <div className="card modal-card">
+        <h2 id="cut-title">Connection don cut</h2>
+        <p className="muted">We no fit reach the room again.</p>
+        <button className="btn primary" onClick={backToMenu}>Back to menu</button>
+      </div>
+    </div>
+  );
+}
+
 const onlyCodeLetters = (raw: string) => normalizeCode(raw).split('').filter(c => CODE_ALPHABET.includes(c)).join('').slice(0, 4);
 
 export function Online() {
   const vehicle = useGame(s => s.vehicle);
-  const { status, error, nickname, create, join, leave } = useNet();
+  const { status, error, cut, nickname, create, join, leave } = useNet();
   const [name, setName] = useState(nickname);
   const [code, setCode] = useState(codeFromUrl);
   const busy = status === 'connecting' || status === 'reconnecting';
@@ -41,6 +55,7 @@ export function Online() {
         </p>
         <button className="btn" onClick={leave}>← Back</button>
       </div>
+      {cut && <ConnectionCut />}
     </div>
   );
 }

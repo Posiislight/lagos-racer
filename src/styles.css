@@ -241,6 +241,10 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
 }
+.net-badge {
+  position: absolute; z-index: 11; pointer-events: none; top: calc(76px + var(--safe-t)); left: calc(12px + var(--safe-l));
+  background: var(--red); color: #fff; border-radius: 999px; padding: 3px 10px; font: 800 12px Archivo, sans-serif;
+}
 .hud-wrong {
   top: 45%; left: 50%; transform: translateX(-50%); background: var(--red); padding: 8px 18px; border-radius: 10px; font-size: 24px;
   animation: blink .5s steps(2) infinite;
@@ -248,7 +252,11 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
 @keyframes msg { 0% { transform: translateX(-50%) scale(1.5); opacity: 0; } 12% { transform: translateX(-50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
 @keyframes blink { 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .hud-msg, .hud-count, .hud-item.full, .hud-wrong { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .hud-msg, .hud-count, .hud-item.full, .net-badge {
+  position: absolute; z-index: 11; pointer-events: none; top: calc(76px + var(--safe-t)); left: calc(12px + var(--safe-l));
+  background: var(--red); color: #fff; border-radius: 999px; padding: 3px 10px; font: 800 12px Archivo, sans-serif;
+}
+.hud-wrong { animation: none; } }
 /* Other players' names over their cars. drei's pointerEvents prop only applies in transform mode. */
 .name-tag {
   pointer-events: none; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis;

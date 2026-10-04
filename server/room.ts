@@ -43,6 +43,10 @@ export class Room {
   lastActivity: number;
   private members = new Map<number, Member>();
   private grid: GridEntry[] = [];
+  /** The current race's grid message, re-sent to a racer who resumes. */
+  private gridMsg: Extract<ServerMessage, { t: 'grid' }> | null = null;
+  /** Cars out of the current race because their phone dropped or left. */
+  private dropped = new Set<number>();
   private loaded = new Set<number>();
   private gridAt = 0;
   private startAt = 0;
@@ -76,8 +80,9 @@ export class Room {
     return slot;
   }
 
-  slotOfToken(token: string): number | null {
-    for (const m of this.members.values()) if (m.token === token) return m.slot;
+  /** The slot this token holds, unless its reconnect grace has run out. */
+  slotOfToken(token: string, now: number): number | null {
+    for (const m of this.members.values()) if (m.token === token && !this.expired(m, now)) return m.slot;
     return null;
   }
 
@@ -110,21 +115,52 @@ export class Room {
     m.leftAt = now;
   }
 
+  /** Gone for good: in a race their cars are out of it at once. */
   remove(slot: number) {
+    this.dropOut(slot);
     if (!this.members.delete(slot)) return;
     if (slot === this.hostSlot) this.hostSlot = this.nextHost();
   }
 
-  /** Removes everyone who has been gone longer than the grace period. */
+  /**
+   * Everyone gone longer than the grace period: out of the race if one is on, and out of the room once it is back
+   * in the lobby (so the race keeps their name for the results). Returns true if anyone was removed.
+   */
   expire(now: number): boolean {
     let removed = false;
     for (const m of [...this.members.values()]) {
-      if (m.leftAt !== null && now - m.leftAt >= RECONNECT_GRACE_MS) {
+      if (!this.expired(m, now)) continue;
+      if (this.phase === 'lobby') {
         this.remove(m.slot);
         removed = true;
-      }
+      } else this.dropOut(m.slot);
     }
     return removed;
+  }
+
+  private expired(m: Member, now: number) {
+    return m.leftAt !== null && now - m.leftAt >= RECONNECT_GRACE_MS;
+  }
+
+  /** Marks this slot's cars (its AI too) DNF in the race under way and tells the racers. */
+  private dropOut(slot: number) {
+    if (this.phase === 'lobby' || !this.referee) return;
+    const netIds = this.grid.filter(g => g.slot === slot && !this.dropped.has(g.netId)).map(g => g.netId);
+    if (!netIds.length) return;
+    for (const id of netIds) {
+      this.referee.dnf(id);
+      this.dropped.add(id);
+    }
+    for (const conn of this.othersOnGrid(slot)) this.send(conn, { t: 'dnf', netIds });
+  }
+
+  /** A racer back from a drop catches up on the race: its grid, the start time if set, and who dropped out. */
+  resync(slot: number) {
+    const conn = this.connOf(slot);
+    if (conn === null || this.phase === 'lobby' || !this.gridMsg || !this.grid.some(g => g.slot === slot)) return;
+    this.send(conn, this.gridMsg);
+    if (this.phase !== 'loading') this.send(conn, { t: 'start', raceSeq: this.raceSeq, at: this.startAt });
+    if (this.dropped.size) this.send(conn, { t: 'dnf', netIds: [...this.dropped] });
   }
 
   /** Applies a lobby change from a member; returns an error code if it is refused. */
@@ -150,17 +186,19 @@ export class Room {
     this.grid = buildGrid(here, this.fillAI, this.hostSlot, random);
     this.referee = new Referee(buildTrack(config.control, 2, config.hills), config.laps, this.grid);
     this.cutoffAt = null;
+    this.dropped.clear();
     this.loaded.clear();
     this.gridAt = now;
     this.phase = 'loading';
-    this.broadcast({
+    this.gridMsg = {
       t: 'grid',
       raceSeq: this.raceSeq,
       grid: this.grid,
       seed: Math.floor(random() * 2 ** 32),
       trackId: this.trackId,
       laps: config.laps,
-    });
+    };
+    this.broadcast(this.gridMsg);
     return null;
   }
 
@@ -226,8 +264,9 @@ export class Room {
 
   /** A relayed snapshot's cars, as the referee sees them. A phone's clock may not run ahead of the room's. */
   observe(snap: Snapshot, now: number) {
-    const time = Math.min(snap.time, this.raceTime(now) + 1);
-    for (const car of snap.cars) this.referee?.observe(car, time);
+    const at = this.raceTime(now);
+    const time = Math.min(snap.time, at + 1);
+    for (const car of snap.cars) this.referee?.observe(car, time, at);
   }
 
   /** Seconds since the green light, by the server's clock. */
@@ -252,7 +291,10 @@ export class Room {
     return accepted;
   }
 
-  /** Sends the results to the racers (if asked) and goes back to the lobby for a rematch, everyone unready. */
+  /**
+   * Sends the results to the racers (if asked) and goes back to the lobby for a rematch, everyone unready and anyone
+   * whose grace ran out during the race gone.
+   */
   private endRace(now: number, withResults: boolean) {
     if (withResults && this.referee) {
       const results = this.referee.results(this.raceTime(now));
@@ -260,7 +302,9 @@ export class Room {
     }
     this.phase = 'lobby';
     this.referee = null;
+    this.gridMsg = null;
     this.cutoffAt = null;
+    this.expire(now);
     for (const m of this.members.values()) m.ready = false;
     this.broadcastRoom();
   }

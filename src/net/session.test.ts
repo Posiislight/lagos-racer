@@ -83,13 +83,14 @@ describe('NetSession', () => {
     function started(ms = 1000) {
       const now = vi.spyOn(performance, 'now').mockReturnValue(ms);
       const { link, sent, binary } = fakeLink();
-      const s = new NetSession(link, clockAhead(), setup);
+      const flash = vi.fn();
+      const s = new NetSession(link, clockAhead(), setup, flash);
       const racers = [racer(0, 'local', 1), racer(1, 'ai', 1), racer(2, 'remote', 2)];
       const race = { racers, net: null } as unknown as RaceRuntime;
       s.attach(race);
       // Server time is ms + 10000; a start at 10000 puts now() at ms / 1000.
       s.setStart(10000);
-      return { s, race, racers, binary, sent, now };
+      return { s, race, racers, binary, sent, now, flash };
     }
 
     const carFor = (netId: number, over: Partial<CarState> = {}): CarState =>
@@ -270,6 +271,45 @@ describe('NetSession', () => {
       s.onEvent({ t: 'finished', netId: 0, time: 80 });
       s.onEvent({ t: 'finished', netId: 9, time: 80 });
       expect(racers.map(r => r.progress.finishTime)).toEqual([null, null, 91.5]);
+    });
+
+    it('dnf hides remote cars; dnf of my own car only flashes the message', () => {
+      const { s, racers, flash } = started(1000);
+      s.onEvent({ t: 'dnf', netIds: [2] });
+      expect(racers[2].remote!.dnf).toBe(true);
+      expect(flash).not.toHaveBeenCalled();
+      // My AI dropping out says nothing; my own car keeps driving here, the room just won't count it.
+      s.onEvent({ t: 'dnf', netIds: [1] });
+      expect(flash).not.toHaveBeenCalled();
+      s.onEvent({ t: 'dnf', netIds: [0, 9] });
+      expect(flash).toHaveBeenCalledExactlyOnceWith('Network wahala');
+      expect(racers[0].remote).toBeNull();
+    });
+
+    it('remembers a dnf that arrives before the race is attached', () => {
+      const s = new NetSession(fakeLink().link, clockAhead(), setup);
+      s.onEvent({ t: 'dnf', netIds: [2] });
+      const remote = racer(2, 'remote', 2);
+      s.attach({ racers: [racer(0, 'local', 1), remote], net: null } as unknown as RaceRuntime);
+      expect(remote.remote!.dnf).toBe(true);
+    });
+
+    it('re-sends a finish the room never answered, until it does', () => {
+      const { s, racers, sent } = started(1000);
+      for (const r of [racers[0], racers[1]]) {
+        r.progress.lapTimes = [30, 30, 30];
+        r.progress.finishTime = 90;
+        s.finish(r);
+      }
+      const claim = (netId: number) => ({ t: 'finish', netId, laps: [30, 30, 30], time: 90 });
+      expect(sent).toEqual([claim(0), claim(1)]);
+      // The room accepted car 1 (its finished comes back to us too); car 0's claim was lost in a drop.
+      s.onEvent({ t: 'finished', netId: 1, time: 90 });
+      s.resendFinishes();
+      expect(sent).toEqual([claim(0), claim(1), claim(0)]);
+      s.onEvent({ t: 'finished', netId: 0, time: 90 });
+      s.resendFinishes();
+      expect(sent).toHaveLength(3);
     });
 
     it('drops snapshots from another raceSeq or from my own slot', () => {

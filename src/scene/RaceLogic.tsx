@@ -89,7 +89,7 @@ export function RaceLogic() {
     for (const r of race.racers) {
       if (!r.body) continue;
       const t = r.body.translation();
-      if (r.kind === 'remote') { trackRemote(race.track, r.progress, t.x, t.z); continue; }
+      if (r.kind === 'remote') { if (!r.remote?.dnf) trackRemote(race.track, r.progress, t.x, t.z); continue; }
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
       // Online, every car this phone drives claims its finish from the room's referee.
       if (e?.finished) race.net?.finish(r);
@@ -123,7 +123,7 @@ export function RaceLogic() {
       const order = standings(race.racers.filter(r => !r.remote?.dnf));
       const best = player.progress.lapTimes.length ? Math.min(...player.progress.lapTimes) : null;
       store.setHud({
-        lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: race.racers.length,
+        lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: order.length,
         time: race.clock, lapTime: race.clock - player.progress.lapStart, bestLap: best,
         speed: Math.abs(player.speed) * 3.6, item: player.item ? { kind: player.item, label: ITEM_LABEL[player.item] } : null, wrongWay: wrongWay.current > 1.2,
       });

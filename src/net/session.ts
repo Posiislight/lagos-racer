@@ -4,7 +4,9 @@ import type { OnlineSetup } from '../game/setup';
 import type { ClockSync } from './clock';
 import type { NetLink } from './connection';
 import { sfx } from '../game/audio';
-import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ServerMessage } from './protocol';
+import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage, type ServerMessage } from './protocol';
+
+type FinishClaim = Extract<ClientMessage, { t: 'finish' }>;
 
 export class NetSession implements NetHooks {
   readonly raceSeq: number;
@@ -14,14 +16,24 @@ export class NetSession implements NetHooks {
   private lastSend = -Infinity;
   /** Cars that sounded their horn since the last send: an AI toots for one frame, which a 15 Hz send would miss. */
   private hornSince = new Set<number>();
+  /** Cars out of the race because their phone dropped; kept in case the race isn't attached yet. */
+  private dnf = new Set<number>();
+  /** Finish claims for my cars the room hasn't answered yet; a claim made while the socket was down is lost. */
+  private unanswered = new Map<number, FinishClaim>();
 
-  constructor(private readonly link: NetLink, private readonly clock: ClockSync, readonly setup: OnlineSetup & { raceSeq: number }) {
+  constructor(
+    private readonly link: NetLink,
+    private readonly clock: ClockSync,
+    readonly setup: OnlineSetup & { raceSeq: number },
+    private readonly flash: (message: string) => void = () => {},
+  ) {
     this.raceSeq = setup.raceSeq;
   }
 
   attach(race: RaceRuntime) {
     race.net = this;
     this.race = race;
+    this.applyDnf();
   }
 
   /** The server's start time (its Date.now()). */
@@ -94,6 +106,13 @@ export class NetSession implements NetHooks {
    * tidies up the hazard; the victim's slowdown or slide arrives in its snapshots.
    */
   onEvent(m: ServerMessage) {
+    if (m.t === 'dnf') {
+      for (const id of m.netIds) this.dnf.add(id);
+      // My own car drives on here, but the room has stopped counting it.
+      if (this.race?.racers.some(r => r.isPlayer && m.netIds.includes(r.id))) this.flash('Network wahala');
+      this.applyDnf();
+      return;
+    }
     const race = this.race;
     if (!race) return;
     if (m.t === 'pickup') {
@@ -114,7 +133,13 @@ export class NetSession implements NetHooks {
       // The referee accepted another phone's finish: it stops being a juju target and ranks by time.
       const r = race.racers.find(x => x.id === m.netId);
       if (r?.kind === 'remote') r.progress.finishTime = m.time;
+      else this.unanswered.delete(m.netId);
     }
+  }
+
+  /** Other phones' cars that dropped out: hidden and out of everyone's way. */
+  private applyDnf() {
+    for (const r of this.race?.racers ?? []) if (r.remote && this.dnf.has(r.id)) r.remote.dnf = true;
   }
 
   pickup(orb: number) {
@@ -133,6 +158,13 @@ export class NetSession implements NetHooks {
   finish(r: Racer) {
     const time = r.progress.finishTime;
     if (time === null) return;
-    this.link.sendJson({ t: 'finish', netId: r.id, laps: [...r.progress.lapTimes], time });
+    const claim: FinishClaim = { t: 'finish', netId: r.id, laps: [...r.progress.lapTimes], time };
+    this.unanswered.set(r.id, claim);
+    this.link.sendJson(claim);
+  }
+
+  /** After a resume: claim again any finish the room never answered. */
+  resendFinishes() {
+    for (const claim of this.unanswered.values()) this.link.sendJson(claim);
   }
 }

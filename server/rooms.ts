@@ -269,7 +269,7 @@ export class RoomServer {
 
   private resume(conn: number, c: Conn, token: string) {
     for (const room of this.rooms.values()) {
-      const slot = room.slotOfToken(token);
+      const slot = room.slotOfToken(token, this.now());
       if (slot === null) continue;
       // The old socket may not have noticed it dropped yet; the new one takes over.
       const old = room.connOf(slot);
@@ -284,6 +284,7 @@ export class RoomServer {
       c.slot = slot;
       this.send(conn, { t: 'welcome', code: room.code, slot, token });
       room.broadcastRoom();
+      room.resync(slot);
       return;
     }
     this.fail(conn, 'expired');

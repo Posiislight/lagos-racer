@@ -107,14 +107,27 @@ describe('Referee', () => {
     expect(ref.distanceOf(0)).toBeCloseTo(33 * 1.6 * 5 + 50 + 30);
   });
 
-  it('rejects a finish time more than 2 s off the server race time', () => {
-    const ref = new Referee(track, LAPS, grid(2));
+  it('accepts a late finish (a reconnect), but not one from the future or from before the car was last seen short of the line', () => {
+    const ref = new Referee(track, LAPS, grid(4));
     const time = (LAPS * L) / 25;
-    drive(ref, 0, 25, 0, time);
-    drive(ref, 1, 25, 0, time);
-    expect(ref.finish(0, lapsAt(25), time, time + 2.5)).toBe(false);
-    expect(ref.finish(1, lapsAt(25), time, time + 1.5)).toBe(true);
-    expect(ref.results(time + 2.5).map(r => [r.netId, r.dnf])).toEqual([[1, false], [0, true]]);
+    for (const netId of [0, 1, 2, 3]) drive(ref, netId, 25, 0, time);
+    // Sent 10 s after the car crossed, once its phone got back online.
+    expect(ref.finish(0, lapsAt(25), time, time + 10)).toBe(true);
+    // Claims at most 1 s ahead of the server's race time.
+    expect(ref.finish(1, lapsAt(25), time, time - 1.5)).toBe(false);
+    expect(ref.finish(2, lapsAt(25), time, time - 0.5)).toBe(true);
+    // The car was still short of the line at (about) `time`, so it can't have finished 3 s earlier.
+    const early = lapsAt(25).map(t => t - 1);
+    expect(ref.finish(3, early, time - 3, time)).toBe(false);
+    expect(ref.results(time + 10).map(r => [r.netId, r.dnf])).toEqual([[0, false], [2, false], [1, true], [3, true]]);
+  });
+
+  it('times "last seen short of the line" by when the snapshot reached the server, not its own stamp', () => {
+    const ref = new Referee(track, LAPS, grid(1));
+    const time = (LAPS * L) / 25;
+    // Every snapshot reaches the server 3 s after its stamp, the last short of the line at about time + 3.
+    for (let t = 0; t <= time + 1e-9; t += 1 / 15) ref.observe(at(0, 25 * t), t, t + 3);
+    expect(ref.finish(0, lapsAt(25), time, time + 3)).toBe(false);
   });
 
   it('orders results: finished by time, then by distance with projections, then DNF', () => {

@@ -167,6 +167,23 @@ describe('items', () => {
     expect(race.hazards).toHaveLength(0);
   });
 
+  it('a DNF car parked under its grid spot picks up nothing and smears no oil', () => {
+    const me = racer(0, 'local', 0);
+    const dnf = racer(1, 'remote', 0);
+    dnf.remote!.dnf = true;
+    const race = makeTestRace([me, dnf], fakeNet());
+    const orb = race.pickups[0];
+    // Parked far below the road, but right under an orb and a slick as far as x and z go.
+    dnf.fake.pos.x = orb.x; dnf.fake.pos.y = -200; dnf.fake.pos.z = orb.z;
+    race.hazards.push(oil(100001, orb.x, orb.z, 0));
+    step(race, 0.1);
+    expect(orb.respawn).toBe(0);
+    expect(dnf.item).toBeNull();
+    expect(race.hazards[0].life).toBeGreaterThan(21);
+    expect(race.net!.pickup).not.toHaveBeenCalled();
+    expect(race.net!.hit).not.toHaveBeenCalled();
+  });
+
   it('juju never targets a DNF racer', () => {
     const ahead = racer(0, 'remote', 80);
     const dnf = racer(1, 'remote', 50);
