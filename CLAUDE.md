@@ -68,6 +68,12 @@ The driver is picked separately from the vehicle (Garage, saved) and sits in eve
 
 Ojuelegba, Ikorodu Garage (built), Third Mainland Bridge, Oshodi under the bridge, flooded Lekki in rainy season, Balogun market. Hazards: LASTMA ambush, goats crossing, danfos cutting in, open gutters, potholes.
 
+Every track has its own look, set in `src/config/tracks.ts` (`setting`: sky, haze, light, the painted horizon and, for tracks over water, the lagoon). A new track should get a different setting and different scenery, not the same buildings with a new road. Tracks are loops of hand-drawn control points; their length, bends and grades are checked by `src/config/tracks.test.ts` and `scripts/track-report.ts`.
+
+Third Mainland Bridge is built: a hand-drawn 2.6 km journey, 2 laps (`src/config/thirdMainland.ts`). Mainland street, a ramp that climbs onto the bridge, a long span over the lagoon with the other carriageway jammed with traffic, the island end, then a low causeway through a stilt-house water village. The road's height comes from `heights` (a profile along the lap); the lagoon, deck and props are in `src/scene/lagoon.ts`.
+
+Shortcuts are supported as data but none are placed yet: a track's `shortcuts` list gives a fork and a rejoin lap distance and the waypoints between (`src/game/shortcuts.ts`, which also checks a shortcut is shorter and doesn't hit the road). Lap counting and positions already follow a car through one. Not yet built: drawing a branch, a gap in the walls at the fork and rejoin, and the AI choosing a branch.
+
 Ojuelegba is laid out on the real road from OpenStreetMap (`scripts/osm-track.mjs`, credit "© OpenStreetMap contributors" in the menu); the buildings and props stay stylised and hand-built. Never derive layouts or models from Google Maps or Street View imagery (their terms forbid it); Street View is only for looking.
 
 **Exception, chosen by the user (4 October): the Ikorodu Garage track uses real business and place names as lettering on signs**, in brand colours, with no logo artwork (`src/config/signs/ikorodu.ts`; spec `docs/superpowers/specs/2026-10-04-ikorodu-garage-track-design.md`). Only names read off a sign are used, never names seen only on a map. This breaks the no-real-brand rule above and carries trademark risk for a deployed game with coins; the track's `signage: 'generic'` flag switches every real name off. The sign text was read in Street View, so before shipping, confirm it against the user's own photos or video.

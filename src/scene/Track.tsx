@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { CuboidCollider, RigidBody, TrimeshCollider } from '@react-three/rapier';
-import { Mesh, MeshStandardMaterial, PlaneGeometry, type Texture } from 'three';
+import { DoubleSide, Mesh, MeshStandardMaterial, PlaneGeometry, type Texture } from 'three';
 import type { TrackConfig } from '../config/tracks';
 import { sampleAt, type Track as TrackData } from '../game/track';
 import { medianMask, roadRangeMask } from '../game/outAndBack';
@@ -9,6 +10,7 @@ import {
 } from './trackGeometry';
 import { KERB, PAVEMENT, buildScenery } from './scenery';
 import { pavementTexture } from './art/textures';
+import { buildLagoon, deckMeshes, lagoonSurface, lagoonTerrain, makeLand, raisedMask } from './lagoon';
 
 // Concrete kerb cross-section: [outwards, up] from the road edge.
 const KERB_PROFILE: [number, number][] = [[0, 0], [0.02, 0.16], [0.08, 0.18], [KERB, 0.18]];
@@ -20,9 +22,16 @@ const BARRIER_PROFILE: [number, number][] = [[0.1, 0], [0.13, 0.85], [0.22, 0.95
  * pavement with the gutter, then shop fronts. The kerb line is the edge of the track (an invisible
  * wall), and everything follows the road's gentle hills.
  */
-export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackData; density: number }) {
+export function Track({ cfg, track, density, animateWater = true }: { cfg: TrackConfig; track: TrackData; density: number; animateWater?: boolean }) {
   const parts = useMemo(() => {
     const hw = cfg.halfWidth;
+    const water = cfg.setting?.water;
+    const land = water ? makeLand(track, water) : null;
+    // Over water the ramps and the deck are raised concrete with parapets; the kerbs and pavements stay at ground level.
+    const raised = water ? raisedMask(track) : null;
+    const grounded = raised?.map(v => !v);
+    // The causeway is a low road in the lagoon: it gets a rocky bank sloping into the water, in place of pavement.
+    const onCauseway = water && land ? track.points.map((p, i) => !raised![i] && !land.isLand(p.pos.x, p.pos.z)) : null;
     const tex = { road: asphaltTexture(), kerb: kerbConcreteTexture(), ground: groundTexture(cfg.ground), pave: pavementTexture() };
     const mat = (map: Texture, o: Partial<MeshStandardMaterial> = {}) => new MeshStandardMaterial({ map, roughness: 0.9, ...o });
     // Out-and-back roads: where the other leg runs alongside, the left edge is a painted median
@@ -41,19 +50,23 @@ export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackD
     ] : [];
     return {
       road: new Mesh(ribbon(track, -hw, hw, 0.02, 14), mat(tex.road, { roughness: 0.85 })),
-      kerbL: new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, notMedian), mat(tex.kerb)),
-      kerbR: new Mesh(sweep(track, hw, 1, KERB_PROFILE, 3), mat(tex.kerb)),
+      kerbL: new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, mask(notMedian, grounded)), mat(tex.kerb)),
+      kerbR: new Mesh(sweep(track, hw, 1, KERB_PROFILE, 3, grounded ?? undefined), mat(tex.kerb)),
       medianParts,
       // Pavement: gutter next to the kerb, out to the shop fronts.
-      paveL: new Mesh(ribbon(track, -(hw + KERB), -(hw + PAVEMENT + 0.6), 0.18, 6, notMedian), mat(tex.pave)),
-      paveR: new Mesh(ribbon(track, hw + KERB, hw + PAVEMENT + 0.6, 0.18, 6), mat(tex.pave)),
-      ground: new Mesh(terrainGeometry(track, hw), mat(tex.ground, { roughness: 1 })),
+      paveL: new Mesh(ribbon(track, -(hw + KERB), -(hw + PAVEMENT + 0.6), 0.18, 6, mask(notMedian, grounded)), mat(tex.pave)),
+      paveR: new Mesh(ribbon(track, hw + KERB, hw + PAVEMENT + 0.6, 0.18, 6, grounded ?? undefined), mat(tex.pave)),
+      ground: new Mesh(water && land ? lagoonTerrain(track, land, water) : terrainGeometry(track, hw), mat(tex.ground, { roughness: 1, ...(water ? { vertexColors: true } : {}) })),
+      lagoon: water && land ? lagoonParts(cfg, track, density, land, tex.road) : null,
+      bank: onCauseway ? bankParts(track, hw, onCauseway) : [],
       surface: surfaceCollider(track, -hw - 1.5, hw + 1.5),
       walls: [...wallBoxes(track, -(hw + 0.35)), ...wallBoxes(track, hw + 0.35)],
       scenery: buildScenery(cfg, track, density, median),
       startLine: startLine(cfg, track),
     };
   }, [cfg, track, density]);
+
+  useFrame((_, dt) => { if (animateWater) parts.lagoon?.surface.scroll(Math.min(dt, 0.05)); });
 
   useEffect(() => () => {
     parts.scenery.traverse(o => { const m = o as Mesh; if (m.isMesh) m.geometry.dispose(); });
@@ -70,6 +83,12 @@ export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackD
       <primitive object={shadowy(parts.paveL)} />
       <primitive object={shadowy(parts.paveR)} />
       {parts.medianParts.map((m, i) => <primitive key={i} object={shadowy(m)} />)}
+      {parts.bank.map((m, i) => <primitive key={i} object={shadowy(m)} />)}
+      {parts.lagoon && <>
+        <primitive object={parts.lagoon.surface.mesh} />
+        <primitive object={parts.lagoon.deck} />
+        <primitive object={parts.lagoon.props} />
+      </>}
       <primitive object={parts.startLine} />
       <primitive object={parts.scenery} />
       <RigidBody type="fixed" colliders={false} friction={0.9}>
@@ -95,4 +114,27 @@ function startLine(cfg: TrackConfig, track: TrackData) {
   m.rotation.y = Math.atan2(at.tangent.x, at.tangent.z);
   m.receiveShadow = true;
   return m;
+}
+
+/** Combine two optional sample masks: a sample is on only if it is on in both. */
+function mask(a: boolean[] | undefined, b: boolean[] | undefined) {
+  return a && b ? a.map((v, i) => v && b[i]) : a ?? b ?? undefined;
+}
+
+/** The lagoon: the water, the concrete deck and the props on and around it. */
+function lagoonParts(cfg: TrackConfig, track: TrackData, density: number, land: ReturnType<typeof makeLand>, roadTexture: Texture) {
+  const water = cfg.setting!.water!;
+  const deck = deckMeshes(track, cfg.halfWidth, { road: roadTexture, concrete: kerbConcreteTexture() });
+  return {
+    surface: lagoonSurface(track, water),
+    deck: deck.group,
+    props: buildLagoon(cfg, track, density, land, deck.oncoming),
+  };
+}
+
+/** A rocky bank down into the water along each side of the causeway. */
+function bankParts(track: TrackData, hw: number, mask: boolean[]) {
+  const rock = new MeshStandardMaterial({ map: kerbConcreteTexture(), color: '#8b8378', roughness: 1, side: DoubleSide });
+  const profile: [number, number][] = [[PAVEMENT + 0.6, 0.18], [PAVEMENT + 2.4, -0.7], [PAVEMENT + 7, -3.8]];
+  return ([-1, 1] as const).map(side => new Mesh(sweep(track, hw + KERB, side, profile, 4, mask), rock));
 }

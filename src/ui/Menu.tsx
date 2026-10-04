@@ -36,7 +36,7 @@ export function Menu() {
       <div className="menu-stripes" aria-hidden="true" />
       <header className="menu-head">
         <div className="board">
-          <small>Ojuelegba Grand Prix</small>
+          <small>{t.name} Grand Prix</small>
           <h1>LAGOS RACER</h1>
         </div>
         <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
@@ -57,7 +57,7 @@ export function Menu() {
           </div>
           <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[t.id] ?? null)}</p>
           <p className="muted">{t.blurb}</p>
-          <p className="credit muted">Road layout © OpenStreetMap contributors</p>
+          {t.credit && <p className="credit muted">Road layout {t.credit}</p>}
         </div>
         <button className="btn primary big" onClick={() => setScreen('campaign')}>CAMPAIGN</button>
         <div className="row menu-row">

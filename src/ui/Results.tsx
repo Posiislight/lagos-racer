@@ -3,6 +3,7 @@ import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
 import { driverById } from '../config/drivers';
 import { nextRace } from '../game/campaign';
+import { trackOrDefault } from '../config/tracks';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
@@ -15,7 +16,7 @@ function timeCell(r: Result, elimination: boolean) {
 }
 
 export function Results() {
-  const { results, spec, outcome, coinsEarned, startRace, setScreen, setDriver, showAccountPrompt, dismissAccountPrompt } = useGame();
+  const { results, spec, outcome, coinsEarned, startRace, setScreen, setDriver, showAccountPrompt, dismissAccountPrompt, track } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   const elimination = spec?.mode.kind === 'elimination';
@@ -29,7 +30,7 @@ export function Results() {
   return (
     <div className="modal results" role="dialog" aria-modal="true" aria-labelledby="results-title">
       <div className="card modal-card wide">
-        <p className="eyebrow">{spec?.title ?? 'Ojuelegba Grand Prix'}</p>
+        <p className="eyebrow">{spec?.title ?? `${trackOrDefault(track).name} Grand Prix`}</p>
         <div className="result-head">
           <h2 id="results-title">{heading}</h2>
           {outcome && <span className={`verdict ${outcome.passed ? 'passed' : 'failed'}`}>{outcome.passed ? 'Passed' : 'Try again'}</span>}

@@ -449,6 +449,7 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
   for (let s = 12; s < track.length; s += 40 / Math.max(0.5, density)) {
     flip = -flip;
     if (flip < 0 && isMedian(s)) continue;
+    if (sampleAt(track, s).pos.y > RAISED) continue;
     lamp(spot(s, flip, hw + 0.75), 2.0);
   }
   if (median && cfg.median) {
@@ -494,7 +495,8 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
   }
   root.add(gantry(track, cfg, m));
   const ring = horizonRing(track);
-  const nRing = Math.round(70 * density);
+  // Over open water there is no ring of buildings, only the far shore.
+  const nRing = cfg.setting?.backdrop === 'shore' ? 0 : Math.round(70 * density);
   for (let i = 0; i < nRing; i++) {
     const a = (i / nRing) * Math.PI * 2 + r() * 0.04, d = ring.radius + r() * 40;
     const x = ring.cx + Math.cos(a) * d, z = ring.cz + Math.sin(a) * d;
@@ -515,6 +517,9 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
   return out;
 }
 
+/** Above this height the road is a ramp or a deck: no street furniture, no shop fronts. */
+export const RAISED = 0.8;
+
 const wrap = (d: number, L: number) => ((((d + L / 2) % L) + L) % L) - L / 2;
 
 function horizonRing(track: Track) {
@@ -533,6 +538,8 @@ function poles(root: Group, track: Track, offset: number, lift: number, m: MatFn
   const span = 26, H = 9.2, tops: Vector3[][] = [[], []];
   for (let s = 6, i = 0; s < track.length - span / 2; s += span, i++) {
     const at = sampleAt(track, s + (r() - 0.5) * 3);
+    // Raised roads (ramps and bridge decks) have no poles beside them.
+    if (at.pos.y > RAISED) continue;
     // No poles on the median side, and so no wires across the road there either.
     const left = !median?.[at.index];
     [-1, 1].forEach((side, k) => {
@@ -575,7 +582,7 @@ const cellKey = (x: number, z: number) => `${Math.floor(x / CELL)},${Math.floor(
  * draw calls become a few dozen, while each merged mesh stays small enough to be frustum-culled,
  * and the sun's shadow pass only draws the cells near the player.
  */
-function chunkAndMerge(root: Group): Group {
+export function chunkAndMerge(root: Group): Group {
   const cells = new Map<string, Group>(), out = new Group(), p = new Vector3();
   root.updateMatrixWorld(true);
   for (const child of [...root.children]) {
@@ -596,7 +603,7 @@ function chunkAndMerge(root: Group): Group {
   return out;
 }
 
-function parkedDanfo(m: MatFn, r: () => number) {
+export function parkedDanfo(m: MatFn, r: () => number) {
   const g = new Group();
   const Y = m('#f2a900', { roughness: 0.45 }), K = m('#1d1c1b'), GL = m('#2b3a42', { roughness: 0.2, metalness: 0.3 });
   const body = new Mesh(new BoxGeometry(4.4, 1.5, 1.8), Y); body.position.y = 1.25; g.add(body);
@@ -609,7 +616,7 @@ function parkedDanfo(m: MatFn, r: () => number) {
   return g;
 }
 
-function palm(m: MatFn, r: () => number) {
+export function palm(m: MatFn, r: () => number) {
   const g = new Group(), trunkM = m('#8d6e4f', { roughness: 0.9, shadow: true }), frondM = m('#2e8b3a', { roughness: 0.7, side: DoubleSide, shadow: true });
   const h = 6 + r() * 3, lean = (r() - 0.5) * 0.3;
   const t1 = new Mesh(new CylinderGeometry(0.22, 0.3, h * 0.55, 7), trunkM); t1.position.y = h * 0.27; g.add(t1);
@@ -682,8 +689,9 @@ function gantry(track: Track, cfg: TrackConfig, m: MatFn) {
   const banner = canvasTex(1024, 128, (x, cw, ch) => {
     x.fillStyle = '#141210'; x.fillRect(0, 0, cw, ch);
     for (let i = 0; i < 32; i++) for (let j = 0; j < 2; j++) { x.fillStyle = (i + j) % 2 ? '#fff' : '#141210'; x.fillRect(i * 32, j * 16, 32, 16); x.fillRect(i * 32, ch - 32 + j * 16, 32, 16); }
+    const text = cfg.banner ?? `${cfg.name.toUpperCase()} GRAND PRIX`;
     x.fillStyle = '#ffb21a'; x.font = '400 64px Bungee, Impact, Arial Black'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText('OJUELEGBA GRAND PRIX', cw / 2, ch / 2 + 4);
+    x.fillText(text, cw / 2, ch / 2 + 4);
   });
   const bm = new MeshStandardMaterial({ map: banner, emissive: new Color(0.25, 0.25, 0.25), emissiveMap: banner });
   [-1, 1].forEach(s => { const p = new Mesh(new PlaneGeometry(w * 2 - 0.5, 1.5), bm); p.position.set(0, 7.4, s * 0.41); p.rotation.y = s > 0 ? 0 : Math.PI; g.add(p); });

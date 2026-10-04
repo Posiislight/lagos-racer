@@ -58,7 +58,7 @@ describe('finishRace', () => {
   it('files the best lap under the track the race was run on', () => {
     state().startRace(CHAPTER_1[1]);
     state().finishRace([], 1, 70);
-    expect(state().best).toEqual({ ikorodu: 70 });
+    expect(state().best).toEqual({ 'third-mainland': 70 });
   });
 });
 

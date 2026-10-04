@@ -42,9 +42,9 @@ export const CHAPTER_1: RaceSpec[] = [
     pass: { place: 3 }, coins: QUICK_COINS, firstClearCoins: 100,
   },
   {
-    id: 'campaign-1-2', title: 'Ikorodu Garage Run', track: 'ikorodu', mode: { kind: 'laps', laps: 3 },
+    id: 'campaign-1-2', title: 'Third Mainland Dash', track: 'third-mainland', mode: { kind: 'laps', laps: 2 },
     excludeDrivers: ['mamaput'],
-    story: 'Danfos, oil drums and agberos at the motor park. Top three again.', rule: 'Top 3 to move on',
+    story: 'Up the ramp, over the lagoon, home through the water village. Top three again.', rule: 'Top 3 to move on',
     pass: { place: 3 }, coins: QUICK_COINS, firstClearCoins: 100,
   },
   {

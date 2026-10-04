@@ -7,7 +7,7 @@ describe('CHAPTER_1', () => {
   it('has the four races in order, two per map', () => {
     expect(CHAPTER_1.map(r => r.id)).toEqual(['campaign-1-1', 'campaign-1-2', 'campaign-1-3', 'campaign-1-4']);
     expect(new Set(CHAPTER_1.map(r => r.id)).size).toBe(4);
-    expect(CHAPTER_1.map(r => r.track)).toEqual(['ojuelegba', 'ikorodu', 'ojuelegba', 'ikorodu']);
+    expect(CHAPTER_1.map(r => r.track)).toEqual(['ojuelegba', 'third-mainland', 'ojuelegba', 'ikorodu']);
     for (const r of CHAPTER_1) expect(TRACKS.some(t => t.id === r.track)).toBe(true);
     expect(CHAPTER_1.map(r => r.mode.kind)).toEqual(['laps', 'laps', 'elimination', 'duel']);
   });
@@ -27,7 +27,7 @@ describe('CHAPTER_1', () => {
 
   it('pins the mode numbers', () => {
     expect(CHAPTER_1[0].mode).toEqual({ kind: 'laps', laps: 3 });
-    expect(CHAPTER_1[1].mode).toEqual({ kind: 'laps', laps: 3 });
+    expect(CHAPTER_1[1].mode).toEqual({ kind: 'laps', laps: 2 });
     expect(CHAPTER_1[2].mode).toEqual({ kind: 'elimination', first: 20, step: 2, floor: 10 });
     expect(CHAPTER_1[3].mode).toEqual({ kind: 'duel', laps: 2, skill: 1.06 });
   });

@@ -1,4 +1,5 @@
-import { project, wrapDelta, type Track } from './track';
+import { wrapDelta, type Track } from './track';
+import { projectRoad as project } from './shortcuts';
 
 /**
  * Lap counting by unwrapped distance along the centre line. Every frame the car's track distance
