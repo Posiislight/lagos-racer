@@ -38,7 +38,20 @@ export function outAndBack(axis: Axis, o: { gap: number; turnRadius: number; sta
   const off = (d: number) => o.gap / 2 + (R - o.gap / 2) * smoothstep(splay, 0, Math.min(d, L - d));
   const ds: number[] = [];
   axis.forEach((p, i) => ds.push(i ? ds[i - 1] + Math.hypot(p[0] - axis[i - 1][0], p[1] - axis[i - 1][1]) : 0));
-  const leg = (d: number, side: 1 | -1): [number, number] => { const a = axisPoint(axis, d), k = off(d) * side; return [a.x + a.nx * k, a.z + a.nz * k]; };
+  // At an axis vertex, offset along the bisector of the two segments' normals, lengthened by the miter
+  // factor, so the legs stay the full gap apart where the road bends (not pinched on the inside).
+  const miter = axis.map((_, i) => {
+    const a = axisPoint(axis, Math.max(0, ds[i] - 0.01)), b = axisPoint(axis, Math.min(ds[ds.length - 1], ds[i] + 0.01));
+    let nx = a.nx + b.nx, nz = a.nz + b.nz;
+    const len = Math.hypot(nx, nz) || 1; nx /= len; nz /= len;
+    const k = 1 / Math.max(0.5, nx * a.nx + nz * a.nz);
+    return [nx * k, nz * k];
+  });
+  const leg = (d: number, side: 1 | -1): [number, number] => {
+    const a = axisPoint(axis, d), k = off(d) * side, i = ds.indexOf(d);
+    const [nx, nz] = i >= 0 ? miter[i] : [a.nx, a.nz];
+    return [a.x + nx * k, a.z + nz * k];
+  };
   const arc = (c: ReturnType<typeof axisPoint>, sign: 1 | -1) => {
     // West end: from north (+n) through west (+t) to south (-n). East end: from south through east to north.
     const out: [number, number][] = [];
@@ -54,6 +67,19 @@ export function outAndBack(axis: Axis, o: { gap: number; turnRadius: number; sta
   const before = ds.filter(d => d < o.startAt).map(d => leg(d, 1));
   const south = [...ds].reverse().map(d => leg(d, -1));
   return [leg(o.startAt, 1), ...north, ...arc(axisPoint(axis, L), 1), ...south, ...arc(axisPoint(axis, 0), -1), ...before];
+}
+
+/** Distance along the axis (from its east end) of the point on it nearest (x, z), clamped to the ends. */
+export function axisDistance(axis: Axis, x: number, z: number): number {
+  let best = 0, bestD = Infinity, acc = 0;
+  for (let i = 1; i < axis.length; i++) {
+    const [ax, az] = axis[i - 1], [bx, bz] = axis[i], sx = bx - ax, sz = bz - az, len2 = sx * sx + sz * sz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * sx + (z - az) * sz) / len2));
+    const d = (ax + sx * t - x) ** 2 + (az + sz * t - z) ** 2, len = Math.sqrt(len2);
+    if (d < bestD) { bestD = d; best = acc + t * len; }
+    acc += len;
+  }
+  return best;
 }
 
 /** Per track sample: true where the left side faces the other leg across the median. */

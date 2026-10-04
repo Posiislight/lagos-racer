@@ -10,10 +10,19 @@ export type BumpBody = { x: number; z: number; vx: number; vz: number; mass: num
 const MIN_SHOVE = 3; // m/s
 const RESTITUTION = 0.6;
 
-/** Velocity change (x, z) for `own` from touching `other`. */
-export function bumpShove(own: BumpBody, other: BumpBody): { x: number; z: number } {
+/**
+ * Velocity change (x, z) for `own` from touching `other`. `normal` is the contact normal (horizontal,
+ * either way round); without it the line between the centres is used, which for two long bodies side
+ * by side points mostly along the road and would act as a push forwards or backwards.
+ */
+export function bumpShove(own: BumpBody, other: BumpBody, normal?: { x: number; z: number }): { x: number; z: number } {
   let dx = own.x - other.x, dz = own.z - other.z, d = Math.hypot(dx, dz);
-  if (d < 1e-6) {
+  const nl = normal ? Math.hypot(normal.x, normal.z) : 0;
+  if (normal && nl > 1e-6) {
+    // Point it away from the other vehicle.
+    const flip = normal.x * dx + normal.z * dz < 0 ? -1 : 1;
+    dx = normal.x * flip; dz = normal.z * flip; d = nl;
+  } else if (d < 1e-6) {
     // Same spot: push out sideways from our own direction of travel.
     const v = Math.hypot(own.vx, own.vz);
     [dx, dz] = v > 1e-6 ? [-own.vz / v, own.vx / v] : [1, 0];

@@ -1,5 +1,5 @@
-import type { Hills } from '../game/track';
-import { outAndBack } from '../game/outAndBack.ts';
+import { buildTrack, type Hills, type Track } from '../game/track.ts';
+import { axisDistance, outAndBack } from '../game/outAndBack.ts';
 import { OJUELEGBA_AXIS, OJUELEGBA_START } from './ojuelegbaAxis.ts';
 
 export type ZoneKind =
@@ -27,7 +27,7 @@ export type TrackConfig = {
   median?: { width: number; redWhite?: [number, number] };
   hills?: Hills;
   /** What the hills follow: lap distance (default) or world x (out-and-back roads). */
-  hillsAxis?: 'lap' | 'x';
+  hillsAxis?: 'lap' | 'x' | 'road';
   /** Road half width, metres. */
   halfWidth: number;
   laps: number;
@@ -45,6 +45,9 @@ export type TrackConfig = {
 };
 
 const HALF_WIDTH = 6.5, MEDIAN = 1.6;
+// The start line sits just west of the Tejuosho market (from your Street View link), far enough in that
+// the whole grid is on the straight, clear of the east U-turn's taper.
+const START = OJUELEGBA_START + 47.4;
 const north = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'north' });
 const south = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'south' });
 
@@ -55,23 +58,23 @@ export const TRACKS: TrackConfig[] = [
     blurb: 'The real Ojuelegba Road: Tejuosho market to under the bridge and back. Mind the agberos.',
     // West along the north carriageway, U-turn under the Western Avenue bridge, back east on the south one.
     // U-turns 18 m round the centre line, so a BRT and another vehicle can get round side by side.
-    control: outAndBack(OJUELEGBA_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 18, splay: 50, startAt: OJUELEGBA_START }),
+    control: outAndBack(OJUELEGBA_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 18, splay: 50, startAt: START }),
     axis: OJUELEGBA_AXIS,
     median: { width: MEDIAN, redWhite: [80, 118] },
     // The real road is flat; keep gentle rolling and a ripple you feel in the suspension.
     hills: [[0.45, 2, 0.4], [0.25, 5, 1.3], [0.08, 13, 2.1]],
-    hillsAxis: 'x',
+    hillsAxis: 'road',
     halfWidth: HALF_WIDTH,
     laps: 3,
     // The Western Avenue deck covers the west U-turn.
     bridges: [{ road: 362, name: 'OJUELEGBA', width: 34 }],
     signs: [{ road: 327, text: 'SURULERE  ·  OSHODI  ·  YABA' }],
-    items: [90, 260, 450, 620],
+    items: [43, 213, 403, 573],
     critters: [
-      { s: 180, kind: 'goat', count: 3 },
-      { s: 330, kind: 'chicken', count: 5 },
-      { s: 520, kind: 'goat', count: 2 },
-      { s: 690, kind: 'chicken', count: 4 },
+      { s: 133, kind: 'goat', count: 3 },
+      { s: 283, kind: 'chicken', count: 5 },
+      { s: 473, kind: 'goat', count: 2 },
+      { s: 643, kind: 'chicken', count: 4 },
     ],
     // What's really there (Street View walk, 3 October), converted to axis metres at 0.38 scale.
     zones: [
@@ -85,3 +88,11 @@ export const TRACKS: TrackConfig[] = [
 ];
 
 export const trackById = (id: string) => TRACKS.find(t => t.id === id)!;
+
+/** The sampled track for a config: its loop, its hills, and what the hills follow. */
+export function trackFor(cfg: TrackConfig): Track {
+  const along = cfg.hillsAxis === 'road' && cfg.axis
+    ? (x: number, z: number) => axisDistance(cfg.axis!, x, z)
+    : cfg.hillsAxis === 'x' ? 'x' : 'lap';
+  return buildTrack(cfg.control, 2, cfg.hills, along);
+}

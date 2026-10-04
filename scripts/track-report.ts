@@ -2,14 +2,13 @@
 // too close (their barriers would overlap). Writes a top-down SVG next to the given path.
 // Usage: node scripts/track-report.ts [trackId] [out.svg]
 import { writeFileSync } from 'node:fs';
-import { buildTrack } from '../src/game/track.ts';
-import { TRACKS } from '../src/config/tracks.ts';
+import { TRACKS, trackFor } from '../src/config/tracks.ts';
 import { medianMask } from '../src/game/outAndBack.ts';
 
 const id = process.argv[2] || 'ojuelegba';
 const out = process.argv[3] || `track-${id}.svg`;
 const cfg = TRACKS.find(t => t.id === id)!;
-const track = buildTrack(cfg.control, 2, cfg.hills, cfg.hillsAxis);
+const track = trackFor(cfg);
 const pts = track.points, n = pts.length;
 // Out-and-back roads: the two legs run a median apart on purpose; only report them if closer than that.
 const mask = cfg.median ? medianMask(track, cfg.halfWidth, cfg.median.width) : pts.map(() => false);

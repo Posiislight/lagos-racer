@@ -26,6 +26,19 @@ describe('bumpShove', () => {
     expect(Math.abs(s.z)).toBeCloseTo(3 * 0.5, 2);
   });
 
+  it('pushes along the contact normal, not the line between centres (a bike beside a bus\'s rear)', () => {
+    // The bus's centre is 4 m ahead and 1.8 m to the side: the centre line is mostly along the road,
+    // but the bodies touch side to side, so the shove must be sideways only.
+    const s = bumpShove(body({ mass: 260 }), body({ x: 4, z: 1.8, mass: 2400 }), { x: 0, z: -1 });
+    expect(Math.abs(s.x)).toBeLessThan(0.01);
+    expect(s.z).toBeLessThan(-2.6);
+  });
+
+  it('turns a normal given the wrong way round to point away from the other vehicle', () => {
+    const s = bumpShove(body({}), body({ z: 2 }), { x: 0, z: 1 });
+    expect(s.z).toBeLessThan(0);
+  });
+
   it('copes with two vehicles in exactly the same place', () => {
     const s = bumpShove(body({ vx: 10 }), body({}));
     expect(Number.isFinite(s.x) && Number.isFinite(s.z)).toBe(true);

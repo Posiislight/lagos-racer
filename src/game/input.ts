@@ -17,13 +17,23 @@ export const touch = { left: false, right: false, gas: false, brake: false, drif
 
 const keys = new Set<string>();
 let itemQueued = false;
+
+const GAME_KEYS_WITH_CTRL = ['KeyA', 'KeyD', 'KeyS', 'KeyW', 'KeyE', 'KeyF', 'KeyH'];
+/**
+ * Keys the page should swallow: arrows and Space (they scroll), and Ctrl with a game key, because Ctrl
+ * is the drift and Ctrl+D, Ctrl+S, Ctrl+A would otherwise open the bookmark or save dialog mid-race.
+ */
+export function swallowKey(e: { code: string; key: string; ctrlKey: boolean }): boolean {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return true;
+  return e.ctrlKey && GAME_KEYS_WITH_CTRL.includes(e.code);
+}
 let listening = false;
 
 export function startKeyboard() {
   if (listening) return;
   listening = true;
   window.addEventListener('keydown', e => {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    if (swallowKey(e)) e.preventDefault();
     if (!e.repeat && ['Space', 'KeyE', 'KeyF', 'ShiftLeft', 'ShiftRight'].includes(e.code)) itemQueued = true;
     keys.add(e.code);
   });

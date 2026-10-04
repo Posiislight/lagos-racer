@@ -4,10 +4,10 @@ import { Physics } from '@react-three/rapier';
 import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
-import { trackById } from '../config/tracks';
+import { trackById, trackFor } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { pickRivals, type Pick } from '../game/lineup';
-import { buildTrack, sampleAt } from '../game/track';
+import { sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
 import { makeRacer, setRace, getRace, type RaceRuntime } from '../game/runtime';
 import { makePickups } from '../game/items';
@@ -33,7 +33,7 @@ const QUALITY: Record<Quality, { density: number; shadows: number; far: number }
 
 export function makeRace(trackId: string, player: Pick): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
   const config = trackById(trackId);
-  const track = buildTrack(config.control, 2, config.hills, config.hillsAxis);
+  const track = trackFor(config);
   // Five rivals (every vehicle at least once, all in different paints), then you at the back.
   const lineup = [...pickRivals(player, 5), player];
   const names = [...AI_NAMES].sort(() => Math.random() - 0.5);

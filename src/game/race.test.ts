@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
 import { createProgress, updateProgress, standings, currentLap, formatTime } from './race';
-import { TRACKS } from '../config/tracks';
+import { TRACKS, trackFor } from '../config/tracks';
+import { medianMask } from './outAndBack';
 
 // A 100 x 60 rounded rectangle, driven anticlockwise from (0, 0) heading +x.
 const control: [number, number][] = [[0, 0], [50, 0], [70, 15], [70, 45], [50, 60], [-50, 60], [-70, 45], [-70, 15], [-50, 0]];
@@ -103,7 +104,7 @@ describe('standings', () => {
 
 describe('ojuelegba track', () => {
   const cfg = TRACKS.find(t => t.id === 'ojuelegba')!;
-  const oj = buildTrack(cfg.control, 2, cfg.hills, cfg.hillsAxis);
+  const oj = trackFor(cfg);
 
   it('is a lap of about 800 m with U-turns wide enough for two vehicles side by side', () => {
     expect(oj.length).toBeGreaterThan(700);
@@ -123,6 +124,49 @@ describe('ojuelegba track', () => {
       const at = sampleAt(oj, s);
       const r = createProgress(oj, at.pos.x + at.right.x * lane, at.pos.z + at.right.z * lane);
       expect(Math.abs(r.distance - s)).toBeLessThan(1);
+    }
+  });
+
+  /** For each median sample, the nearest sample on the other leg (more than 60 m away round the lap). */
+  const acrossMedian = () => {
+    const mask = medianMask(oj, cfg.halfWidth, cfg.median!.width), pairs: { i: number; j: number; d: number }[] = [];
+    oj.points.forEach((p, i) => {
+      if (!mask[i]) return;
+      let best = -1, bd = Infinity;
+      oj.points.forEach((q, j) => {
+        const along = Math.abs(p.s - q.s), wrapped = Math.min(along, oj.length - along);
+        if (wrapped < 60) return;
+        const d = Math.hypot(p.pos.x - q.pos.x, p.pos.z - q.pos.z);
+        if (d < bd) { bd = d; best = j; }
+      });
+      pairs.push({ i, j: best, d: bd });
+    });
+    return pairs;
+  };
+
+  it('keeps both legs at the same height across the median', () => {
+    // Straight across: one full gap to the left of each median sample, on the other leg's centre line.
+    const mask = medianMask(oj, cfg.halfWidth, cfg.median!.width), gap = 2 * cfg.halfWidth + cfg.median!.width;
+    let worst = 0;
+    oj.points.forEach((p, i) => {
+      if (!mask[i]) return;
+      const q = project(oj, p.pos.x - p.right.x * gap, p.pos.z - p.right.z * gap);
+      worst = Math.max(worst, Math.abs(sampleAt(oj, q.s).pos.y - p.pos.y));
+    });
+    // Between axis vertices the line straight across meets the other leg up to ~1 m further along the
+    // road, so a few cm remain on a 5% slope; hills following world x left 0.27 m.
+    expect(worst).toBeLessThan(0.06);
+  });
+
+  it('keeps the legs a full median apart, even where the road bends', () => {
+    const closest = Math.min(...acrossMedian().map(p => p.d));
+    expect(closest).toBeGreaterThan(14.3);
+  });
+
+  it('starts on a straight, clear of the U-turn taper (the grid points along the road)', () => {
+    for (let s = -40; s <= 2; s += 2) {
+      const k = Math.abs(oj.points[sampleAt(oj, s).index].curvature);
+      expect(k).toBeLessThan(1 / 60);
     }
   });
 
