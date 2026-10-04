@@ -87,6 +87,10 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .preview { position: absolute !important; inset: 0; }
 .menu-side { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; justify-content: flex-end; min-height: 0; }
 .menu-side .card h2 { margin-bottom: 2px; }
+.menu-side .row { flex-wrap: nowrap; gap: 8px; }
+.menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
+.track-pick { display: flex; gap: 6px; margin-top: 8px; }
+.track-pick .btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; font-size: 13px; }
 .track-line { margin: 8px 0 0; font-size: 14px; }
 .credit { margin: 4px 0 0; font-size: 11px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
@@ -170,6 +174,43 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .account { background: #eef7f0; border: 2px dashed var(--green); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
 .account p { margin: 0 0 8px; }
 @media (max-height: 480px) { .table td, .table th { padding: 3px 6px; } .modal-card h2 { font-size: 20px; } }
+
+/* ---------- online + lobby ---------- */
+.online, .lobby {
+  position: absolute; inset: 0; overflow-y: auto; display: grid; gap: 12px; align-content: center; justify-items: center;
+  background: linear-gradient(180deg, #8fd0f2 0%, #f7e3b5 80%);
+  padding: calc(14px + var(--safe-t)) calc(16px + var(--safe-r)) calc(14px + var(--safe-b)) calc(16px + var(--safe-l));
+}
+.online-card { width: min(440px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.online-card h2 { margin-bottom: 0; }
+.online-card .muted { margin: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 13px; color: var(--muted); }
+.field input {
+  font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 10px;
+  padding: 10px 12px; min-height: 46px; width: 100%; -webkit-user-select: text; user-select: text;
+}
+.field input:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; text-align: center; font-family: Bungee, Impact, sans-serif; }
+.join-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.or { margin: 0; text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.net-note { margin: 0; min-height: 1.4em; font-weight: 700; font-size: 14px; color: var(--muted); }
+.net-note.bad { color: var(--red); }
+.lobby { grid-template-columns: minmax(0, 420px) minmax(0, 420px); justify-content: center; align-items: start; align-content: center; }
+.lobby .card { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.room-code { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); letter-spacing: .12em; line-height: 1; }
+.lobby .table { margin: 4px 0 0; }
+.tick { color: var(--green); font-weight: 900; font-size: 18px; }
+.lobby-picks { flex-wrap: wrap; overflow: visible; }
+.lobby-host .btn { flex: 1; }
+.lobby .btn.ready { background: #bfe8c9; }
+.lobby .btn.ready::after { content: ' ✓'; }
+.lobby .btn { white-space: nowrap; }
+@media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
+@media (max-height: 480px) {
+  .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
+  .online-card .muted { display: none; }
+  .room-code { font-size: 36px; }
+}
 
 /* ---------- race ---------- */
 .race { position: absolute; inset: 0; background: #f3e4c8; touch-action: none; }
@@ -260,6 +301,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   -webkit-text-stroke: 4px var(--ink); text-shadow: 0 8px 0 var(--ink); animation: pop .5s ease-out;
 }
 .hud-count.go { color: #7ee08a; font-size: clamp(48px, 11vw, 110px); }
+.hud-count.wait { color: #fff; white-space: nowrap; font-size: clamp(24px, 5vw, 44px); -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); }
 .hud-msg {
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
@@ -269,6 +311,10 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .hud-msg.long { white-space: normal; width: min(82vw, 640px); text-align: center; animation-duration: 3.2s; }
 .hud-msg.long b { display: block; font-weight: 400; }
 .hud-msg.long small { display: block; font-size: clamp(14px, 2.6vw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }
+.net-badge {
+  position: absolute; z-index: 11; pointer-events: none; top: calc(76px + var(--safe-t)); left: calc(12px + var(--safe-l));
+  background: var(--red); color: #fff; border-radius: 999px; padding: 3px 10px; font: 800 12px Archivo, sans-serif;
+}
 .hud-wrong {
   top: 45%; left: 50%; transform: translateX(-50%); background: var(--red); padding: 8px 18px; border-radius: 10px; font-size: 24px;
   animation: blink .5s steps(2) infinite;
@@ -277,6 +323,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @keyframes msg { 0% { transform: translateX(-50%) scale(1.5); opacity: 0; } 12% { transform: translateX(-50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
 @keyframes blink { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .hud-msg, .hud-count, .hud-item.full, .hud-special.ready, .hud-wrong { animation: none; } }
+/* Other players' names over their cars. drei's pointerEvents prop only applies in transform mode. */
+.name-tag {
+  pointer-events: none; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(20, 18, 16, .78); color: var(--led); border-radius: 6px; padding: 2px 7px 3px;
+  font-family: Archivo, sans-serif; font-weight: 900; font-size: 12px; line-height: 1.1;
+}
 
 /* ---------- touch controls ---------- */
 .touch { position: absolute; inset: 0; pointer-events: none; z-index: 11; }

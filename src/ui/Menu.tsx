@@ -64,6 +64,7 @@ export function Menu() {
           <button className="btn" onClick={() => launchRace()}>OYA, RACE!</button>
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
+          <button className="btn" onClick={() => setScreen('online')}>Race with friends</button>
         </div>
         <p className="keys muted">You're always on the gas · ← → or A D to steer · Space to use items · Q for your special · C to drift · H to honk · Esc to pause</p>
       </div>

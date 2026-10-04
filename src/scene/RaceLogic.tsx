@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { aiState, getRace, type Racer } from '../game/runtime';
 import { isIn } from '../game/modes';
-import { updateProgress, standings, currentLap, lapMessage } from '../game/race';
+import { updateProgress, trackRemote, standings, currentLap, lapMessage } from '../game/race';
 import { clearQueuedPresses, readPlayer } from '../game/input';
 import { catchUpGap, driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
@@ -15,6 +15,7 @@ import { beep, Engine, sfx } from '../game/audio';
 import { itemHint } from '../game/hints';
 
 const COUNT = ['3', '2', '1'];
+const WAITING = 'Waiting for others…';
 // ?autopilot=1 lets the AI drive the player's car (for play-testing and demos).
 const IS_TOUCH = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
 const AUTOPILOT = typeof location !== 'undefined' && new URLSearchParams(location.search).get('autopilot') === '1';
@@ -55,20 +56,28 @@ export function RaceLogic() {
     const race = getRace();
     const store = useGame.getState();
     if (store.paused) clearQueuedPresses();
-    if (!race || store.paused) return;
+    // Online the race goes on while the menu is open: the other phones are still driving.
+    if (!race || (store.paused && !race.net)) return;
     const dt = Math.min(dtRaw, 0.05);
     const player = race.racers.find(r => r.isPlayer)!;
     const laps = race.config.laps;
 
-    // Countdown: 3, 2, 1, OYA GO!
+    // Countdown: 3, 2, 1, OYA GO! Online it runs off the room's start time, so every phone goes together.
     if (race.phase === 'countdown') {
-      race.countdown -= dt;
-      const label = race.countdown > 0 ? COUNT[Math.min(2, Math.floor(3 - race.countdown))] ?? '3' : 'OYA GO!';
-      if (label !== lastCount.current) {
-        lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' });
-        if (label === 'OYA GO!' && race.spec?.taunts) store.flash(race.spec.taunts.before);
+      if (race.net && !race.net.started) {
+        if (lastCount.current !== WAITING) { lastCount.current = WAITING; store.setHud({ countdown: WAITING, phase: 'countdown' }); }
+      } else {
+        if (race.net) race.countdown = -race.net.now();
+        else race.countdown -= dt;
+        const label = race.countdown > 0 ? COUNT[Math.min(2, Math.floor(3 - race.countdown))] ?? '3' : 'OYA GO!';
+        if (label !== lastCount.current) {
+          lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' });
+          if (label === 'OYA GO!' && race.spec?.taunts) store.flash(race.spec.taunts.before);
+        }
+        if (race.countdown <= 0) { race.phase = 'racing'; store.setHud({ phase: 'racing' }); setTimeout(() => useGame.getState().setHud({ countdown: '' }), 900); }
       }
-      if (race.countdown <= 0) { race.phase = 'racing'; store.setHud({ phase: 'racing' }); setTimeout(() => useGame.getState().setHud({ countdown: '' }), 900); }
+    } else if (race.net) {
+      race.clock = race.net.now();
     } else {
       race.clock += dt;
     }
@@ -80,11 +89,12 @@ export function RaceLogic() {
       if (out.isPlayer) { sfx('bump'); race.phase = 'finished'; }
     }
 
-    // Controls: the player drives until they finish, then the AI brings them home.
+    // Controls: the player drives until they finish, then the AI brings them home. Other phones drive their own cars.
     for (const r of race.racers) {
       // A racer who is out brakes to a stop and presses nothing.
       if (!isIn(r)) { Object.assign(r.controls, { throttle: 0, brake: 1, steer: 0, handbrake: false, useItem: false, special: false, horn: false }); continue; }
-      if (r.isPlayer && r.progress.finishTime === null && !AUTOPILOT) {
+      if (r.kind === 'remote') continue;
+      if (r.kind === 'local' && r.progress.finishTime === null && !AUTOPILOT) {
         readPlayer(r.controls, dt, { tilt: store.settings.steering === 'tilt', invertTilt: store.settings.invertTilt });
         unstick(r, dt, race.phase === 'racing');
       }
@@ -98,12 +108,17 @@ export function RaceLogic() {
     for (const r of race.racers) {
       if (!r.body || !isIn(r)) continue;
       const t = r.body.translation();
+      if (r.kind === 'remote') { if (!r.remote?.dnf) trackRemote(race.track, r.progress, t.x, t.z); continue; }
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
+      // Online, every car this phone drives claims its finish from the room's referee.
+      if (e?.finished) race.net?.finish(r);
       if (e && r.isPlayer) {
         if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); race.phase = 'finished'; }
         else { sfx('lap'); const banner = lapMessage(e.lap, laps); if (banner) store.flash(banner); }
       }
     }
+
+    race.net?.update(race);
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
     updateSpecials(race, dt, m => store.flash(m));
@@ -132,8 +147,8 @@ export function RaceLogic() {
     hudTimer.current -= dt;
     if (hudTimer.current <= 0) {
       hudTimer.current = 0.1;
-      // Position among those still in; racers who are out no longer count.
-      const inRace = race.racers.filter(isIn);
+      // Position among those still in; racers who are out (or dropped, in a room race) no longer count.
+      const inRace = race.racers.filter(r => isIn(r) && !r.remote?.dnf);
       const order = standings(inRace);
       const best = player.progress.lapTimes.length ? Math.min(...player.progress.lapTimes) : null;
       store.setHud({
@@ -145,8 +160,8 @@ export function RaceLogic() {
     }
 
     // Results: when the mode says the race is over (for laps, once the player is home and the others
-    // are in or a few seconds have passed).
-    if (!reported.current && race.mode.over(race)) {
+    // are in or a few seconds have passed). A room race gets its results from the server instead.
+    if (!reported.current && !race.net && race.mode.over(race)) {
       reported.current = true;
       const byId = new Map(race.racers.map(r => [r.id, r]));
       const order = race.mode.ranking(race).map(id => byId.get(id)!);

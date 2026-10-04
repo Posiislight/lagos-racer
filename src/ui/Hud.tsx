@@ -38,7 +38,7 @@ export function Hud({ onPause }: { onPause: () => void }) {
       </button>
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>
-      {hud.countdown && <div className={`hud-count${hud.countdown.length > 1 ? ' go' : ''}`} key={`count-${hud.countdown}`}>{hud.countdown}</div>}
+      {hud.countdown && <div className={`hud-count${hud.countdown === 'OYA GO!' ? ' go' : hud.countdown.length > 1 ? ' wait' : ''}`} key={`count-${hud.countdown}`}>{hud.countdown}</div>}
       {hud.message && <Message text={hud.message} key={`msg-${hud.messageKey}`} />}
       {hud.wrongWay && <div className="hud-wrong">WRONG WAY! TURN AM!</div>}
     </div>
@@ -69,6 +69,9 @@ function ProgressLine({ lap, laps, elimination }: { lap: number; laps: number; e
         r.racers.forEach((c, i) => {
           const dot = el.querySelector<HTMLElement>(`[data-i="${i}"]`);
           if (!dot) return;
+          // A car out of the race is taken off the line.
+          dot.style.display = c.remote?.dnf ? 'none' : '';
+          if (c.remote?.dnf) return;
           // Finished racers sit at the end; everyone else at their distance into the current lap.
           // Racers who are out (elimination) lose their dot.
           dot.style.display = c.outAt !== null ? 'none' : '';

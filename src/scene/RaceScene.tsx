@@ -4,12 +4,13 @@ import { Physics } from '@react-three/rapier';
 import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
-import { STREET, trackOrDefault, type Setting } from '../config/tracks';
+import { STREET, TRACKS, trackOrDefault, type Setting } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
 import { useGame, type Quality } from '../game/store';
 import { resetPlayerInput } from '../game/input';
+import { getSession, useNet } from '../net/store';
 import { Track } from './Track';
 import { Vehicle } from './Vehicle';
 import { ChaseCamera } from './ChaseCamera';
@@ -36,25 +37,32 @@ export function RaceScene() {
   const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
+  const online = useGame(s => s.online);
   const q = QUALITY[quality];
 
-  // A fresh race whenever a new one is started.
-  const setup = useMemo(
-    () => makeRace(spec ?? { track: trackId, mode: { kind: 'laps', laps: trackOrDefault(trackId).laps } }, { vehicle: vehicleById(vehicle).id, paint }, driver, spec),
-    [raceId, trackId, spec, vehicle, paint, driver],
-  );
+  // A fresh race whenever a new one is started; a room race is laid out from the server's grid.
+  const { setup, session } = useMemo(() => {
+    const session = online ? getSession() : null;
+    // The room's track, if this build has it.
+    const roomTrack = session ? useNet.getState().pendingGrid?.trackId : undefined;
+    const track = roomTrack && TRACKS.some(t => t.id === roomTrack) ? roomTrack : trackId;
+    const race = session ? { track, mode: { kind: 'laps' as const, laps: trackOrDefault(track).laps } } : (spec ?? { track, mode: { kind: 'laps' as const, laps: trackOrDefault(track).laps } });
+    return { setup: makeRace(race, { vehicle: vehicleById(vehicle).id, paint }, driver, session ? null : spec, session?.setup), session };
+  }, [raceId, trackId, spec, vehicle, paint, driver, online]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {
     setRace(setup.race);
     resetPlayerInput();
+    if (session) { session.attach(setup.race); session.loaded(); }
     return () => { if (getRace() === setup.race) setRace(null); };
-  }, [setup]);
+  }, [setup, session]);
 
   return (
     <>
       <SkyAndLight shadows={q.shadows} far={q.far} setting={setup.race.config.setting ?? STREET} />
-      <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused} interpolate>
+      {/* A room race never stops for one phone's menu. */}
+      <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
         <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={quality !== 'low'} />
         {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} />)}
       </Physics>

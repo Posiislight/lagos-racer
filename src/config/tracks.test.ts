@@ -116,6 +116,26 @@ describe('ikorodu track', () => {
   });
 });
 
+describe('every track, in detail', () => {
+  for (const cfg of TRACKS) {
+    describe(cfg.id, () => {
+      const track = trackFor(cfg);
+      it('has a lap, pickups and critters that all lie within it', () => {
+        expect(cfg.laps).toBeGreaterThanOrEqual(1);
+        for (const s of cfg.items) { expect(s).toBeGreaterThan(0); expect(s).toBeLessThan(track.length); }
+        for (const c of cfg.critters ?? []) { expect(c.s).toBeGreaterThan(0); expect(c.s).toBeLessThan(track.length); }
+      });
+      it('has no bend a BRT cannot take (12 m radius)', () => {
+        const tightest = Math.min(...track.points.map(p => 1 / Math.max(1e-6, Math.abs(p.curvature))));
+        expect(tightest).toBeGreaterThanOrEqual(12);
+      });
+      it('starts and ends the lap at the same height', () => {
+        expect(track.points[0].pos.y).toBeCloseTo(0, 5);
+      });
+    });
+  }
+});
+
 describe('Third Mainland Bridge', () => {
   const cfg = TRACKS.find(t => t.id === 'third-mainland')!;
   const track = trackFor(cfg);

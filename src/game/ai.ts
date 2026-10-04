@@ -4,7 +4,7 @@ import { sampleAt } from './track';
 import { isIn } from './modes';
 import { SPECIALS, driverById } from '../config/drivers';
 
-export const AI_NAMES = ['Odogwu Rider', 'Starboy-ish', 'Mama Danfo', 'Conductor Sule', 'Aunty Bisi', 'Area Fada', 'Oga Landlord'];
+export { AI_NAMES } from './names';
 
 /** Speed (m/s) a vehicle can hold through a bend of curvature k with the given grip (m/s²). */
 export function cornerSpeed(k: number, grip: number) {

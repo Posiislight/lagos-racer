@@ -110,7 +110,8 @@ export function updateCritters(race: RaceRuntime, dt: number) {
 
 function checkHits(race: RaceRuntime, c: Critter) {
   for (const r of race.racers) {
-    if (!r.body || !isIn(r)) continue;
+    // A car out of the race is parked under its grid spot, not driving into goats.
+    if (!r.body || !isIn(r) || r.remote?.dnf) continue;
     const t = r.body.translation(), q = r.body.rotation();
     const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
     const fx = Math.cos(yaw), fz = -Math.sin(yaw);
@@ -124,6 +125,8 @@ function checkHits(race: RaceRuntime, c: Critter) {
     c.state = 'fly'; c.timer = 1.3;
     c.vx = lv.x * 0.7 + (Math.random() - 0.5) * 6; c.vz = lv.z * 0.7 + (Math.random() - 0.5) * 6;
     c.vy = 7 + speed * 0.25; c.spin = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 8);
+    // Another phone's car: the critter flies here too, but that phone works out its own knock.
+    if (r.kind === 'remote') return;
     // It never stops you: a little speed lost and a shaky ride for a moment. Flimsy rides feel
     // it more, buses hardly at all.
     const flimsy = 1.15 - r.vehicle.stats.toughness * 0.09;

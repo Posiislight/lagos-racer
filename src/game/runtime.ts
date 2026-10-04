@@ -8,6 +8,7 @@ import type { RacerProgress } from './race';
 import type { Critter } from './critters';
 import type { Mode } from './modes';
 import type { RaceSpec } from '../config/campaign';
+import type { SnapshotBuffer } from '../net/interpolation';
 import { DEFAULT_DRIVER, type DriverId } from '../config/drivers';
 
 /**
@@ -38,15 +39,24 @@ export type AIState = {
   special: boolean;
 };
 
+/** A car driven on another phone, drawn from its snapshot buffer. */
+export type RemoteCar = { buffer: SnapshotBuffer; dnf: boolean };
+
 export const aiState = (lane: number, skill: number, itemDelay = 2, laneTarget = lane, special = false): AIState =>
   ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0, special });
 
 export type Racer = {
+  /** Online this is the netId (grid index). */
   id: number;
   name: string;
   vehicle: VehicleConfig;
   paint: Paint;
   isPlayer: boolean;
+  /** Who drives it: this phone's player, this phone's AI, or another phone. */
+  kind: 'local' | 'ai' | 'remote';
+  /** Slot of the phone that drives it; 0 offline. */
+  owner: number;
+  remote: RemoteCar | null;
   controls: Controls;
   body: RapierRigidBody | null;
   /** Interpolated visual group (use for cameras and effects). */
@@ -143,7 +153,23 @@ export type RaceRuntime = {
   mode: Mode;
   /** The campaign race being run, or null for a quick race. */
   spec: RaceSpec | null;
+  /** Room race hooks; null offline. */
+  net: NetHooks | null;
 };
+
+/** What the race tells the room, and the room's clock. */
+export interface NetHooks {
+  /** True once the room has announced the start time. */
+  readonly started: boolean;
+  /** Synced race clock (s), negative before the start. */
+  now(): number;
+  /** Called every frame: sends this phone's cars to the room when a snapshot is due. */
+  update(race: RaceRuntime): void;
+  pickup(orb: number): void;
+  use(h: Hazard): void;
+  hit(hazardId: number, victim: number): void;
+  finish(r: Racer): void;
+}
 
 let current: RaceRuntime | null = null;
 export const getRace = () => current;
@@ -151,7 +177,7 @@ export const setRace = (r: RaceRuntime | null) => { current = r; };
 
 export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress, driver: DriverId = DEFAULT_DRIVER): Racer {
   return {
-    id, name, vehicle, paint, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
+    id, name, vehicle, paint, isPlayer, kind: isPlayer ? 'local' : 'ai', owner: 0, remote: null, controls: emptyControls(), body: null, visual: null, progress,
     speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, shield: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
     bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false, outAt: null,
     driver, charge: 0, push: 0, cough: 0, trail: 0, trailDist: 0, trailCount: 0, ai: null,

@@ -71,6 +71,23 @@ export function lapMessage(lap: number, laps: number): string | null {
   return lap === laps - 1 ? 'FINAL LAP!' : `LAP ${lap + 1}`;
 }
 
+/**
+ * Project onto the track searching only near lap distance `distance` (any lap, negative on the grid), the way
+ * updateProgress searches near the last spot. Where two legs of a road run side by side across a median, a car
+ * is never put on the other leg. For when there is no last spot to search from (the room's referee).
+ */
+export function projectNear(track: Track, x: number, z: number, distance: number) {
+  const s = ((distance % track.length) + track.length) % track.length;
+  return project(track, x, z, Math.min(track.points.length - 1, Math.floor(s / track.spacing)));
+}
+
+/** Another phone owns this car's distance and laps; we only keep the track-relative position fresh. */
+export function trackRemote(track: Track, r: RacerProgress, x: number, z: number) {
+  // Searched near the last spot, as updateProgress does, so it never jumps to the other leg of the road.
+  const p = project(track, x, z, r.index);
+  r.index = p.index; r.s = p.s; r.lateral = p.lateral;
+}
+
 /** The lap the racer is on now, 1-based and clamped to the race length. */
 export function currentLap(r: RacerProgress, totalLaps: number) {
   return Math.min(totalLaps, Math.max(1, r.lapsDone + 1));
@@ -85,6 +102,11 @@ export function standings<T extends { progress: Pick<RacerProgress, 'distance' |
     if (fb !== null) return 1;
     return b.progress.distance - a.progress.distance;
   });
+}
+
+/** Coins for finishing in this place (1 is first). */
+export function coinsForPlace(place: number) {
+  return [150, 100, 60, 30][place - 1] ?? 20;
 }
 
 export function formatTime(t: number | null | undefined) {

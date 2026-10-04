@@ -7,13 +7,14 @@ import type { ItemKind } from './runtime';
 import { loadSave, writeSave, type Saved, type Settings } from './save';
 
 export type { Quality, Settings } from './save';
-export type Screen = 'menu' | 'garage' | 'race' | 'campaign';
+export type Screen = 'menu' | 'garage' | 'campaign' | 'online' | 'lobby' | 'race';
 
 /**
  * time is the finish time, or a projection from average speed (projected: true) for racers still on track.
  * color: their paint. out: race clock seconds when knocked out (elimination), else null.
+ * dnf is only set in a room race, for a car the referee threw out or that dropped.
  */
-export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; out: number | null };
+export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; out: number | null; dnf?: boolean };
 
 /** What a finished campaign race meant for the player (null for a quick race). */
 export type Outcome = { place: number; passed: boolean; firstClear: boolean; unlocked: DriverId | null };
@@ -52,6 +53,8 @@ export type State = Saved & {
   spec: RaceSpec | null;
   /** How the last race went, for the results card (null for a quick race). */
   outcome: Outcome | null;
+  /** True while the race is a room race (Race with friends). */
+  online: boolean;
   paused: boolean;
   hud: Hud;
   results: Result[] | null;
@@ -68,12 +71,14 @@ export type State = Saved & {
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   /** Start a campaign race, or a quick race when no spec is given. */
   startRace: (spec?: RaceSpec) => void;
+  startOnlineRace: () => void;
   quitRace: () => void;
   setPaused: (p: boolean) => void;
   setHud: (h: Partial<Hud>) => void;
   flash: (message: string) => void;
   /** `place` is the player's 1-based finishing place. */
-  finishRace: (results: Result[], place: number, bestLap: number | null) => void;
+  /** `room` is set for a room race: its coins come from the server's results and its best lap is on the room's track. */
+  finishRace: (results: Result[], place: number, bestLap: number | null, room?: { coins: number; trackId: string }) => void;
   dismissAccountPrompt: () => void;
 };
 
@@ -89,6 +94,7 @@ export const useGame = create<State>((set, get) => ({
   raceId: 0,
   spec: null,
   outcome: null,
+  online: false,
   paused: false,
   hud: emptyHud(),
   results: null,
@@ -111,16 +117,18 @@ export const useGame = create<State>((set, get) => ({
     save();
   },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
-  startRace: spec => set(s => ({ screen: 'race', spec: spec ?? null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
-  quitRace: () => set({ screen: 'menu', paused: false, results: null }),
+  startRace: spec => set(s => ({ screen: 'race', online: false, spec: spec ?? null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  // Room races are always on the server's track (see ONLINE_TRACK); the solo track pick is left alone.
+  startOnlineRace: () => set(s => ({ screen: 'race', online: true, spec: null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  quitRace: () => set({ screen: 'menu', online: false, paused: false, results: null }),
   setPaused: paused => set({ paused }),
   setHud: h => set(s => ({ hud: { ...s.hud, ...h } })),
   flash: message => set(s => ({ hud: { ...s.hud, message, messageKey: s.hud.messageKey + 1 } })),
-  finishRace: (results, place, bestLap) => {
+  finishRace: (results, place, bestLap, room) => {
     const s = get();
-    const settled = settle(s.spec, place, s.campaign.cleared);
+    const settled = room ? { ...settle(null, place, s.campaign.cleared), coins: room.coins } : settle(s.spec, place, s.campaign.cleared);
     // The best lap belongs to the track the race was run on, which a campaign race picks for itself.
-    const trackId = s.spec?.track ?? s.track;
+    const trackId = room?.trackId ?? s.spec?.track ?? s.track;
     const best = { ...s.best };
     if (bestLap !== null && (best[trackId] === undefined || bestLap < best[trackId])) best[trackId] = bestLap;
     const races = s.races + 1;

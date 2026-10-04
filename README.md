@@ -24,8 +24,30 @@ Other commands:
 | `node scripts/ikorodu-axis.mjs` | Re-derive the Ikorodu Garage centre line into `src/config/ikoroduAxis.ts` |
 | `node scripts/osm-track.mjs` | Re-derive the Ojuelegba Road layout from OpenStreetMap into `src/config/ojuelegbaAxis.ts` (only needed to change the layout) |
 | `node scripts/playtest.mjs --gpu --autopilot --seconds=30` | Headless play-test with screenshots and a log of positions, speeds and FPS, plus respawns and the longest vehicle-to-vehicle contact (dev server must be running). `--vehicle=brt --paint=red`, `--eval="js"` |
+| `node scripts/net-race.mjs --tabs=3 [--lag=250 --jitter=80 --loss=5] [--timeout=900]` | Online race between headless tabs; exits 0 only if every tab shows identical standings. Needs the dev server on the `--url` (default `http://localhost:5175/`, e.g. `npx vite --port 5175 --strictPort`); starts and stops the room server itself |
 
 Handy URL flags: `?unlock=all` opens the locked BRT, `?autopilot=1` lets the AI drive your vehicle.
+
+## Multiplayer (local)
+
+Racing with friends needs the room server running next to the game:
+
+```bash
+npm run server   # room server on port 8787 (set PORT to change it)
+npm run dev      # the game, as above
+```
+
+Phones on the same Wi-Fi reach the server through the laptop's address: the game connects to `ws://<the address you opened>:8787`, so open the "Network" address Vite prints on each phone and it finds the server by itself. Set `VITE_ROOM_SERVER` to point at a server somewhere else. In the game, **Race with friends** (main menu) opens the online screen: pick a nickname, then **Create room** or type a friend's 4-letter code and **Join room**. The lobby shows the room code, a **Share** button (a link ending in `?room=CODE`, which opens the join screen with the code filled in), everyone's ride and ready ticks, and for the host a **Start** button once at least two players are ready. The nickname is remembered on the device; the connection is only opened once you create or join a room. Add `?lag=120&jitter=40&loss=3` (ms, ms, percent) to fake a bad network when testing.
+
+## Deploying multiplayer
+
+The site stays on Vercel; the room server runs on Railway.
+
+1. In Railway, create a service from this repo and pick the EU West region (closest to Lagos players). `railway.json` makes it build with a no-op command and start `npm run server`, with `/health` as the health check. Railway sets `PORT` itself.
+2. Generate a public domain for the service and copy it.
+3. In Vercel, set the environment variable `VITE_ROOM_SERVER=wss://<domain>` (see `.env.example`) and redeploy the site, because Vite bakes it in at build time.
+
+Troubleshooting: if the site is served over https it must use `wss://`, not `ws://`, or the browser blocks the connection.
 
 ## Controls
 
