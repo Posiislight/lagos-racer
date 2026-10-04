@@ -878,6 +878,36 @@ describe('finish and results', () => {
     expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
   });
 
+  it('accepts an honest finish after a mobile-data stall delivers the last snapshots late', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    const T = half(time);
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, T - 3);
+    // The socket stalls: the last 3 s of snapshots all reach the server 3 s late, followed by the finish.
+    now = startAt + (T + 3) * 1000;
+    for (let t = T - 2.5; t <= T + 1e-9; t += 0.5) {
+      server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: t, cars: [carAt(0, 25 * t)] }));
+    }
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+  });
+
+  it('still reads a finish that follows a burst of 40 buffered snapshots in the same millisecond', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, half(time));
+    const relayed = b.peer.sent.filter(d => typeof d !== 'string').length;
+    for (let i = 0; i < 40; i++) {
+      server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: half(time), cars: [carAt(0, 25 * half(time))] }));
+    }
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+    // Snapshots keep their own limit.
+    expect(b.peer.sent.filter(d => typeof d !== 'string').length - relayed).toBeLessThanOrEqual(30);
+  });
+
   it('refuses a finish claimed from the future', () => {
     const { a, b } = racers();
     const startAt = msgs(a.peer, 'start')[0].at;

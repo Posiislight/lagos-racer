@@ -22,12 +22,15 @@ export interface Peer {
 
 type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
 
+/** One second's message count; snapshots and JSON messages each get their own. */
+type Budget = { start: number; count: number };
+
 type Conn = {
   peer: Peer;
   room: Room | null;
   slot: number;
-  windowStart: number;
-  windowCount: number;
+  snapshots: Budget;
+  messages: Budget;
 };
 
 // Record keeps this list exhaustive when a vehicle is added.
@@ -123,7 +126,8 @@ export class RoomServer {
 
   open(peer: Peer): number {
     const id = this.nextConn++;
-    this.conns.set(id, { peer, room: null, slot: 0, windowStart: this.now(), windowCount: 0 });
+    const now = this.now();
+    this.conns.set(id, { peer, room: null, slot: 0, snapshots: { start: now, count: 0 }, messages: { start: now, count: 0 } });
     return id;
   }
 
@@ -131,7 +135,8 @@ export class RoomServer {
     const c = this.conns.get(conn);
     if (!c) return;
     const bytes = typeof data === 'string' ? (data.length > MAX_MESSAGE_BYTES ? Infinity : Buffer.byteLength(data)) : data.byteLength;
-    if (bytes > MAX_MESSAGE_BYTES || !this.withinRate(c)) return;
+    // A burst of buffered snapshots must not use up the budget for the finish that follows it.
+    if (bytes > MAX_MESSAGE_BYTES || !this.withinRate(typeof data === 'string' ? c.messages : c.snapshots)) return;
     if (typeof data !== 'string') return this.relay(c, data);
     const m = parse(data);
     if (!m) return;
@@ -181,13 +186,13 @@ export class RoomServer {
     }
   }
 
-  private withinRate(c: Conn): boolean {
+  private withinRate(b: Budget): boolean {
     const now = this.now();
-    if (now - c.windowStart >= 1000) {
-      c.windowStart = now;
-      c.windowCount = 0;
+    if (now - b.start >= 1000) {
+      b.start = now;
+      b.count = 0;
     }
-    return ++c.windowCount <= RATE_LIMIT_PER_S;
+    return ++b.count <= RATE_LIMIT_PER_S;
   }
 
   /** Forwards a valid car snapshot, untouched, to the other racers, and shows it to the referee. */

@@ -284,7 +284,7 @@ export class Room {
   observe(snap: Snapshot, now: number) {
     const at = this.raceTime(now);
     const time = Math.min(snap.time, at + 1);
-    for (const car of snap.cars) this.referee?.observe(car, time, at);
+    for (const car of snap.cars) this.referee?.observe(car, time);
   }
 
   /** Seconds since the green light, by the server's clock. */

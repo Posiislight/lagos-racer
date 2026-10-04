@@ -16,7 +16,7 @@ const SUM_SLACK = 0.5;
 const GRID_DEPTH = 50;
 const DISTANCE_SLACK = 30;
 // A finish claim may come late (a phone that dropped re-sends it on resume) but never from the future, and never
-// from well before the server last saw the car still short of the line.
+// from well before the car's last snapshot that had it still short of the line.
 const FUTURE_SLACK = 1;
 const CLOCK_SLACK = 2;
 
@@ -26,7 +26,7 @@ type Car = {
   /** The referee's own idea of the distance driven, only ever moved as far as the car could have gone. */
   distance: number;
   lastTime: number;
-  /** Server race time (s) of the last snapshot that had the car short of the line. */
+  /** Race time (s) stamped on the last snapshot that had the car short of the line. */
   lastShortAt: number;
   finishTime: number | null;
   laps: number[];
@@ -49,10 +49,10 @@ export class Referee {
   }
 
   /**
-   * A car's pose from a snapshot at race time `time` (s), which the room keeps from running ahead of its own clock,
-   * received at server race time `at`.
+   * A car's pose from a snapshot at race time `time` (s), which the room keeps from running ahead of its own clock.
+   * Its own stamp, not when it arrived: a stalled socket delivers the last few seconds in one late burst.
    */
-  observe(state: CarState, time: number, at = time) {
+  observe(state: CarState, time: number) {
     const car = this.cars.get(state.netId);
     if (!car || car.finishTime !== null || car.dnf) return;
     const L = this.track.length;
@@ -63,7 +63,7 @@ export class Referee {
     const cap = car.topSpeed * SPEED_MARGIN * Math.max(0, time) + GRID_DEPTH + DISTANCE_SLACK;
     car.distance = Math.min(car.distance + reach, cap, Math.max(car.distance - MAX_BACK, state.distance));
     car.lastTime = Math.max(car.lastTime, time);
-    if (state.distance < this.laps * L) car.lastShortAt = Math.max(car.lastShortAt, at);
+    if (state.distance < this.laps * L) car.lastShortAt = Math.max(car.lastShortAt, time);
   }
 
   /**

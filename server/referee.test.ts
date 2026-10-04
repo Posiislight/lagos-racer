@@ -122,12 +122,15 @@ describe('Referee', () => {
     expect(ref.results(time + 10).map(r => [r.netId, r.dnf])).toEqual([[0, false], [2, false], [1, true], [3, true]]);
   });
 
-  it('times "last seen short of the line" by when the snapshot reached the server, not its own stamp', () => {
-    const ref = new Referee(track, LAPS, grid(1));
+  it('times "last seen short of the line" by the snapshot own stamp, so a late burst still finishes', () => {
+    const ref = new Referee(track, LAPS, grid(2));
     const time = (LAPS * L) / 25;
-    // Every snapshot reaches the server 3 s after its stamp, the last short of the line at about time + 3.
-    for (let t = 0; t <= time + 1e-9; t += 1 / 15) ref.observe(at(0, 25 * t), t, t + 3);
-    expect(ref.finish(0, lapsAt(25), time, time + 3)).toBe(false);
+    // Car 0's last 4 s of snapshots all reach the server together, 4 s late: its finish is honest.
+    for (const netId of [0, 1]) drive(ref, netId, 25, 0, time);
+    expect(ref.finish(0, lapsAt(25), time, time + 4)).toBe(true);
+    // Car 1 was stamped still short of the line at about `time`, so a finish 3 s earlier is still refused.
+    const early = lapsAt(25).map(t => t - 1);
+    expect(ref.finish(1, early, time - 3, time + 4)).toBe(false);
   });
 
   it('orders results: finished by time, then by distance with projections, then DNF', () => {
