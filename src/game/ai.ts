@@ -1,6 +1,7 @@
 import { MathUtils } from 'three';
 import type { RaceRuntime, Racer } from './runtime';
 import { sampleAt } from './track';
+import { driverById } from '../config/drivers';
 
 export const AI_NAMES = ['Odogwu Rider', 'Starboy-ish', 'Mama Danfo', 'Conductor Sule', 'Aunty Bisi', 'Area Fada', 'Oga Landlord'];
 
@@ -39,6 +40,30 @@ const footprint = (r: Racer): Footprint => ({
   lateral: r.progress.lateral, distance: r.progress.distance,
   halfLength: r.vehicle.chassis.length * r.vehicle.scale / 2, halfWidth: r.vehicle.chassis.width * r.vehicle.scale / 2,
 });
+
+/**
+ * Whether an AI driver presses its special button this frame. It waits a moment after the meter fills,
+ * then fires at a sensible time: Moshood on a straight (Push Squad needs room to run), Mama Put with a
+ * rival close behind (the trail is for them). Either fires anyway after waiting 10 s.
+ */
+export function aiSpecial(r: Racer, race: RaceRuntime, dt: number, rand: () => number = Math.random): boolean {
+  const ai = r.ai;
+  if (!ai) return false;
+  if (r.charge < 1) { ai.specialDelay = -1; ai.specialWait = 0; return false; }
+  if (ai.specialDelay < 0) ai.specialDelay = 0.5 + rand() * 1.5;
+  ai.specialDelay -= dt;
+  ai.specialWait += dt;
+  if (ai.specialDelay > 0) return false;
+  if (ai.specialWait > 10) return true;
+  if (driverById(r.driver).special.kind === 'push') {
+    return Math.abs(race.track.points[sampleAt(race.track, r.progress.s + 25).index].curvature) < 0.02;
+  }
+  return race.racers.some(o => {
+    if (o === r) return false;
+    const gap = o.progress.distance - r.progress.distance;
+    return gap < -3 && gap > -30;
+  });
+}
 
 export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: number) {
   const ai = r.ai, b = r.body;
@@ -139,4 +164,6 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
     }
     if (use) { c.useItem = true; ai.itemDelay = 1 + Math.random() * 3; }
   }
+
+  c.special = aiSpecial(r, race, dt);
 }
