@@ -64,6 +64,12 @@ export function resyncProgress(track: Track, r: RacerProgress, x: number, z: num
   r.index = p.index; r.s = p.s; r.lateral = p.lateral;
 }
 
+/** The banner for completing lap `lap` of `laps`; none when the race has no lap limit. */
+export function lapMessage(lap: number, laps: number): string | null {
+  if (!Number.isFinite(laps)) return null;
+  return lap === laps - 1 ? 'FINAL LAP!' : `LAP ${lap + 1}`;
+}
+
 /** The lap the racer is on now, 1-based and clamped to the race length. */
 export function currentLap(r: RacerProgress, totalLaps: number) {
   return Math.min(totalLaps, Math.max(1, r.lapsDone + 1));

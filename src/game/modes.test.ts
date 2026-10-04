@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMode, eliminationInterval, isIn, type ModeRacer, type ModeView } from './modes';
+import { createMode, eliminationInterval, isIn, underPower, type ModeRacer, type ModeView } from './modes';
 import { standings } from './race';
 
 const racer = (id: number, distance: number, extra: { finishTime?: number | null; outAt?: number | null } = {}): ModeRacer => ({
@@ -135,5 +135,17 @@ describe('duel mode', () => {
     const v = view([racer(0, 500), racer(1, 900, { finishTime: 80 })]);
     expect(mode.ranking(v)).toEqual([1, 0]);
     expect(mode.hud(v)).toBeNull();
+  });
+});
+
+describe('underPower', () => {
+  it('is off in the countdown and for a racer who is out, even one knocked out at 0 s', () => {
+    expect(underPower('countdown', null)).toBe(false);
+    expect(underPower('racing', 12)).toBe(false);
+    expect(underPower('racing', 0)).toBe(false);
+  });
+  it('is on while racing or after the finish, for a racer still in', () => {
+    expect(underPower('racing', null)).toBe(true);
+    expect(underPower('finished', null)).toBe(true);
   });
 });

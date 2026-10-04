@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { aiState, getRace, type Racer } from '../game/runtime';
 import { isIn } from '../game/modes';
-import { updateProgress, standings, currentLap } from '../game/race';
+import { updateProgress, standings, currentLap, lapMessage } from '../game/race';
 import { clearQueuedPresses, readPlayer } from '../game/input';
 import { catchUpGap, driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
@@ -101,7 +101,7 @@ export function RaceLogic() {
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
       if (e && r.isPlayer) {
         if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); race.phase = 'finished'; }
-        else { sfx('lap'); store.flash(e.lap === laps - 1 ? 'FINAL LAP!' : `LAP ${e.lap + 1}`); }
+        else { sfx('lap'); const banner = lapMessage(e.lap, laps); if (banner) store.flash(banner); }
       }
     }
 

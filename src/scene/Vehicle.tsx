@@ -12,6 +12,7 @@ import { sampleAt } from '../game/track';
 import { resyncProgress } from '../game/race';
 import { playHorn } from '../game/audio';
 import { speedFactors } from '../game/specials';
+import { underPower } from '../game/modes';
 
 const G = 9.81;
 const _q = new Quaternion(), _fwd = new Vector3(), _v = new Vector3();
@@ -101,7 +102,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     const v = vc.currentVehicleSpeed();
     racer.speed = v;
     const speedFrac = Math.min(1, Math.abs(v) / t.topSpeed);
-    const racing = race.phase !== 'countdown';
+    const racing = underPower(race.phase, racer.outAt);
     const boosting = racer.boost > 0, slippy = racer.slip > 0;
     const f = speedFactors(racer);
 

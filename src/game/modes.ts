@@ -35,6 +35,9 @@ const FINISH_WAIT = 6;
 
 export const isIn = (r: { outAt: number | null }) => r.outAt === null;
 
+/** Whether a vehicle's engine and pedals work: not in the countdown, and not once its racer is out (it is held on the brakes, never reversing). */
+export const underPower = (phase: ModeView['phase'], outAt: number | null) => phase !== 'countdown' && outAt === null;
+
 /** Seconds between knock-outs: `first`, shrinking by `step` each round, never under `floor`. `round` counts from 0. */
 export function eliminationInterval(m: { first: number; step: number; floor: number }, round: number): number {
   return Math.max(m.floor, m.first - m.step * round);

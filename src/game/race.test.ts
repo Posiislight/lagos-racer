@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
-import { createProgress, updateProgress, standings, currentLap, formatTime } from './race';
+import { createProgress, updateProgress, standings, currentLap, formatTime, lapMessage } from './race';
 import { TRACKS, trackFor } from '../config/tracks';
 import { medianMask } from './outAndBack';
 
@@ -174,5 +174,16 @@ describe('ojuelegba track', () => {
     const ys = oj.points.map(p => p.pos.y), range = Math.max(...ys) - Math.min(...ys);
     expect(range).toBeGreaterThan(0.8);
     expect(range).toBeLessThan(2);
+  });
+});
+
+describe('lapMessage', () => {
+  it('announces the next lap and the final lap', () => {
+    expect(lapMessage(1, 3)).toBe('LAP 2');
+    expect(lapMessage(2, 3)).toBe('FINAL LAP!');
+  });
+  it('says nothing when the race has no lap limit (elimination)', () => {
+    expect(lapMessage(1, Infinity)).toBeNull();
+    expect(lapMessage(5, Infinity)).toBeNull();
   });
 });
