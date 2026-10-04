@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { upgradePrice } from '../config/economy';
 import type { ItemKind } from './runtime';
+import { levelsFor, sanitizeUpgrades, type UpgradeKind, type UpgradeMap } from './upgrades';
 
 export type Quality = 'low' | 'medium' | 'high';
 export type Screen = 'menu' | 'garage' | 'race';
@@ -28,7 +30,8 @@ export type Hud = {
   wrongWay: boolean;
 };
 
-type Saved = { settings: Settings; coins: number; best: Record<string, number>; races: number; vehicle: VehicleId; unlocked: VehicleId[]; accountPromptDismissed: boolean };
+/** `coins` is the naira balance (the saved field keeps its old name so existing saves still load). */
+type Saved = { settings: Settings; coins: number; best: Record<string, number>; races: number; vehicle: VehicleId; unlocked: VehicleId[]; upgrades: UpgradeMap; accountPromptDismissed: boolean };
 
 const SAVE_KEY = 'lagos-racer:v1';
 
@@ -43,13 +46,13 @@ function detectQuality(): Quality {
 function load(): Saved {
   const fallback: Saved = {
     settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-    coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false,
+    coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false,
   };
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return fallback;
     const s = JSON.parse(raw) as Partial<Saved>;
-    return { ...fallback, ...s, settings: { ...fallback.settings, ...s.settings } };
+    return { ...fallback, ...s, settings: { ...fallback.settings, ...s.settings }, upgrades: sanitizeUpgrades(s.upgrades) };
   } catch {
     return fallback;
   }
@@ -71,6 +74,8 @@ export type State = Saved & {
   setScreen: (s: Screen) => void;
   setVehicle: (v: VehicleId) => void;
   unlock: (v: VehicleId) => void;
+  /** Buy the next level of one upgrade. True if it was bought. */
+  buyUpgrade: (v: VehicleId, kind: UpgradeKind) => boolean;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   startRace: () => void;
   quitRace: () => void;
@@ -104,6 +109,15 @@ export const useGame = create<State>((set, get) => ({
     set({ coins: s.coins - price, unlocked: [...s.unlocked, v], vehicle: v });
     save();
   },
+  buyUpgrade: (v, kind) => {
+    const s = get(), config = VEHICLES.find(x => x.id === v);
+    if (!config || (config.locked && !s.unlocked.includes(v))) return false;
+    const levels = levelsFor(s.upgrades, v), price = upgradePrice(levels[kind]);
+    if (price === null || s.coins < price) return false;
+    set({ coins: s.coins - price, upgrades: { ...s.upgrades, [v]: { ...levels, [kind]: levels[kind] + 1 } } });
+    save();
+    return true;
+  },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
   startRace: () => set(s => ({ screen: 'race', raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
   quitRace: () => set({ screen: 'menu', paused: false, results: null }),
@@ -125,6 +139,6 @@ export const useGame = create<State>((set, get) => ({
 
 function save() {
   const s = useGame.getState();
-  const data: Saved = { settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, accountPromptDismissed: s.accountPromptDismissed };
+  const data: Saved = { settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades, accountPromptDismissed: s.accountPromptDismissed };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* private mode: progress just isn't kept */ }
 }
