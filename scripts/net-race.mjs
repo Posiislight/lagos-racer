@@ -4,46 +4,62 @@
 //   --lag=250 --jitter=80 --loss=5 fake a bad network in every tab (ms, ms, percent)
 //   --url=http://localhost:5175/   game URL; the dev server must already be running
 //                                  (npx vite --port 5175 --strictPort)
-//   --timeout=300                  seconds to wait for the results
+//   --timeout=900                  seconds to wait for the results (software rendering is slow: 3 tabs take ~8 min)
 //   --gpu                          try the real GPU instead of SwiftShader
-// Spawns `npm run server` itself and stops it on the way out. Exits 0 only if every tab shows identical standings.
+// Spawns the room server itself and stops it on the way out. Exits 0 only if every tab shows identical standings.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v ?? true]; }));
-const base = args.url || 'http://localhost:5175/';
-const tabs = Math.min(6, Math.max(2, +(args.tabs || 3)));
-const timeout = +(args.timeout || 300);
-const lagParams = ['lag', 'jitter', 'loss'].filter(k => args[k] !== undefined).map(k => `${k}=${args[k]}`);
+const usage = msg => { console.error(`${msg}\nusage: node scripts/net-race.mjs [--tabs=3] [--lag=ms --jitter=ms --loss=percent] [--url=...] [--timeout=900] [--gpu]`); process.exit(1); };
+const num = (key, fallback) => {
+  if (args[key] === undefined) return fallback;
+  const n = Number(args[key]);
+  if (args[key] === true || args[key] === '' || !Number.isFinite(n)) usage(`--${key} must be a number`);
+  return n;
+};
+const tabs = Math.min(6, Math.max(2, Math.round(num('tabs', 3))));
+const timeout = num('timeout', 900);
+if (timeout <= 0) usage('--timeout must be positive');
+for (const k of ['lag', 'jitter', 'loss']) num(k, 0);
+const base = typeof args.url === 'string' && args.url ? args.url : 'http://localhost:5175/';
+const lagParams = ['lag', 'jitter', 'loss'].filter(k => args[k] !== undefined).map(k => `${k}=${Number(args[k])}`);
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const exe = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
-const profile = mkdtempSync(path.join(tmpdir(), 'lr-net-'));
+if (!exe) usage('no Chrome or Edge found');
 const gl = args.gpu ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, '$1')), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Same as `npm run server`, but as one plain node process so killing it really stops the server.
-const server = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
-let serverLog = '';
-server.stdout.on('data', d => { serverLog += d; });
-server.stderr.on('data', d => { serverLog += d; });
-const browser = spawn(exe, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=800,450',
-  '--hide-scrollbars', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
-  '--disable-backgrounding-occluded-windows', ...gl, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
-
-let finished = false;
+// Cleanup is installed before anything is spawned, so no startup failure can leave a child behind.
+let server = null, browser = null, profile = null, finished = false;
 const done = code => {
   if (finished) return;
   finished = true;
-  try { browser.kill(); } catch { /* already gone */ }
-  try { server.kill(); } catch { /* already gone */ }
-  setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* chrome may still hold files */ } process.exit(code); }, 1000);
+  try { browser?.kill(); } catch { /* already gone */ }
+  try { server?.kill(); } catch { /* already gone */ }
+  setTimeout(() => { try { if (profile) rmSync(profile, { recursive: true, force: true }); } catch { /* chrome may still hold files */ } process.exit(code); }, 1000);
 };
-process.on('SIGINT', () => done(1));
 const fail = msg => { console.error(msg); done(1); return new Promise(() => {}); };
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(sig, () => done(1));
+process.on('uncaughtException', e => { console.error(e); done(1); });
 process.on('unhandledRejection', e => { console.error(e); done(1); });
+
+// Same as `npm run server`, but as one plain node process so killing it really stops the server.
+server = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+let serverLog = '';
+server.stdout.on('data', d => { serverLog += d; });
+server.stderr.on('data', d => { serverLog += d; });
+server.on('error', e => { console.error('room server failed:', e.message); done(1); });
+profile = mkdtempSync(path.join(tmpdir(), 'lr-net-'));
+browser = spawn(exe, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--window-size=800,450',
+  '--hide-scrollbars', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+  '--disable-backgrounding-occluded-windows', ...gl, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
+browser.on('error', e => { console.error('browser failed:', e.message); done(1); });
+
 
 let port;
 for (let i = 0; i < 100 && !port; i++) { await sleep(100); try { port = readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim(); } catch { /* not yet */ } }
