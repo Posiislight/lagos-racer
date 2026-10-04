@@ -6,6 +6,8 @@ import type { Track } from './track';
 import { emptyControls, type Controls } from './input';
 import type { RacerProgress } from './race';
 import type { Critter } from './critters';
+import type { Mode } from './modes';
+import type { RaceSpec } from '../config/campaign';
 import { DEFAULT_DRIVER, type DriverId } from '../config/drivers';
 
 /**
@@ -137,6 +139,10 @@ export type RaceRuntime = {
   nextId: number;
   puffs: Puff[];
   critters: Critter[];
+  /** How this race ends and who is ranked where (laps, elimination or duel). */
+  mode: Mode;
+  /** The campaign race being run, or null for a quick race. */
+  spec: RaceSpec | null;
 };
 
 let current: RaceRuntime | null = null;

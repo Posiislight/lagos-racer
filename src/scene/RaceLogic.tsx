@@ -8,7 +8,8 @@ import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateSpecials } from '../game/specials';
 import { driverById } from '../config/drivers';
 import { updateCritters } from '../game/critters';
-import { useGame, type Result } from '../game/store';
+import { useGame } from '../game/store';
+import { buildResults } from '../game/results';
 import { beep, Engine, sfx } from '../game/audio';
 import { itemHint } from '../game/hints';
 
@@ -22,7 +23,6 @@ export function RaceLogic() {
   const hudTimer = useRef(0);
   const lastCount = useRef('');
   const wrongWay = useRef(0);
-  const finishedAt = useRef<number | null>(null);
   const heldItem = useRef<string | null>(null);
   const reported = useRef(false);
   const engine = useRef<Engine | null>(null);
@@ -68,6 +68,7 @@ export function RaceLogic() {
     } else {
       race.clock += dt;
     }
+    race.mode.tick(race, dt); // knock-out events are handled in a later task
 
     // Controls: the player drives until they finish, then the AI brings them home.
     for (const r of race.racers) {
@@ -87,7 +88,7 @@ export function RaceLogic() {
       const t = r.body.translation();
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
       if (e && r.isPlayer) {
-        if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); finishedAt.current = race.clock; race.phase = 'finished'; }
+        if (e.finished) { sfx('finish'); store.flash(standings(race.racers).indexOf(r) === 0 ? 'YOU WIN! OGA!' : 'FINISH!'); race.phase = 'finished'; }
         else { sfx('lap'); store.flash(e.lap === laps - 1 ? 'FINAL LAP!' : `LAP ${e.lap + 1}`); }
       }
     }
@@ -129,26 +130,16 @@ export function RaceLogic() {
       });
     }
 
-    // Results: once the player is home, wait for the others (or give up after a few seconds).
-    if (finishedAt.current !== null && !reported.current) {
-      const allIn = race.racers.every(r => r.progress.finishTime !== null);
-      if (allIn || race.clock - finishedAt.current > 6) {
-        reported.current = true;
-        const order = standings(race.racers);
-        const total = laps * race.track.length;
-        const results: Result[] = order.map(r => {
-          const done = r.progress.finishTime;
-          const avg = r.progress.distance > 0 ? r.progress.distance / race.clock : 0;
-          const projected = done === null && avg > 1 ? race.clock + (total - r.progress.distance) / avg : null;
-          return {
-            name: r.name, vehicle: r.vehicle.id, color: r.paint.color, isPlayer: r.isPlayer, time: done ?? projected, projected: done === null,
-            best: r.progress.lapTimes.length ? Math.min(...r.progress.lapTimes) : null, out: null,
-          };
-        });
-        const place = order.indexOf(player);
-        store.finishRace(results, place + 1, results[place].best);
-        store.setHud({ phase: 'finished' });
-      }
+    // Results: when the mode says the race is over (for laps, once the player is home and the others
+    // are in or a few seconds have passed).
+    if (!reported.current && race.mode.over(race)) {
+      reported.current = true;
+      const byId = new Map(race.racers.map(r => [r.id, r]));
+      const order = race.mode.ranking(race).map(id => byId.get(id)!);
+      const results = buildResults(order, race.clock, laps, race.track.length);
+      const place = order.indexOf(player) + 1;
+      store.finishRace(results, place, results[place - 1].best);
+      store.setHud({ phase: 'finished' });
     }
   });
 
