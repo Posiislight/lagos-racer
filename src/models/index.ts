@@ -3,6 +3,7 @@ import { buildBRT, buildDanfo, buildKeke, buildOkada } from './generated/showroo
 import { findAnimated, mergeDecals, mergeStatic } from './optimize';
 
 import type { VehicleId } from '../config/vehicles';
+import type { DriverId } from '../config/drivers';
 
 export type VehicleModel = {
   /** Wrapper group: faces +x, right side on +z, ground at y = 0, scaled for the game. */
@@ -17,12 +18,12 @@ export type VehicleModel = {
 
 const WHEEL_MAT = new MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.4 });
 
-/** Each builder takes the body colour (paint). */
-const BUILDERS: Record<VehicleId, (color: string) => Group> = {
-  okada: c => buildOkada(c),
-  keke: c => buildKeke(c),
-  danfo: c => buildDanfo(c),
-  brt: c => buildBRT(c, '01'),
+/** Each builder takes the body colour (paint) and, optionally, which driver character sits in it. */
+const BUILDERS: Record<VehicleId, (color: string, driver?: DriverId) => Group> = {
+  okada: (c, d) => buildOkada(c, d),
+  keke: (c, d) => buildKeke(c, d),
+  danfo: (c, d) => buildDanfo(c, d),
+  brt: (c, d) => buildBRT(c, '01', d),
 };
 
 /**
@@ -30,8 +31,8 @@ const BUILDERS: Record<VehicleId, (color: string) => Group> = {
  * side on -z and the showroom mirrors them, so do the same here (and flip text decals back so they
  * still read).
  */
-export function buildVehicleModel(id: VehicleId, color: string, scale = 1, opts: { merge?: boolean; shadowProxy?: boolean } = {}): VehicleModel {
-  const model = BUILDERS[id](color);
+export function buildVehicleModel(id: VehicleId, color: string, scale = 1, opts: { merge?: boolean; shadowProxy?: boolean; driver?: DriverId } = {}): VehicleModel {
+  const model = BUILDERS[id](color, opts.driver);
   const anim = model.userData.anim as ((t: number) => void) | undefined;
 
   const wheels: VehicleModel['wheels'] = [];
@@ -75,4 +76,13 @@ export function buildVehicleModel(id: VehicleId, color: string, scale = 1, opts:
     root.traverse(o => { o.castShadow = o.castShadow && !o.userData.decal; });
   }
   return { root, wheels, anim, size };
+}
+
+/** Dev only: how many meshes a built, merged model has (to check a driver doesn't blow the draw-call budget). */
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __meshCount: (id: string, driver?: string) => number }).__meshCount = (id, driver) => {
+    let n = 0;
+    buildVehicleModel(id as VehicleId, '#d92b2b', 1, { driver: driver as DriverId | undefined }).root.traverse(o => { if ((o as Mesh).isMesh) n++; });
+    return n;
+  };
 }

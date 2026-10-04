@@ -34,7 +34,7 @@ export function Menu() {
         <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
       </header>
       <div className="menu-preview">
-        <Suspense fallback={null}><Preview id={vehicle} color={p.color} /></Suspense>
+        <Suspense fallback={null}><Preview id={vehicle} color={p.color} driver={driver} /></Suspense>
       </div>
       <div className="menu-side">
         <div className="card">

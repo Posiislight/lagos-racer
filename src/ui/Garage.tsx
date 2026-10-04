@@ -29,7 +29,7 @@ export function Garage() {
       </header>
       <div className="garage-body">
         <div className="garage-preview">
-          <Suspense fallback={null}><Preview id={looking} color={current.color} /></Suspense>
+          <Suspense fallback={null}><Preview id={looking} color={current.color} driver={driver} /></Suspense>
         </div>
         <div className="card garage-card">
           <h2>{v.name}</h2>
