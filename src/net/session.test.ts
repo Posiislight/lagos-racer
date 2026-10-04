@@ -54,6 +54,19 @@ describe('NetSession', () => {
     expect(sent).toEqual([{ t: 'loaded' }]);
   });
 
+  it('after a resume re-sends loaded until the start is known (it may have been lost in the drop)', () => {
+    const { link, sent } = fakeLink();
+    const s = new NetSession(link, clockAhead(), setup);
+    s.resumed();
+    expect(sent).toEqual([]);
+    s.loaded();
+    s.resumed();
+    expect(sent).toEqual([{ t: 'loaded' }, { t: 'loaded' }]);
+    s.setStart(20000);
+    s.resumed();
+    expect(sent).toHaveLength(2);
+  });
+
   it('attach makes the session the race hooks', () => {
     const s = new NetSession(fakeLink().link, clockAhead(), setup);
     const race = { net: null } as unknown as Parameters<NetSession['attach']>[0];
@@ -305,10 +318,10 @@ describe('NetSession', () => {
       expect(sent).toEqual([claim(0), claim(1)]);
       // The room accepted car 1 (its finished comes back to us too); car 0's claim was lost in a drop.
       s.onEvent({ t: 'finished', netId: 1, time: 90 });
-      s.resendFinishes();
+      s.resumed();
       expect(sent).toEqual([claim(0), claim(1), claim(0)]);
       s.onEvent({ t: 'finished', netId: 0, time: 90 });
-      s.resendFinishes();
+      s.resumed();
       expect(sent).toHaveLength(3);
     });
 

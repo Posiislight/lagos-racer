@@ -77,7 +77,7 @@ export function Lobby() {
             </button>
           ))}
         </div>
-        <button className={`btn${me?.ready ? ' ready' : ' primary'}`} aria-pressed={!!me?.ready} onClick={() => setReady(!me?.ready)}>
+        <button className={`btn${me?.ready ? ' ready' : ' primary'}`} aria-pressed={!!me?.ready} disabled={inRace} onClick={() => setReady(!me?.ready)}>
           Ready
         </button>
         {isHost && (

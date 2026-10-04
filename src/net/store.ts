@@ -165,8 +165,8 @@ export const useNet = create<NetState>((set, get) => {
         writeToken(m.token);
         set({ code: m.code, mySlot: m.slot, error: null });
         startPings();
-        // Back from a drop mid-race: a finish claimed while the socket was down never got there.
-        session?.resendFinishes();
+        // Back from a drop mid-race: catch the room up on what was lost while the socket was down.
+        session?.resumed();
         const game = useGame.getState();
         if (game.screen === 'online') game.setScreen('lobby');
         break;

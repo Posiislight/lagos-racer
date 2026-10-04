@@ -163,8 +163,12 @@ export class NetSession implements NetHooks {
     this.link.sendJson(claim);
   }
 
-  /** After a resume: claim again any finish the room never answered. */
-  resendFinishes() {
+  /**
+   * After a resume: anything sent while the socket was down never got there. Say loaded again if the start is still
+   * unknown (the room ignores it outside loading), and claim again any finish the room never answered.
+   */
+  resumed() {
+    if (this.sentLoaded && this.startAt === null) this.link.sendJson({ t: 'loaded' });
     for (const claim of this.unanswered.values()) this.link.sendJson(claim);
   }
 }
