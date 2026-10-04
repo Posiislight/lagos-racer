@@ -206,6 +206,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .hud-progress .flag { position: absolute; right: -4px; top: -6px; width: 10px; height: 20px; background: repeating-linear-gradient(#141210 0 5px, #f3efe4 5px 10px); border-radius: 2px; }
 .hud-progress i { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 3px solid #141210; }
 .hud-progress i.me { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 4px; }
+/* Elimination: seconds to the next LASTMA clamp, next to "5/6 left". */
+/* Narrow portrait screens: the clamp timer would collide with the clock, so the bar drops below the position board. */
+@media (max-width: 720px) and (orientation: portrait) { .hud-progress.elim { top: calc(78px + var(--safe-t)); width: min(92vw, 420px); } }
+.hud-progress .elim-timer { flex: none; min-width: 40px; text-align: center; background: var(--board); color: var(--led); border-radius: 8px; padding: 2px 8px; font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.hud-progress .elim-timer.warn { background: #d9261c; color: #fff; animation: pulse .6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .hud-progress .elim-timer.warn { animation: none; } }
 .hud-lap .time, .hud-lap .best { font-family: Archivo, sans-serif; font-weight: 900; text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; }
 .hud-lap .time { font-size: 20px; }
 .hud-lap .best { font-size: 12px; opacity: .9; }
@@ -258,6 +264,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
 }
+/* A long one-liner (a knocked-out racer's name and "clamped by LASTMA!") wraps and shrinks instead of running off the screen. */
+.hud-msg.wrap { white-space: normal; width: min(86vw, 640px); text-align: center; font-size: clamp(20px, 4.4vw, 40px); }
 .hud-msg.long { white-space: normal; width: min(82vw, 640px); text-align: center; animation-duration: 3.2s; }
 .hud-msg.long b { display: block; font-weight: 400; }
 .hud-msg.long small { display: block; font-size: clamp(14px, 2.6vw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { aiState, getRace, type Racer } from '../game/runtime';
+import { isIn } from '../game/modes';
 import { updateProgress, standings, currentLap } from '../game/race';
 import { clearQueuedPresses, readPlayer } from '../game/input';
 import { catchUpGap, driveAI } from '../game/ai';
@@ -71,10 +72,18 @@ export function RaceLogic() {
     } else {
       race.clock += dt;
     }
-    race.mode.tick(race, dt); // knock-out events are handled in a later task
+    // Elimination: LASTMA clamps whoever is last. A knocked-out player ends the race.
+    for (const e of race.mode.tick(race, dt)) {
+      const out = race.racers.find(r => r.id === e.racerId);
+      if (!out) continue;
+      store.flash(out.isPlayer ? 'LASTMA CLAMPED YOU!' : `${out.name} clamped by LASTMA!`);
+      if (out.isPlayer) { sfx('bump'); race.phase = 'finished'; }
+    }
 
     // Controls: the player drives until they finish, then the AI brings them home.
     for (const r of race.racers) {
+      // A racer who is out brakes to a stop and presses nothing.
+      if (!isIn(r)) { Object.assign(r.controls, { throttle: 0, brake: 1, steer: 0, handbrake: false, useItem: false, special: false, horn: false }); continue; }
       if (r.isPlayer && r.progress.finishTime === null && !AUTOPILOT) {
         readPlayer(r.controls, dt, { tilt: store.settings.steering === 'tilt', invertTilt: store.settings.invertTilt });
         unstick(r, dt, race.phase === 'racing');
@@ -87,7 +96,7 @@ export function RaceLogic() {
 
     // Progress and laps.
     for (const r of race.racers) {
-      if (!r.body) continue;
+      if (!r.body || !isIn(r)) continue;
       const t = r.body.translation();
       const e = updateProgress(race.track, r.progress, t.x, t.z, race.clock, laps);
       if (e && r.isPlayer) {
@@ -123,10 +132,12 @@ export function RaceLogic() {
     hudTimer.current -= dt;
     if (hudTimer.current <= 0) {
       hudTimer.current = 0.1;
-      const order = standings(race.racers);
+      // Position among those still in; racers who are out no longer count.
+      const inRace = race.racers.filter(isIn);
+      const order = standings(inRace);
       const best = player.progress.lapTimes.length ? Math.min(...player.progress.lapTimes) : null;
       store.setHud({
-        lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: race.racers.length,
+        lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1 || inRace.length, racers: inRace.length, elimination: race.mode.hud(race),
         time: race.clock, lapTime: race.clock - player.progress.lapStart, bestLap: best,
         speed: Math.abs(player.speed) * 3.6, item: player.item ? { kind: player.item, label: ITEM_LABEL[player.item] } : null, wrongWay: wrongWay.current > 1.2,
         special: { name: driverById(player.driver).special.name, charge: player.charge, ready: player.charge >= 1 },

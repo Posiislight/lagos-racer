@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, RoundCuboidCollider, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, CapsuleGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Points, PointsMaterial, Quaternion, SphereGeometry, Vector3,
+  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Points, PointsMaterial, Quaternion, SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
 import { getRace, type Racer } from '../game/runtime';
@@ -43,7 +43,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
   const { world } = useRapier();
   const lay = useMemo(() => layout(racer), [racer]);
   const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.paint.color, racer.vehicle.scale, { merge, shadowProxy: true, driver: racer.driver }), [racer.vehicle, racer.paint, racer.driver, merge]);
-  const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0 });
+  const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0, removed: false });
   /** Shove this racer away from another one it's touching. */
   const shove = (other: Racer) => {
     const b = body.current, ob = other.body;
@@ -77,8 +77,10 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     }
     controller.current = vc;
     return () => {
+      // An eliminated car has already had its controller removed (see the useFrame below).
+      const alive = controller.current === vc;
       controller.current = null;
-      try { world.removeVehicleController(vc); } catch { /* world already torn down */ }
+      if (alive) try { world.removeVehicleController(vc); } catch { /* world already torn down */ }
       racer.body = null;
       racer.visual = null;
     };
@@ -189,6 +191,20 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
     const dt = Math.min(dtRaw, 0.05), s = state.current, t = racer.vehicle.tuning;
     const b = body.current;
     if (!b) return;
+    // Knocked out (elimination): the LASTMA clamp shows at once; two seconds later the car vanishes
+    // and leaves the physics world, so the others can drive through where it stopped. racer.body
+    // stays set so the other loops can still read its position.
+    fx.clamp.visible = racer.outAt !== null;
+    const raceNow = getRace();
+    if (racer.outAt !== null && !s.removed && raceNow && raceNow.clock - racer.outAt > 2) {
+      s.removed = true;
+      racer.speed = 0;
+      if (visual.current) visual.current.visible = false;
+      const vc = controller.current;
+      controller.current = null;
+      if (vc) try { world.removeVehicleController(vc); } catch { /* world already torn down */ }
+      b.setEnabled(false);
+    }
     const v = racer.speed;
     // Wheels roll with road speed.
     for (const w of model.wheels) w.obj.rotation.z -= (v / (w.radius * racer.vehicle.scale)) * dt;
@@ -297,6 +313,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           <primitive object={fx.sparks} />
           <primitive object={fx.bubble} />
           <primitive object={fx.boys} />
+          <primitive object={fx.clamp} />
         </group>
       </group>
     </RigidBody>
@@ -366,6 +383,15 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
     boy.position.z = (i - 1) * Math.max(0.7, w * 0.8);
     boys.add(boy);
   });
-  return { flame, aura, bubble, sparks, boys, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
+  // LASTMA's wheel clamp (placeholder): a yellow block bolted on the front left wheel, with a black bar.
+  const [wx, wz] = lay.wheels[0], side = Math.sign(wz) || -1;
+  const clamp = new Group();
+  const block = new Mesh(new BoxGeometry(lay.R * 1.1, lay.R * 1.5, 0.3), new MeshStandardMaterial({ color: '#ffd400', roughness: 0.5, emissive: '#5a4800' }));
+  const bar = new Mesh(new BoxGeometry(lay.R * 1.4, 0.12, 0.34), new MeshStandardMaterial({ color: '#141210', roughness: 0.6 }));
+  bar.position.y = lay.R * 0.45;
+  clamp.add(block, bar);
+  clamp.position.set(wx, lay.R * 1.05, wz + side * 0.2);
+  clamp.visible = false;
+  return { flame, aura, bubble, sparks, boys, clamp, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
 }
 const SPARKS = 12;

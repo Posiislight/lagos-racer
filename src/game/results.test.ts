@@ -41,4 +41,17 @@ describe('buildResults', () => {
     expect(res[0].out).toBe(38);
     expect(res[1].out).toBeNull();
   });
+
+  it('gives a racer who was knocked out its knock-out time and no finish time, even with a lap limit', () => {
+    const r = racerAt(1, 10);
+    r.progress.distance = 100;
+    r.outAt = 38;
+    expect(buildResults([r], 40, 3, 600)[0]).toMatchObject({ out: 38, time: null, projected: false });
+  });
+
+  it('shows a racer still in during an elimination with no time and not out', () => {
+    const r = racerAt(1, 10);
+    r.progress.distance = 100;
+    expect(buildResults([r], 40, Infinity, 600)[0]).toMatchObject({ out: null, time: null, projected: false });
+  });
 });

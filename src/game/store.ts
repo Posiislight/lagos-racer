@@ -36,6 +36,8 @@ export type Hud = {
   wrongWay: boolean;
   /** The player's special power: its name, the meter (0..1) and whether it can be fired. */
   special: { name: string; charge: number; ready: boolean };
+  /** Elimination only: racers left, the grid size, seconds to the next knock-out and rounds done (null in other races). */
+  elimination: { left: number; total: number; timer: number; round: number } | null;
 };
 
 const initial = loadSave();
@@ -78,7 +80,7 @@ export type State = Saved & {
 const emptyHud = (): Hud => ({
   phase: 'loading', countdown: '', lap: 1, laps: 3, position: 1, racers: 1, time: 0, lapTime: 0, bestLap: null,
   speed: 0, item: null, message: '', messageKey: 0, wrongWay: false,
-  special: { name: '', charge: 0, ready: false },
+  special: { name: '', charge: 0, ready: false }, elimination: null,
 });
 
 export const useGame = create<State>((set, get) => ({

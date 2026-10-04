@@ -1,14 +1,22 @@
-import { useGame } from '../game/store';
+import { useGame, type Result } from '../game/store';
 import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
 
+/** The time column: when a racer was clamped, that they are still in (elimination), or their finish. */
+function timeCell(r: Result, elimination: boolean) {
+  if (r.out !== null) return `out ${formatTime(r.out)}`;
+  if (r.time === null) return elimination ? 'Still in' : 'DNF';
+  return (r.projected ? '~' : '') + formatTime(r.time);
+}
+
 export function Results() {
-  const { results, coinsEarned, startRace, setScreen, showAccountPrompt, dismissAccountPrompt } = useGame();
+  const { results, spec, coinsEarned, startRace, setScreen, showAccountPrompt, dismissAccountPrompt } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
+  const elimination = spec?.mode.kind === 'elimination';
   return (
     <div className="modal results" role="dialog" aria-modal="true" aria-labelledby="results-title">
       <div className="card modal-card wide">
@@ -23,7 +31,7 @@ export function Results() {
                 <td>{i + 1}</td>
                 <td>{r.name}</td>
                 <td><span className="dot" style={{ background: r.color }} /> {vehicleById(r.vehicle).name}</td>
-                <td title={r.projected ? 'Still racing: projected finish' : undefined}>{r.time === null ? 'DNF' : (r.projected ? '~' : '') + formatTime(r.time)}</td>
+                <td title={r.projected ? 'Still racing: projected finish' : undefined}>{timeCell(r, elimination)}</td>
                 <td>{formatTime(r.best)}</td>
               </tr>
             ))}

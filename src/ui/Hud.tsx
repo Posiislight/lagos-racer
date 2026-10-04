@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { useGame } from '../game/store';
+import { useGame, type Hud as HudState } from '../game/store';
 import { formatTime } from '../game/race';
 import { getRace } from '../game/runtime';
 import { queueItem, queueSpecial } from '../game/input';
@@ -18,7 +18,7 @@ export function Hud({ onPause }: { onPause: () => void }) {
       <div className="hud-pos" aria-label={`Position ${hud.position} of ${hud.racers}`}>
         <b>{hud.position}</b><sup>{suffix(hud.position)}</sup><span>/{hud.racers}</span>
       </div>
-      <ProgressLine lap={hud.lap} laps={hud.laps} />
+      <ProgressLine lap={hud.lap} laps={hud.laps} elimination={hud.elimination} />
       <div className="hud-lap">
         <div className="time">{formatTime(hud.time)}</div>
         <div className="best">Best lap {formatTime(hud.bestLap ?? best ?? null)}</div>
@@ -48,7 +48,7 @@ export function Hud({ onPause }: { onPause: () => void }) {
 /** A flashed message. "JUJU! Press Space to…" shows the shout big and the how-to underneath, smaller. */
 function Message({ text }: { text: string }) {
   const i = text.indexOf('! ');
-  if (i < 0 || text.length <= 16) return <div className="hud-msg">{text}</div>;
+  if (i < 0 || text.length <= 16) return <div className={`hud-msg${text.length > 22 ? ' wrap' : ''}`}>{text}</div>;
   return <div className="hud-msg long"><b>{text.slice(0, i + 1)}</b><small>{text.slice(i + 2)}</small></div>;
 }
 
@@ -56,7 +56,7 @@ function Message({ text }: { text: string }) {
  * The lap as a straight line across the top of the screen, start on the left, with a dot per racer
  * at how far round the lap they are. Updated every frame without re-rendering React.
  */
-function ProgressLine({ lap, laps }: { lap: number; laps: number }) {
+function ProgressLine({ lap, laps, elimination }: { lap: number; laps: number; elimination: HudState['elimination'] }) {
   const track = useRef<HTMLDivElement>(null);
   const race = getRace();
 
@@ -70,6 +70,8 @@ function ProgressLine({ lap, laps }: { lap: number; laps: number }) {
           const dot = el.querySelector<HTMLElement>(`[data-i="${i}"]`);
           if (!dot) return;
           // Finished racers sit at the end; everyone else at their distance into the current lap.
+          // Racers who are out (elimination) lose their dot.
+          dot.style.display = c.outAt !== null ? 'none' : '';
           const done = c.progress.finishTime !== null;
           const frac = done ? 1 : (((c.progress.distance % L) + L) % L) / L;
           dot.style.left = `${(frac * 100).toFixed(2)}%`;
@@ -83,8 +85,13 @@ function ProgressLine({ lap, laps }: { lap: number; laps: number }) {
 
   if (!race) return null;
   return (
-    <div className="hud-progress" aria-label={`Lap ${lap} of ${laps}`}>
-      <div className="lap">LAP <b>{lap}</b>/{laps}</div>
+    <div className={`hud-progress${elimination ? ' elim' : ''}`} aria-label={elimination ? `${elimination.left} of ${elimination.total} racers left` : `Lap ${lap} of ${laps}`}>
+      {elimination ? (
+        <>
+          <div className="lap"><b>{elimination.left}</b>/{elimination.total} left</div>
+          <div className={`elim-timer${elimination.timer <= 3 ? ' warn' : ''}`} aria-label="Seconds to the next LASTMA clamp">{Math.ceil(elimination.timer)}</div>
+        </>
+      ) : <div className="lap">LAP <b>{lap}</b>/{laps}</div>}
       <div className="line" ref={track} aria-hidden="true">
         <span className="flag" />
         {/* Player last so their dot draws on top. */}
