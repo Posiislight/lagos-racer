@@ -50,7 +50,7 @@ plan touches. Execute this plan after that work lands, and check these points ag
 - Server limits: `MAX_MESSAGE_BYTES = 4096`, `RATE_LIMIT_PER_S = 30` messages per connection.
 - Referee:
   - finish distance must be at least `laps × track.length − 30` m;
-  - every lap must be at least `track.length / (maxTopSpeed × 1.6)` s, where `maxTopSpeed` is the vehicle's top speed with all upgrades at level 5 (`applyUpgrades(base, { engine: 5, tyres: 5, body: 5 }).tuning.topSpeed`);
+  - every lap must be at least `track.length / (maxTopSpeed × 1.6)` s, where `maxTopSpeed` is the vehicle's top speed with all upgrades at level 5 (`applyUpgrades(base, { speed: 5, handling: 5, toughness: 5 }).tuning.topSpeed`);
   - the lap times must sum to the finish time within 0.5 s.
 - Coins by place: `[150, 100, 60, 30]`, then 20.
 - Player-facing copy (verbatim):

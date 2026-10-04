@@ -9,45 +9,45 @@ describe('buyUpgrade', () => {
 
   it('charges the level price and raises the level', () => {
     reset(100_000);
-    expect(state().buyUpgrade('okada', 'engine')).toBe(true);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(true);
     expect(state().coins).toBe(20_000);
-    expect(state().upgrades.okada?.engine).toBe(1);
+    expect(state().upgrades.okada?.speed).toBe(1);
   });
 
   it('does nothing when the player is short of naira', () => {
     reset(79_999);
-    expect(state().buyUpgrade('okada', 'engine')).toBe(false);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
     expect(state().coins).toBe(79_999);
     expect(state().upgrades.okada).toBeUndefined();
   });
 
   it('does nothing at level 5', () => {
-    useGame.setState({ coins: 10_000_000, unlocked: [], upgrades: { okada: { engine: 5, tyres: 0, body: 0 } } });
-    expect(state().buyUpgrade('okada', 'engine')).toBe(false);
+    useGame.setState({ coins: 10_000_000, unlocked: [], upgrades: { okada: { speed: 5, handling: 0, toughness: 0 } } });
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
     expect(state().coins).toBe(10_000_000);
-    expect(state().upgrades.okada?.engine).toBe(5);
+    expect(state().upgrades.okada?.speed).toBe(5);
   });
 
   it('does nothing for a vehicle that is still locked, then works once it is unlocked', () => {
     reset(10_000_000);
-    expect(state().buyUpgrade('brt-blue', 'body')).toBe(false);
+    expect(state().buyUpgrade('brt-blue', 'toughness')).toBe(false);
     expect(state().coins).toBe(10_000_000);
     useGame.setState({ unlocked: ['brt-blue'] });
-    expect(state().buyUpgrade('brt-blue', 'body')).toBe(true);
-    expect(state().upgrades['brt-blue']?.body).toBe(1);
+    expect(state().buyUpgrade('brt-blue', 'toughness')).toBe(true);
+    expect(state().upgrades['brt-blue']?.toughness).toBe(1);
   });
 
   it('buys once when a second tap arrives with money for only one', () => {
     reset(100_000);
-    expect(state().buyUpgrade('okada', 'engine')).toBe(true);
-    expect(state().buyUpgrade('okada', 'engine')).toBe(false);
-    expect(state().upgrades.okada?.engine).toBe(1);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(true);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
+    expect(state().upgrades.okada?.speed).toBe(1);
     expect(state().coins).toBe(20_000);
   });
 
   it('keeps each vehicle\'s upgrades separate', () => {
     reset(500_000);
-    state().buyUpgrade('okada', 'engine');
+    state().buyUpgrade('okada', 'speed');
     expect(state().upgrades['okada-blue']).toBeUndefined();
   });
 });

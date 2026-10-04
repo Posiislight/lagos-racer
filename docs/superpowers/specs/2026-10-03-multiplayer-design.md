@@ -192,7 +192,7 @@ screen, with no effect on that car.
   - the referee's own tracked distance for that car (from snapshots, using the same `updateProgress`) is at
     least `laps × track.length − 30 m`;
   - no lap is shorter than `track.length / (topSpeed × 1.6)`, where `topSpeed` is the vehicle's maxed-out
-    top speed (`applyUpgrades(base, { engine: 5, tyres: 5, body: 5 }).tuning.topSpeed`, see
+    top speed (`applyUpgrades(base, { speed: 5, handling: 5, toughness: 5 }).tuning.topSpeed`, see
     `2026-10-04-vehicle-upgrades-design.md`), because upgraded cars are faster than base. The 1.6 allows for fuel boosts and cutting
     the inside line.
   - A rejected finish marks the car DNF.

@@ -1,38 +1,40 @@
 import { VEHICLES, type VehicleConfig, type VehicleId } from '../config/vehicles';
 import { MAX_UPGRADE_LEVEL, STAT_BAR_STEP, UPGRADE_STEPS } from '../config/economy';
 
-/** Engine: speed. Tyres: handling. Body: toughness. */
-export type UpgradeKind = 'engine' | 'tyres' | 'body';
-export const UPGRADE_KINDS: UpgradeKind[] = ['engine', 'tyres', 'body'];
+/** You upgrade the stats themselves: the same three the Garage bars show. */
+export type UpgradeKind = 'speed' | 'handling' | 'toughness';
+export const UPGRADE_KINDS: UpgradeKind[] = ['speed', 'handling', 'toughness'];
 
 export type UpgradeLevels = Record<UpgradeKind, number>;
-export const NO_UPGRADES: UpgradeLevels = { engine: 0, tyres: 0, body: 0 };
+export const NO_UPGRADES: UpgradeLevels = { speed: 0, handling: 0, toughness: 0 };
 
 /** Levels bought for each vehicle. A vehicle with no entry has no upgrades. */
 export type UpgradeMap = Partial<Record<VehicleId, UpgradeLevels>>;
 
-export const UPGRADE_INFO: Record<UpgradeKind, { label: string; blurb: string }> = {
-  engine: { label: 'Engine', blurb: 'More top speed and quicker off the line' },
-  tyres: { label: 'Tyres', blurb: 'Grip in corners, sharper steering, better brakes' },
-  body: { label: 'Body', blurb: 'Crashes and wall scrapes cost less speed' },
-};
+export const UPGRADE_LABEL: Record<UpgradeKind, string> = { speed: 'Speed', handling: 'Handling', toughness: 'Toughness' };
 
 export const levelsFor = (map: UpgradeMap, id: VehicleId): UpgradeLevels => map[id] ?? NO_UPGRADES;
 
 /** The vehicle as it drives with these upgrades. Returns a new config; the base is never changed. */
 export function applyUpgrades(base: VehicleConfig, levels: UpgradeLevels): VehicleConfig {
-  const t = base.tuning, { engine, tyres, body } = UPGRADE_STEPS;
+  const t = base.tuning, { speed, handling, toughness } = UPGRADE_STEPS;
+  const shown = displayStats(base, levels);
   return {
     ...base,
+    stats: {
+      speed: shown.speed.base + shown.speed.bonus,
+      handling: shown.handling.base + shown.handling.bonus,
+      toughness: shown.toughness.base + shown.toughness.bonus,
+    },
     tuning: {
       ...t,
-      topSpeed: t.topSpeed * (1 + engine.topSpeed * levels.engine),
-      accel: t.accel * (1 + engine.accel * levels.engine),
-      grip: t.grip * (1 + tyres.grip * levels.tyres),
-      steerAtSpeed: Math.min(1, t.steerAtSpeed * (1 + tyres.steerAtSpeed * levels.tyres)),
-      brake: t.brake * (1 + tyres.brake * levels.tyres),
-      impact: t.impact * (1 + body.impact * levels.body),
-      mass: t.mass * (1 + body.mass * levels.body),
+      topSpeed: t.topSpeed * (1 + speed.topSpeed * levels.speed),
+      accel: t.accel * (1 + speed.accel * levels.speed),
+      grip: t.grip * (1 + handling.grip * levels.handling),
+      steerAtSpeed: Math.min(1, t.steerAtSpeed * (1 + handling.steerAtSpeed * levels.handling)),
+      brake: t.brake * (1 + handling.brake * levels.handling),
+      impact: t.impact * (1 + toughness.impact * levels.toughness),
+      mass: t.mass * (1 + toughness.mass * levels.toughness),
     },
   };
 }
@@ -41,9 +43,9 @@ export function applyUpgrades(base: VehicleConfig, levels: UpgradeLevels): Vehic
 export function displayStats(base: VehicleConfig, levels: UpgradeLevels) {
   const bar = (value: number, level: number) => ({ base: value, bonus: Math.min(10 - value, STAT_BAR_STEP * level) });
   return {
-    speed: bar(base.stats.speed, levels.engine),
-    handling: bar(base.stats.handling, levels.tyres),
-    toughness: bar(base.stats.toughness, levels.body),
+    speed: bar(base.stats.speed, levels.speed),
+    handling: bar(base.stats.handling, levels.handling),
+    toughness: bar(base.stats.toughness, levels.toughness),
   };
 }
 
@@ -58,7 +60,7 @@ export function sanitizeUpgrades(raw: unknown): UpgradeMap {
       const n = (entry as Record<string, unknown>)[kind];
       return typeof n === 'number' && Number.isInteger(n) ? Math.min(MAX_UPGRADE_LEVEL, Math.max(0, n)) : 0;
     };
-    out[id] = { engine: level('engine'), tyres: level('tyres'), body: level('body') };
+    out[id] = { speed: level('speed'), handling: level('handling'), toughness: level('toughness') };
   }
   return out;
 }

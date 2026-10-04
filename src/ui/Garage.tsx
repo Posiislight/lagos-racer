@@ -2,7 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
 import { MAX_UPGRADE_LEVEL, formatNaira, upgradePrice } from '../config/economy';
-import { UPGRADE_INFO, UPGRADE_KINDS, displayStats, levelsFor } from '../game/upgrades';
+import { UPGRADE_KINDS, UPGRADE_LABEL, displayStats, levelsFor } from '../game/upgrades';
 
 const Preview = lazy(() => import('./Preview'));
 
@@ -40,10 +40,26 @@ export function Garage() {
         <div className="card garage-card">
           <h2>{v.name}</h2>
           <p className="muted">{v.blurb}</p>
-          <div className="stats">
-            <Bar label="Speed" {...stats.speed} />
-            <Bar label="Handling" {...stats.handling} />
-            <Bar label="Toughness" {...stats.toughness} />
+          <div className="stat-rows">
+            {UPGRADE_KINDS.map(kind => {
+              const level = levels[kind], price = upgradePrice(level);
+              return (
+                <div key={kind} className={isLocked ? 'stat-row locked' : 'stat-row'}>
+                  <Bar label={UPGRADE_LABEL[kind]} {...stats[kind]} />
+                  {!isLocked && (
+                    <>
+                      <span className="pips" role="img" aria-label={`Level ${level} of ${MAX_UPGRADE_LEVEL}`}>
+                        {Array.from({ length: MAX_UPGRADE_LEVEL }, (_, i) => <i key={i} className={i < level ? 'on' : ''} />)}
+                      </span>
+                      {price === null
+                        ? <span className="upgrade-max">MAX</span>
+                        : <button className="btn upgrade-buy" disabled={coins < price} onClick={() => buyUpgrade(v.id, kind)}
+                            aria-label={`Upgrade ${UPGRADE_LABEL[kind]} for ${formatNaira(price)}`}>{formatNaira(price)}</button>}
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {isLocked ? (
             <>
@@ -53,28 +69,9 @@ export function Garage() {
               </button>
             </>
           ) : (
-            <>
-              <div className="upgrades">
-                {UPGRADE_KINDS.map(kind => {
-                  const level = levels[kind], price = upgradePrice(level);
-                  return (
-                    <div key={kind} className="upgrade" title={UPGRADE_INFO[kind].blurb}>
-                      <span className="upgrade-name">{UPGRADE_INFO[kind].label}</span>
-                      <span className="pips" role="img" aria-label={`Level ${level} of ${MAX_UPGRADE_LEVEL}`}>
-                        {Array.from({ length: MAX_UPGRADE_LEVEL }, (_, i) => <i key={i} className={i < level ? 'on' : ''} />)}
-                      </span>
-                      {price === null
-                        ? <span className="upgrade-max">MAX</span>
-                        : <button className="btn upgrade-buy" disabled={coins < price} onClick={() => buyUpgrade(v.id, kind)}
-                            aria-label={`Upgrade ${UPGRADE_INFO[kind].label} for ${formatNaira(price)}`}>{formatNaira(price)}</button>}
-                    </div>
-                  );
-                })}
-              </div>
-              <button className="btn primary" disabled={vehicle === v.id} onClick={() => { setVehicle(v.id); setScreen('menu'); }}>
-                {vehicle === v.id ? 'Selected' : 'Ride this one'}
-              </button>
-            </>
+            <button className="btn primary" disabled={vehicle === v.id} onClick={() => { setVehicle(v.id); setScreen('menu'); }}>
+              {vehicle === v.id ? 'Selected' : 'Ride this one'}
+            </button>
           )}
         </div>
       </div>

@@ -11,11 +11,14 @@ export const UPGRADE_PRICES = [80_000, 120_000, 160_000, 200_000, 260_000];
 
 export const MAX_UPGRADE_LEVEL = 5;
 
-/** Fraction added per level. Body's impact is negative: knocks and wall scrapes cost less speed. */
+/**
+ * What each stat upgrade does to the tuning, as a fraction added per level. Toughness's impact is
+ * negative: crashes and wall scrapes cost less speed.
+ */
 export const UPGRADE_STEPS = {
-  engine: { topSpeed: 0.04, accel: 0.06 },
-  tyres: { grip: 0.04, steerAtSpeed: 0.03, brake: 0.04 },
-  body: { impact: -0.1, mass: 0.03 },
+  speed: { topSpeed: 0.04, accel: 0.06 },
+  handling: { grip: 0.04, steerAtSpeed: 0.03, brake: 0.04 },
+  toughness: { impact: -0.1, mass: 0.03 },
 };
 
 /** How much one upgrade level adds to its stat bar in the Garage (out of 10). */

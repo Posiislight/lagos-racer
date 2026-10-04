@@ -117,13 +117,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .bar { display: flex; }
 .bar i { display: block; height: 100%; background: var(--yellow); border-right: 2px solid var(--ink); transition: width .35s ease; }
 .bar i.up { background: var(--green); }
-.upgrades { display: grid; gap: 6px; margin: 0 0 12px; }
-.upgrade { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; }
-.pips { display: flex; gap: 4px; }
-.pips i { box-sizing: border-box; flex: 0 0 18px; height: 12px; border-radius: 3px; border: 2px solid var(--ink); background: rgba(35, 31, 27, .12); }
+/* One row per stat: name, bar, level pips and the price of the next level. */
+.stat-rows { display: grid; gap: 8px; margin: 10px 0 14px; }
+.stat-row { display: grid; grid-template-columns: 76px minmax(48px, 1fr) auto auto; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+.stat-row.locked { grid-template-columns: 76px 1fr; }
+.stat-row > span:first-child { color: var(--muted); }
+.pips { display: flex; gap: 2px; }
+.pips i { box-sizing: border-box; flex: 0 0 11px; height: 11px; border-radius: 3px; border: 2px solid var(--ink); background: rgba(35, 31, 27, .12); }
 .pips i.on { background: var(--green); }
-.upgrade-buy { min-height: 38px; padding: 4px 12px; font-size: 14px; min-width: 84px; }
-.upgrade-max { min-width: 84px; text-align: center; font-weight: 900; color: var(--green); }
+.upgrade-buy { min-height: 38px; padding: 4px 8px; font-size: 14px; min-width: 78px; }
+.upgrade-max { min-width: 78px; text-align: center; font-weight: 900; color: var(--green); }
 .stops { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
 .stops::-webkit-scrollbar { display: none; }
 .stops button {
@@ -135,17 +138,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @media (max-height: 480px) {
   .garage-card .muted { display: none; }
   .garage-card h2 { font-size: 20px; }
-  /* Short landscape phones: stats and the ride button on the left, upgrades on the right. */
-  .garage-body { grid-template-columns: 1fr minmax(440px, 62%); }
-  .upgrade { grid-template-columns: 48px auto auto; gap: 10px; justify-content: space-between; }
-  .pips { gap: 2px; }
-  .pips i { flex-basis: 11px; height: 11px; }
-  .upgrade-buy, .upgrade-max { min-width: 78px; padding: 4px 8px; }
-  .garage-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: start; }
-  .garage-card h2 { grid-column: 1 / -1; margin: 12px 0 4px; }
-  .garage-card .stats { grid-column: 1; grid-row: 2; margin: 4px 0 8px; }
-  .garage-card .upgrades { grid-column: 2; grid-row: 2 / span 2; margin: 4px 0 0; }
-  .garage-card > .btn { grid-column: 1; grid-row: 3; }
+  .garage-card .stat-rows { gap: 6px; margin: 6px 0 10px; }
 }
 
 /* ---------- modal ---------- */
