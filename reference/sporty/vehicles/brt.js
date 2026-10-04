@@ -99,7 +99,7 @@ function brtGlowTex(){
   });
 }
 
-function buildBRT(lowerColor, number){
+function buildBRT(lowerColor, number, driver){
   number=String(number||'01');
   const g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const add=o=>{ body.add(o); return o; }, dec=o=>{ g.add(o); return o; };
@@ -260,8 +260,9 @@ function buildBRT(lowerColor, number){
   ug.rotation.x=-PI/2; ug.position.y=.012; g.add(ug);
 
   /* ---- conductor in race helmet, leaning out of the open front door, waving and shouting the stop ---- */
-  const con=person({shirt:YEL, pants:'#1f2a44', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:lowerColor, pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'});
-  con.scale.setScalar(1.1);
+  const con=driver ? driverFigure(driver,{pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'})
+    : person({shirt:YEL, pants:'#1f2a44', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:lowerColor, pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'});
+  con.scale.multiplyScalar(1.1);
   con.userData.wave.userData.noBake=true;
   brtBake(con);
   fixedChild(g,con,4.84,1.068,-1.42,PI/2,.15);

@@ -69,11 +69,12 @@ function kekeRB(w,h,d,r,m,x,y,z,seg=2){
   return mesh(kekeGC[k],m,x,y,z);
 }
 function kekeWheel(r,w,rim,o){ const wh=sportWheel(r,w,rim,o); kekeMerge(wh.children[0]); return wh; }
-function kekeRider(o){ return kekeMerge(person(o)); }
+// With a `driver` id the figure is that character, seated with the same hands and feet.
+function kekeRider(o,driver){ return kekeMerge(driver ? driverFigure(driver,{hands:o.hands, ankle:o.ankle}) : person(o)); }
 // Tilt a decal about z after its facing turn (lets text lie on raked faces and on the roof).
 function kekeTilt(d,t){ d.rotation.order='ZYX'; d.rotation.z=t; return d; }
 
-function buildKeke(bodyColor='#ffb000'){
+function buildKeke(bodyColor='#ffb000', driver){
   const g=new THREE.Group(), body=new THREE.Group(), add=o=>{ body.add(o); return o; };
   const Y=paint(bodyColor), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
   const LED=glow('#eaf8ff',2.2), RED=glow('#ff1a0a',1.0), NEON=glow('#25ff8a',1.8), TI=mat('#5a5fd0',{metalness:.9,roughness:.25});
@@ -250,7 +251,7 @@ function buildKeke(bodyColor='#ffb000'){
 
   /* crew: helmeted driver, the extra squeezed in beside him, three at the back */
   fixedChild(g,kekeRider({shirt:'#1f8a4c', pants:'#1f8a4c', arms:'long', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:'#1f8a4c',
-    hands:{L:[.39,.34,.25],R:[.39,.34,-.29]}, ankle:[.34,-.22]}),.27,.70,.02);
+    hands:{L:[.39,.34,.25],R:[.39,.34,-.29]}, ankle:[.34,-.22]}, driver),.27,.70,.02);
   const eh=fixedChild(g,kekeRider({shirt:'#c62828', skin:MAT.skin2, hat:'cap', hatColor:'#1e88e5', hands:{L:[.3,.2,.08],R:[.27,.18,-.17]}, ankle:[.3,-.22]}),.12,.70,-.44);
   eh.rotation.x=-.17;
   [['#8e44ad',-.38,MAT.skin1,{wave:'R',cash:true}],['#16a085',0,MAT.skin2,{}],['#e67e22',.38,MAT.skin1,{}]].forEach(([c,z,sk,o])=>{

@@ -269,6 +269,7 @@ function person(o={}){
   const g=new THREE.Group(), standing=o.pose==='stand';
   const shirt=asMat(o.shirt||'#2e7d32'), pants=asMat(o.pants||'#37322c'), skin=o.skin||MAT.skin1;
   const torsoMat=o.vest?asMat(o.vest):shirt;
+  const shoeMat=o.shoe?mat(o.shoe,{roughness:.6}):MAT.shoe;
   const torso=mesh(capsuleGeo(.15,.16),torsoMat,0,.28,0); torso.scale.set(.9,1,1.05); g.add(torso);
   const pelvis=sph(.15,pants,0,.12,0); pelvis.scale.set(.9,.6,1.05); g.add(pelvis);
   if(o.vest){
@@ -277,14 +278,29 @@ function person(o={}){
   }
   const head=new THREE.Group(); head.position.set(.03,.67,0); g.add(head);
   head.add(sph(.2,skin,0,0,0,28));
+  g.userData.head=head;
+  /* angry: 0 = friendly, 1 = scowl, 2 = shouting. Slanted brows, heavy skin-coloured lids, small pupils, a frown */
+  const ang=o.angry===true?1:(o.angry||0);
   [-1,1].forEach(s=>{
     const w=sph(.06,MAT.eyeW,.162,.035,.077*s,18); w.scale.set(.6,1,.85); head.add(w);
-    head.add(sph(.028,MAT.pupil,.19,.03,.077*s,12));
-    const br=mesh(capsuleGeo(.013,.055),MAT.hair,.163,.115,.078*s); br.rotation.x=Math.PI/2; br.rotation.y=s*.25; head.add(br);
+    head.add(sph(ang?.024:.028,MAT.pupil,.19,ang?.022:.03,.077*s,12));
+    if(ang){
+      const bg=new THREE.Group(); bg.position.set(.178,.1,.078*s); bg.rotation.x=-s*(.35+.2*ang);
+      const br=mesh(capsuleGeo(.019,.07),MAT.hair); br.rotation.x=Math.PI/2; bg.add(br); head.add(bg);
+      const lid=new THREE.Group(); lid.position.set(.162,.023,.077*s); lid.rotation.x=-s*(.3+.15*ang);
+      const cap=mesh(new THREE.SphereGeometry(.0645,18,8,0,Math.PI*2,0,Math.PI*.5),skin); cap.scale.set(.6,1,.85); lid.add(cap); head.add(lid);
+    }else{
+      const br=mesh(capsuleGeo(.013,.055),MAT.hair,.163,.115,.078*s); br.rotation.x=Math.PI/2; br.rotation.y=s*.25; head.add(br);
+    }
     head.add(sph(.045,skin,-.01,0,.196*s,12));
   });
   head.add(sph(.036,skin,.2,-.02,0,12));
-  const mouth=mesh(new THREE.TorusGeometry(.05,.012,6,14,Math.PI),MAT.mouth,.184,-.085,0); mouth.rotation.set(0,Math.PI/2,Math.PI); head.add(mouth);
+  const mouth=mesh(new THREE.TorusGeometry(.05,.012,6,14,Math.PI),MAT.mouth,.184,ang?-.12:-.085,0); mouth.rotation.set(0,Math.PI/2,ang?0:Math.PI); head.add(mouth);
+  if(ang>=2){
+    const om=sph(.04,mat('#2a0d0a'),.176,-.098,0,14); om.scale.set(.3,.8,1.15); head.add(om);
+    head.add(rbox(.012,.014,.06,.005,MAT.eyeW,.186,-.076,0));
+  }
+  if(o.mustache){ const m=mesh(capsuleGeo(.012,.085),MAT.hair,.2,-.052,0); m.rotation.x=Math.PI/2; head.add(m); }
   if(o.hat==='helmet'){
     // open-face race helmet: dome + back/side skirt, centre stripe, short peak
     const H=paint(o.hatColor||'#f5f6f1'), hg=new THREE.Group(); hg.position.y=.025; head.add(hg);
@@ -321,9 +337,34 @@ function person(o={}){
     const hip=[.02,.08,.09*s];
     const knee = standing ? [.05,-.2,.1*s] : [.32,.12,.11*s];
     const foot=[ank[0],ank[1],(standing?.1:.11)*s];
-    g.add(limb(hip,knee,.075,pants)); g.add(limb(knee,foot,.065,pants));
-    g.add(rbox(.19,.08,.11,.035,MAT.shoe,foot[0]+.05,foot[1]-.045,foot[2]));
+    g.add(limb(hip,knee,.075,pants)); g.add(limb(knee,foot,.065,o.shorts?skin:pants));
+    g.add(rbox(.19,.08,.11,.035,shoeMat,foot[0]+.05,foot[1]-.045,foot[2]));
   });
+  return g;
+}
+
+/* ---------- the two drivers (the game picks one; every vehicle seats whoever is chosen) ---------- */
+/* red + gold ankara for Mama Put's dress and head tie (its own material, so ANKARA/ANKARA2 on the vehicles don't change) */
+const DRIVER_ANKARA = new THREE.MeshStandardMaterial({roughness:.7, side:THREE.DoubleSide, map:ctex(128,128,(x)=>{
+  x.fillStyle='#c8321e'; x.fillRect(0,0,128,128);
+  for(let i=0;i<2;i++)for(let j=0;j<2;j++){
+    const cx=32+i*64, cy=32+j*64;
+    x.fillStyle='#f2a900'; x.beginPath(); x.arc(cx,cy,24,0,7); x.fill();
+    x.fillStyle='#fff2d0'; x.beginPath(); x.arc(cx,cy,14,0,7); x.fill();
+    x.fillStyle='#1a1a1a'; x.beginPath(); x.arc(cx,cy,6,0,7); x.fill();
+    x.fillStyle='#1f8a4c'; x.save(); x.translate(cx+32,cy+32); x.rotate(Math.PI/4); x.fillRect(-7,-7,14,14); x.restore();
+  }
+},3)});
+const DRIVER_LOOKS = {
+  moshood: { person:{ shirt:'#d9c76a', arms:'bare', pants:'#3a4a66', shorts:true, shoe:'#2d7dd2', mustache:true, angry:2, skin:MAT.skin1 }, build:[.95,1.04,.85] },
+  mamaput: { person:{ shirt:DRIVER_ANKARA, arms:'bare', pants:DRIVER_ANKARA, skin:MAT.skin2, gele:DRIVER_ANKARA, shoe:'#6b3d9a', angry:1 }, build:[1,1,1.12] },
+};
+/* A driver's figure. `seat` carries the pose options the vehicle owns (hands, ankle, pose, wave...). */
+function driverFigure(id, seat={}){
+  const look=DRIVER_LOOKS[id];
+  if(!look) throw new Error('driverFigure: unknown driver '+id);
+  const g=person({...look.person, ...seat});
+  g.scale.set(...look.build);
   return g;
 }
 function fixedChild(parent, child, x,y,z, ry=0, lean=0){

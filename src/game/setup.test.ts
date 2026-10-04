@@ -13,7 +13,7 @@ const okada = { vehicle: 'okada' as const, paint: 'red' };
 
 describe('makeRace', () => {
   it('offline makeRace is unchanged: 6 racers, the player last and local, the rest ai', () => {
-    const { race, spawns } = makeRace('ojuelegba', { vehicle: 'keke', paint: 'white' });
+    const { race, spawns } = makeRace('ojuelegba', { vehicle: 'keke', paint: 'white' }, 'moshood');
     expect(race.racers).toHaveLength(6);
     expect(spawns).toHaveLength(6);
     const player = race.racers[5];
@@ -30,7 +30,7 @@ describe('makeRace', () => {
   });
 
   it('online: my entry is local, other humans remote, owners set from grid slots', () => {
-    const { race, spawns } = makeRace('ojuelegba', okada, online(2));
+    const { race, spawns } = makeRace('ojuelegba', okada, 'moshood', online(2));
     expect(race.racers).toHaveLength(4);
     expect(spawns).toHaveLength(4);
     expect(race.racers.map(r => [r.id, r.kind, r.owner, r.isPlayer, r.name, r.vehicle.id])).toEqual([
@@ -44,19 +44,19 @@ describe('makeRace', () => {
     expect(race.racers[1].ai).toBeNull();
     expect(race.racers[3].ai).not.toBeNull();
     // Grid positions match the offline layout: netId 0 is the front of the left lane.
-    const offline = makeRace('ojuelegba', okada).spawns;
+    const offline = makeRace('ojuelegba', okada, 'moshood').spawns;
     expect(spawns).toEqual(offline.slice(0, 4));
   });
 
   it('online: hazard ids start at mySlot × 100000', () => {
-    expect(makeRace('ojuelegba', okada, online(1)).race.nextId).toBe(100000);
-    expect(makeRace('ojuelegba', okada, online(3)).race.nextId).toBe(300000);
+    expect(makeRace('ojuelegba', okada, 'moshood', online(1)).race.nextId).toBe(100000);
+    expect(makeRace('ojuelegba', okada, 'moshood', online(3)).race.nextId).toBe(300000);
   });
 
   it('online: the same seed gives identical critters and AI skills on two calls', () => {
-    const a = makeRace('ojuelegba', okada, online(1, 99)).race;
-    const b = makeRace('ojuelegba', okada, online(2, 99)).race;
-    const c = makeRace('ojuelegba', okada, online(1, 100)).race;
+    const a = makeRace('ojuelegba', okada, 'moshood', online(1, 99)).race;
+    const b = makeRace('ojuelegba', okada, 'moshood', online(2, 99)).race;
+    const c = makeRace('ojuelegba', okada, 'moshood', online(1, 100)).race;
     expect(a.critters.length).toBeGreaterThan(0);
     expect(b.critters).toEqual(a.critters);
     expect(c.critters).not.toEqual(a.critters);

@@ -285,3 +285,14 @@ describe('odeshi', () => {
     expect(target.setLinvel).toHaveBeenCalled();
   });
 });
+
+describe('soup patches', () => {
+  it('do not act like crude oil: the oil rules only apply to oil', () => {
+    const owner = racerAt(1, 80), caught = racerAt(2, 40);
+    const race = raceWith([owner, caught]);
+    const at = caught.body!.translation();
+    race.hazards.push({ id: 97, kind: 'soup', x: at.x, y: 0, z: at.z, vx: 0, vy: 0, vz: 0, owner: owner.id, target: null, life: 9, armed: 0, ground: 0 });
+    updateItems(race, 0.016, vi.fn());
+    expect(caught.slip).toBe(0);
+  });
+});

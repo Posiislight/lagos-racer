@@ -66,7 +66,7 @@ export function beep(high = false) {
   tone(high ? 1046 : 523, ctx.currentTime, high ? 0.5 : 0.18, 'square', 0.08);
 }
 
-export function sfx(kind: 'pickup' | 'throw' | 'oil' | 'slip' | 'boost' | 'juju' | 'odeshi' | 'lap' | 'finish' | 'bump' | 'goat' | 'chicken') {
+export function sfx(kind: 'pickup' | 'throw' | 'oil' | 'slip' | 'boost' | 'juju' | 'odeshi' | 'lap' | 'finish' | 'bump' | 'goat' | 'chicken' | 'push' | 'soup' | 'cough' | 'notReady') {
   if (!ctx) return;
   const t = ctx.currentTime;
   switch (kind) {
@@ -76,6 +76,10 @@ export function sfx(kind: 'pickup' | 'throw' | 'oil' | 'slip' | 'boost' | 'juju'
     case 'boost': noise(t, 0.6, 0.25, 3000, 0.7); tone(180, t, 0.5, 'sawtooth', 0.06, 520); break;
     case 'slip': tone(700, t, 0.45, 'triangle', 0.05, 240); noise(t, 0.3, 0.1, 1200, 3); break;
     case 'juju': tone(320, t, 0.5, 'sine', 0.12, 90); tone(480, t + 0.05, 0.4, 'triangle', 0.05, 140); noise(t, 0.5, 0.15, 900, 2); break;
+    case 'push': [392, 523, 659].forEach((f, i) => tone(f, t + i * 0.07, 0.12, 'square', 0.05)); noise(t, 0.3, 0.1, 2500, 0.7); break;
+    case 'soup': noise(t, 0.5, 0.18, 4000, 1.2); tone(300, t, 0.4, 'sine', 0.03, 180); break;
+    case 'cough': [0, 0.16].forEach(d => { noise(t + d, 0.12, 0.25, 700, 2); tone(150, t + d, 0.1, 'sawtooth', 0.04, 90); }); break;
+    case 'notReady': tone(150, t, 0.1, 'square', 0.05); break;
     case 'odeshi': [523, 784, 1175].forEach((f, i) => tone(f, t + i * 0.07, 0.2, 'sine', 0.07)); tone(2093, t + 0.22, 0.3, 'triangle', 0.03); break;
     case 'lap': [784, 988].forEach((f, i) => tone(f, t + i * 0.1, 0.14, 'square', 0.05)); break;
     case 'finish': [523, 659, 784, 1046].forEach((f, i) => tone(f, t + i * 0.12, i === 3 ? 0.5 : 0.14, 'square', 0.06)); break;

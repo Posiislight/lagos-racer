@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, RoundCuboidCollider, useAfterPhysicsStep, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Object3D, Points, PointsMaterial, Quaternion,
+  AdditiveBlending, BufferAttribute, BufferGeometry, CapsuleGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Points, PointsMaterial, Quaternion,
   SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
@@ -15,6 +15,7 @@ import { playHorn } from '../game/audio';
 import type { Pose } from '../net/interpolation';
 import { clampContactSpeed } from '../game/contact';
 import { NameTag } from './NameTag';
+import { speedFactors } from '../game/specials';
 
 const G = 9.81;
 const _q = new Quaternion(), _fwd = new Vector3(), _v = new Vector3();
@@ -54,7 +55,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
   const controller = useRef<DynamicRayCastVehicleController | null>(null);
   const { world } = useRapier();
   const lay = useMemo(() => layout(racer), [racer]);
-  const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.paint.color, racer.vehicle.scale, { merge, shadowProxy: true }), [racer.vehicle, racer.paint, merge]);
+  const model = useMemo(() => buildVehicleModel(racer.vehicle.id, racer.paint.color, racer.vehicle.scale, { merge, shadowProxy: true, driver: racer.driver }), [racer.vehicle, racer.paint, racer.driver, merge]);
   const state = useRef({ roll: 0, pitch: 0, yawRate: 0, lastSpeed: 0, hornCooldown: 0, bumpCooldown: 0 });
   /** Shove this racer away from another one it's touching. */
   const shove = (other: Racer) => {
@@ -126,23 +127,25 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     racer.speed = v;
     const speedFrac = Math.min(1, Math.abs(v) / t.topSpeed);
     const racing = race.phase !== 'countdown';
-    const boosting = racer.boost > 0, cursed = racer.curse > 0, slippy = racer.slip > 0;
+    const boosting = racer.boost > 0, slippy = racer.slip > 0;
+    const f = speedFactors(racer);
 
     // Steering: full lock when slow, less at speed. Positive wheel angle turns left.
     // Running over animals makes the steering shaky; oil makes the vehicle wander.
     let steerIn = c.steer;
     if (racer.wobble > 0) steerIn += Math.sin(race.clock * 23 + racer.id * 5) * 0.4 * Math.min(1, racer.wobble * 1.5);
     if (slippy) steerIn += Math.sin(race.clock * 6 + racer.id * 3) * 0.35;
+    if (racer.cough > 0) steerIn += Math.sin(race.clock * 7 + racer.id * 3) * 0.3 * Math.min(1, racer.cough);
     const steerScale = MathUtils.lerp(1, t.steerAtSpeed, speedFrac);
     const steer = -MathUtils.clamp(steerIn, -1, 1) * t.steer * steerScale;
     vc.setWheelSteering(0, steer); vc.setWheelSteering(1, steer);
 
     // Engine: strong low down, fading to nothing at top speed. Brake button reverses when stopped.
-    // Fuel gives a burst of extra speed; juju holds you back for a while.
-    const perWheel = t.mass * t.accel / 4 * (boosting ? 2.2 : 1) * (cursed ? 0.55 : 1);
+    // Fuel and Push Squad speed you up; juju and a pepper-soup cough hold you back (see speedFactors).
+    const perWheel = t.mass * t.accel / 4 * f.accel;
     let engine = 0, brake = 0;
     if (racing) {
-      const top = t.topSpeed * racer.topBoost * (boosting ? 1.3 : 1) * (cursed ? 0.62 : 1);
+      const top = t.topSpeed * racer.topBoost * f.top;
       if (c.throttle > 0 && v < top) engine = perWheel * c.throttle * Math.max(0.15, 1 - (Math.max(0, v) / top) ** 2);
       if (v > top + 1) brake = t.mass / 1200; // shed speed gently when juju lowers the limit
       if (c.brake > 0) {
@@ -198,7 +201,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
       if (racer.scraping) { const drag = Math.pow(0.55, dt); nx *= drag; nz *= drag; }
       b.setLinvel({ x: nx + racer.bump.x, y: lin.y, z: nz + racer.bump.z }, true);
       // Fuel: a push from behind on top of the extra engine power.
-      if (boosting && v < t.topSpeed * 1.3) b.applyImpulse({ x: _fwd.x * t.mass * 9 * dt, y: 0, z: _fwd.z * t.mass * 9 * dt }, true);
+      if (boosting && v < t.topSpeed * f.top) b.applyImpulse({ x: _fwd.x * t.mass * 9 * dt, y: 0, z: _fwd.z * t.mass * 9 * dt }, true);
 
       // A little downforce keeps the wheels planted over kerbs.
       b.applyImpulse({ x: 0, y: -t.mass * 0.03 * Math.abs(v) * dt, z: 0 }, true);
@@ -271,6 +274,9 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
       for (let i = 0; i < SPARKS; i++) pos.setXYZ(i, -(sp.from + Math.random() * (sp.to - sp.from)), (Math.random() - 0.5) * sp.w * 2, (Math.random() - 0.5) * sp.w * 2);
       pos.needsUpdate = true;
     }
+    // Moshood's boys run behind and shove while Push Squad lasts.
+    fx.boys.visible = racer.push > 0;
+    if (fx.boys.visible) fx.boys.children.forEach((boy, i) => { boy.position.y = Math.abs(Math.sin(tt * 14 + i * 2)) * 0.14; });
     fx.aura.visible = racer.curse > 0;
     if (fx.aura.visible) {
       const p = 1 + Math.sin(tt * 9) * 0.08;
@@ -340,6 +346,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
           <primitive object={fx.aura} />
           <primitive object={fx.sparks} />
           <primitive object={fx.bubble} />
+          <primitive object={fx.boys} />
         </group>
         {remote && !dropped && (
           <group position={[0, model.size.y - lay.originY + 0.5, 0]}>
@@ -384,6 +391,7 @@ export function respawn(racer: Racer, b: RapierRigidBody) {
   b.setLinvel({ x: 0, y: 0, z: 0 }, true);
   b.setAngvel({ x: 0, y: 0, z: 0 }, true);
   racer.scraping = false;
+  racer.trail = 0;
   racer.bump.x = racer.bump.z = 0;
   resyncProgress(race.track, racer.progress, x, z);
 }
@@ -417,6 +425,22 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
   );
   bubble.position.set(0, lay.originY, 0);
   bubble.visible = false;
-  return { flame, aura, bubble, sparks, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
+  // Three of the boys, shoving from behind: a capsule body and a round head each, leaning into it.
+  const boys = new Group();
+  boys.position.set(-(len + 0.8), 0, 0);
+  boys.visible = false;
+  const body = new CapsuleGeometry(0.2, 0.55, 4, 8), head = new SphereGeometry(0.2, 12, 8);
+  ['#e8452c', '#2f9e5b', '#f2b705'].forEach((shirt, i) => {
+    const boy = new Group();
+    const torso = new Mesh(body, new MeshStandardMaterial({ color: shirt, roughness: 0.7 }));
+    torso.position.y = 0.75;
+    const skull = new Mesh(head, new MeshStandardMaterial({ color: i === 1 ? '#6b4326' : '#8a5a36', roughness: 0.6 }));
+    skull.position.y = 1.4;
+    boy.add(torso, skull);
+    boy.rotation.z = -0.35;
+    boy.position.z = (i - 1) * Math.max(0.7, w * 0.8);
+    boys.add(boy);
+  });
+  return { flame, aura, bubble, sparks, boys, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
 }
 const SPARKS = 12;

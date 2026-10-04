@@ -4,7 +4,8 @@ import type { GridEntry } from '../net/protocol';
 import { SnapshotBuffer } from '../net/interpolation';
 import { sampleAt } from './track';
 import { createProgress } from './race';
-import { makeRacer, type AIState, type RaceRuntime, type Racer } from './runtime';
+import { DEFAULT_DRIVER, randomDriver, type DriverId } from '../config/drivers';
+import { aiState, makeRacer, type RaceRuntime, type Racer } from './runtime';
 import { makePickups } from './items';
 import { makeCritters } from './critters';
 import { AI_NAMES } from './ai';
@@ -16,10 +17,9 @@ export type Spawn = { x: number; y: number; z: number; yaw: number };
 /** A room race: the server's grid, which slot is this phone, and the seed every phone shares. */
 export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number };
 
-const aiState = (lane: number, k: number, rand: () => number): AIState =>
-  ({ lane, laneTarget: lane, skill: 0.9 + k * 0.035 + rand() * 0.03, itemDelay: 2, stuck: 0, reverseTime: 0 });
+const rivalAI = (lane: number, k: number, rand: () => number) => aiState(lane, 0.9 + k * 0.035 + rand() * 0.03, 2);
 
-export function makeRace(trackId: string, player: Pick, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
+export function makeRace(trackId: string, player: Pick, playerDriver: DriverId, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
   const config = trackById(trackId);
   const track = trackFor(config);
   const spawns: Spawn[] = [];
@@ -42,12 +42,12 @@ export function makeRace(trackId: string, player: Pick, online?: OnlineSetup): {
       const mine = g.slot === online.mySlot;
       const kind = !mine ? 'remote' : g.ai ? 'ai' : 'local';
       const v = vehicleById(g.vehicle);
-      const r = makeRacer(g.netId, g.name, v, paintOf(v, g.paint), kind === 'local', progress);
+      const r = makeRacer(g.netId, g.name, v, paintOf(v, g.paint), kind === 'local', progress, kind === 'local' ? playerDriver : DEFAULT_DRIVER);
       r.kind = kind;
       r.owner = g.slot;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
       // Every phone rolls every AI's skill in grid order, so they all agree whoever drives it.
-      if (g.ai) r.ai = aiState(lane, g.netId, rand);
+      if (g.ai) r.ai = rivalAI(lane, g.netId, rand);
       return r;
     });
   } else {
@@ -58,8 +58,8 @@ export function makeRace(trackId: string, player: Pick, online?: OnlineSetup): {
       const { lane, progress } = place(k);
       const isPlayer = k === lineup.length - 1;
       const v = vehicleById(vid);
-      const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, progress);
-      if (!isPlayer) r.ai = aiState(lane, k, Math.random);
+      const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, progress, isPlayer ? playerDriver : randomDriver());
+      if (!isPlayer) r.ai = rivalAI(lane, k, Math.random);
       return r;
     });
   }

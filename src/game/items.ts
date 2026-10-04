@@ -12,7 +12,7 @@ const JUJU_HIT = 2.2;
 const ODESHI_TIME = 8;
 
 /** How long an effect lasts: flimsy vehicles suffer longer, tough ones shrug it off. */
-const lasting = (r: Racer, base: number) => base * (1.25 - r.vehicle.stats.toughness * 0.055);
+export const lasting = (r: Racer, base: number) => base * (1.25 - r.vehicle.stats.toughness * 0.055);
 
 /** Rows of glowing orbs across the road at the track's item distances. */
 export function makePickups(race: Pick<RaceRuntime, 'config' | 'track'>, nextId: () => number): Pickup[] {
@@ -102,7 +102,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
   for (const h of race.hazards) {
     h.life -= dt; h.armed -= dt;
     if (h.kind === 'juju') updateJuju(race, h, dt, flash);
-    else {
+    else if (h.kind === 'oil') {
       // Each phone decides only for the cars it drives; a remote car's slip arrives in its snapshots.
       for (const r of race.racers) {
         if (!r.body || r.kind === 'remote' || r.immune > 0 || r.shield > 0 || (h.armed > 0 && r.id === h.owner)) continue;

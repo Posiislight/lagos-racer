@@ -3,17 +3,18 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ACESFilmicToneMapping, Box3, Group, Vector3 } from 'three';
 import { buildVehicleModel } from '../models';
 import { vehicleById, type VehicleId } from '../config/vehicles';
+import type { DriverId } from '../config/drivers';
 
 /** A vehicle slowly turning on a yellow-and-black kerb turntable. */
-function Turntable({ id, color }: { id: VehicleId; color: string }) {
+function Turntable({ id, color, driver }: { id: VehicleId; color: string; driver: DriverId }) {
   const spin = useRef<Group>(null);
   const model = useMemo(() => {
-    const m = buildVehicleModel(id, color, 1);
+    const m = buildVehicleModel(id, color, 1, { driver });
     const box = new Box3().setFromObject(m.root), size = box.getSize(new Vector3()), centre = box.getCenter(new Vector3());
     m.root.position.set(-centre.x, 0, -centre.z);
     const k = 3.2 / Math.max(size.x, size.z * 1.4, size.y * 1.2);
     return { ...m, k };
-  }, [id, color]);
+  }, [id, color, driver]);
   const kerbs = useMemo(() => Array.from({ length: 28 }, (_, i) => i), []);
   useFrame(({ clock }, dt) => {
     if (spin.current) spin.current.rotation.y += dt * 0.45;
@@ -40,7 +41,7 @@ function Turntable({ id, color }: { id: VehicleId; color: string }) {
   );
 }
 
-export default function Preview({ id, color }: { id: VehicleId; color: string }) {
+export default function Preview({ id, color, driver }: { id: VehicleId; color: string; driver: DriverId }) {
   const v = vehicleById(id);
   return (
     <Canvas
@@ -55,7 +56,7 @@ export default function Preview({ id, color }: { id: VehicleId; color: string })
       <hemisphereLight args={['#fff6e8', '#7a5a40', 1.6]} />
       <directionalLight position={[4, 8, 3]} intensity={3} castShadow shadow-mapSize={[1024, 1024]} shadow-bias={-0.0005} />
       <directionalLight position={[-5, 3, -4]} intensity={0.8} color="#bcdcff" />
-      <Turntable id={id} color={color} />
+      <Turntable id={id} color={color} driver={driver} />
     </Canvas>
   );
 }

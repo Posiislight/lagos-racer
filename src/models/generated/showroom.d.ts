@@ -2,11 +2,14 @@
 import type { Group, Material, Texture, Mesh, BufferGeometry, Object3D } from 'three';
 
 type Vec = [number, number, number];
-export function buildOkada(body?: string): Group;
-export function buildKeke(bodyColor?: string): Group;
-export function buildDanfo(bodyColor?: string): Group;
-export function buildBRT(lowerColor: string, number: string): Group;
+/** `driver` (a driver id) swaps the vehicle's own driver figure for that character; omit it to keep the showroom figure. */
+export function buildOkada(body?: string, driver?: string): Group;
+export function buildKeke(bodyColor?: string, driver?: string): Group;
+export function buildDanfo(bodyColor?: string, driver?: string): Group;
+export function buildBRT(lowerColor: string, number: string, driver?: string): Group;
 export function person(o?: Record<string, unknown>): Group;
+/** Moshood or Mama Put, ready to seat; `seat` carries pose options the vehicle owns (hands, ankle, pose, wave...). Throws for an unknown id. */
+export function driverFigure(id: string, seat?: Record<string, unknown>): Group;
 export function fixedChild(parent: Object3D, child: Object3D, x: number, y: number, z: number, ry?: number, lean?: number): Group;
 export function mat(color: string, opts?: Record<string, unknown>): Material;
 export function paint(color: string): Material;

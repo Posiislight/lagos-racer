@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { VEHICLES, paintOf, type VehicleId } from '../config/vehicles';
+import { DRIVERS } from '../config/drivers';
 
 const Preview = lazy(() => import('./Preview'));
 
@@ -14,7 +15,7 @@ function Bar({ label, value }: { label: string; value: number }) {
 }
 
 export function Garage() {
-  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock, paint, setPaint } = useGame();
+  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock, paint, setPaint, driver, setDriver } = useGame();
   const [looking, setLooking] = useState<VehicleId>(vehicle);
   const v = VEHICLES.find(x => x.id === looking)!;
   const isLocked = !!v.locked && !unlocked.includes(v.id);
@@ -28,7 +29,7 @@ export function Garage() {
       </header>
       <div className="garage-body">
         <div className="garage-preview">
-          <Suspense fallback={null}><Preview id={looking} color={current.color} /></Suspense>
+          <Suspense fallback={null}><Preview id={looking} color={current.color} driver={driver} /></Suspense>
         </div>
         <div className="card garage-card">
           <h2>{v.name}</h2>
@@ -71,6 +72,15 @@ export function Garage() {
             </button>
           );
         })}
+      </div>
+      <div className="drivers" role="tablist" aria-label="Drivers">
+        {DRIVERS.map(d => (
+          <button key={d.id} role="tab" aria-selected={d.id === driver} onClick={() => setDriver(d.id)}>
+            <b>{d.name}</b><span className="role"> · {d.role}</span>
+            <span className="special">{d.special.name} · charges in {d.special.chargeTime} s</span>
+            <small>{d.blurb}</small>
+          </button>
+        ))}
       </div>
     </div>
   );

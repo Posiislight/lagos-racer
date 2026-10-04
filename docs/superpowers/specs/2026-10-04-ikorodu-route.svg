@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 940" width="560" height="940" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="560" height="940" fill="#f6f3ec"/>
+  <text x="20" y="30" font-size="18" font-weight="700" fill="#222">Ikorodu: General Hospital to the garage roundabout and back</text>
+  <text x="20" y="50" font-size="12" fill="#555">Road layout from OpenStreetMap (© OpenStreetMap contributors). North is up.</text>
+  <text x="20" y="66" font-size="12" fill="#555">About 1.4 km each way at real scale.</text>
+
+  <!-- map: screen x = (x+560)*0.52, screen y = 80 + (z+220)*0.52 ; z positive is south -->
+  <g transform="translate(0,80) scale(0.52) translate(560,220)">
+    <!-- side roads at the junction -->
+    <polyline points="-13,7 -140,-33 -305,-121 -442,-180" fill="none" stroke="#c9c3b5" stroke-width="16" stroke-linecap="round"/>
+    <polyline points="12,19 130,-250" fill="none" stroke="#c9c3b5" stroke-width="16" stroke-linecap="round"/>
+
+    <!-- single two-way road: hospital end to the start of the dual carriageway -->
+    <polyline points="-474,1307 -503,1289 -385,1094 -265,881 -207,754 -126,519 -95,407" fill="none" stroke="#8a8478" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="-474,1307 -503,1289 -385,1094 -265,881 -207,754 -126,519 -95,407" fill="none" stroke="#e8e2d2" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="-474,1307 -503,1289 -385,1094 -265,881 -207,754 -126,519 -95,407" fill="none" stroke="#8a8478" stroke-width="1.5" stroke-dasharray="10 8" stroke-linejoin="round"/>
+
+    <!-- dual carriageway: out (east side) and back (west side) -->
+    <polyline points="-95,407 -60,307 -34,219 -3,62 10,32" fill="none" stroke="#c0392b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="-21,31 -13,48 -12,77 -40,218 -95,398" fill="none" stroke="#1f6fb2" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- roundabout -->
+    <circle cx="-5" cy="22" r="18" fill="#f6f3ec" stroke="#222" stroke-width="7"/>
+    <circle cx="-5" cy="22" r="6" fill="#d8b45a"/>
+
+    <!-- hospital -->
+    <rect x="-470" y="1330" width="64" height="48" rx="6" fill="#2e8b57" stroke="#1d5c3a" stroke-width="3"/>
+    <rect x="-442" y="1338" width="8" height="32" fill="#fff"/><rect x="-454" y="1350" width="32" height="8" fill="#fff"/>
+  </g>
+
+  <!-- labels -->
+  <g font-size="13" fill="#222">
+    <text x="318" y="200" font-weight="700">Roundabout</text>
+    <text x="318" y="216" fill="#555">the turnaround, radius about 18 m</text>
+    <text x="305" y="305" fill="#555">Ayangburen Road</text>
+    <text x="305" y="321" fill="#555">dual carriageway, about 390 m</text>
+    <text x="218" y="585" fill="#555">Ayangburen Road</text>
+    <text x="218" y="601" fill="#555">single two-way road, about 490 m</text>
+    <text x="128" y="760" fill="#555">Beach Road</text>
+    <text x="128" y="776" fill="#555">single two-way road, about 490 m</text>
+    <text x="118" y="900" font-weight="700">General Hospital Ikorodu</text>
+    <text x="118" y="916" fill="#555">start and turnaround at the south end</text>
+    <text x="378" y="130" fill="#8a8478">Sagamu Road</text>
+    <text x="30" y="170" fill="#8a8478">Ikorodu Road</text>
+  </g>
+
+  <!-- legend -->
+  <g transform="translate(340,500)" font-size="12" fill="#222">
+    <rect x="-10" y="-18" width="212" height="86" rx="6" fill="#fff" stroke="#d8d2c2"/>
+    <line x1="0" y1="0" x2="30" y2="0" stroke="#c0392b" stroke-width="6" stroke-linecap="round"/><text x="40" y="4">out, hospital to roundabout</text>
+    <line x1="0" y1="22" x2="30" y2="22" stroke="#1f6fb2" stroke-width="6" stroke-linecap="round"/><text x="40" y="26">back, roundabout to hospital</text>
+    <line x1="0" y1="44" x2="30" y2="44" stroke="#8a8478" stroke-width="6" stroke-linecap="round"/><text x="40" y="48">one road used both ways</text>
+  </g>
+
+  <!-- scale bar: 200 m real = 104 px -->
+  <g transform="translate(420,905)">
+    <line x1="0" y1="0" x2="104" y2="0" stroke="#222" stroke-width="3"/>
+    <line x1="0" y1="-5" x2="0" y2="5" stroke="#222" stroke-width="2"/><line x1="104" y1="-5" x2="104" y2="5" stroke="#222" stroke-width="2"/>
+    <text x="52" y="-9" font-size="12" text-anchor="middle" fill="#222">200 m</text>
+  </g>
+</svg>

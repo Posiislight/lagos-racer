@@ -121,7 +121,8 @@ has its own `tsconfig` (Node types, no DOM).
    - if the host leaves the lobby, the next player to have joined becomes host.
 5. **Start:**
    - the server builds the grid (humans in join order with AI filling the gaps, or humans only) and a room
-     seed, and sends both to everyone;
+     seed, and sends both to everyone. Each grid entry carries the car's `driverId` (`moshood` or `mamaput`),
+     chosen in the lobby next to the vehicle; AI cars get a random one from the room seed;
    - each phone loads the race (the lazy-loaded 3D and physics chunks can take several seconds on mobile
      data) and reports `loaded`;
    - once every phone has reported, or after 20 s, the server sets a start time 3.5 s ahead and sends it.
@@ -143,7 +144,8 @@ lowest latency. During the race, one ping every 5 s keeps it fresh. The race clo
 - Each car takes about 35 bytes:
   - netId, position (3 × f32), rotation quaternion (4 × i16), linear velocity (3 × i16 at cm/s);
   - steer (i8), distance driven (f32), laps done (u8);
-  - flags (u8: boost, slip, curse, wobble, horn, finished).
+  - flags (u8: boost, slip, curse, wobble, horn, finished, push, cough). Push Squad and the soup cough
+    are driver specials (see the drivers-and-specials design), so the byte is now full.
 - Every message carries the owner's race clock time.
 - The server forwards snapshots to everyone else in the room, without decoding them except to update
   its referee. Each phone downloads under 5 KB/s in a six-car race.
@@ -171,7 +173,7 @@ lowest latency. During the race, one ping every 5 s keeps it fresh. The race clo
 | Event | Who sends | What happens |
 |---|---|---|
 | `pickup` (orb id) | Owner of the car that drove through it | Owner gets the item instantly. Every phone hides that orb for its usual 3 s respawn. If two cars grab the same orb at the same moment, both keep their items. |
-| `use` (hazard id, kind, position, velocity, target netId) | Owner of the car using the item | Every phone spawns the same oil slick or juju. The juju target is chosen by the thrower from its standings at that moment. Fuel only sets the boost flag. |
+| `use` (hazard id, kind, position, velocity, target netId) | Owner of the car using the item | Every phone spawns the same oil slick or juju. The juju target is chosen by the thrower from its standings at that moment. Fuel only sets the boost flag. Driver specials: `use` also carries the kinds `'push'` and `'soup'`. Push only sets the owner's `push` flag. Soup patches are spawned by each phone along the owner's car from the `soup` use event, so there are no per-patch messages; a victim's owner sends `hit` when its car is in a patch. |
 | `hit` (hazard id, victim netId) | Victim's owner | The victim applies slip or curse locally, as now. Every phone plays the puff and removes the juju, or shortens the oil's life. |
 
 Hazard ids come from `playerSlot × 100000 + counter` (slots are 1–6), so they never clash. A phone only runs hit detection

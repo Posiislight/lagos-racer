@@ -12,11 +12,13 @@ export const fx = {
   juju: Infinity,
   /** 0..1: oily screen edges while the player is slipping on crude oil. */
   slip: 0,
+  /** 0..1: the blurred, watering-eyes screen while the player is coughing from pepper soup. */
+  cough: 0,
   /** Power-ups just picked up, at their screen position (CSS pixels), waiting to fly into the item button. */
   pickups: [] as { kind: ItemKind; x: number; y: number }[],
   quality: 'high' as Quality,
 };
 
 export function resetFx() {
-  fx.boost = 0; fx.juju = Infinity; fx.slip = 0; fx.pickups.length = 0;
+  fx.boost = 0; fx.juju = Infinity; fx.slip = 0; fx.cough = 0; fx.pickups.length = 0;
 }

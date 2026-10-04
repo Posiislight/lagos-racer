@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { useGame } from '../game/store';
 import { formatTime } from '../game/race';
 import { getRace } from '../game/runtime';
-import { queueItem } from '../game/input';
+import { queueItem, queueSpecial } from '../game/input';
+import { useIsTouch } from './TouchControls';
 import { ITEM_ICON } from '../scene/art/items';
 
 const suffix = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th');
@@ -10,6 +11,7 @@ const suffix = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st
 export function Hud({ onPause }: { onPause: () => void }) {
   const hud = useGame(s => s.hud);
   const best = useGame(s => s.best[s.track]);
+  const isTouch = useIsTouch();
   if (hud.phase === 'loading') return null;
   return (
     <div className="hud">
@@ -24,6 +26,15 @@ export function Hud({ onPause }: { onPause: () => void }) {
       {/* The power-up button: middle of the right-hand side, under your right thumb. */}
       <button className={`hud-item${hud.item ? ' full' : ''}`} onPointerDown={e => { e.preventDefault(); queueItem(); }} aria-label={hud.item ? `Use ${hud.item.label}` : 'No item'}>
         {hud.item ? <img className="icon-img" src={ITEM_ICON[hud.item.kind]} alt="" /> : <span className="icon dim">USE</span>}
+      </button>
+      {/* The special button: left of the power-up button. The ring fills as the meter charges. */}
+      <button
+        className={`hud-special${hud.special.ready ? ' ready' : ''}`} style={{ '--charge': hud.special.charge } as CSSProperties}
+        onPointerDown={e => { e.preventDefault(); queueSpecial(); }}
+        aria-label={`Special: ${hud.special.name}${hud.special.ready ? ', ready' : ''}`}
+      >
+        <span className="face">{hud.special.name.split(' ')[0]}</span>
+        {!isTouch && <kbd>Q</kbd>}
       </button>
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>

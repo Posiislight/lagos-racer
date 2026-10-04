@@ -31,6 +31,7 @@ export function RaceScene() {
   const raceId = useGame(s => s.raceId);
   const trackId = useGame(s => s.track);
   const vehicle = useGame(s => s.vehicle);
+  const driver = useGame(s => s.driver);
   const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
@@ -43,8 +44,8 @@ export function RaceScene() {
     // The room's track, if this build has it.
     const roomTrack = session ? useNet.getState().pendingGrid?.trackId : undefined;
     const track = roomTrack && TRACKS.some(t => t.id === roomTrack) ? roomTrack : trackId;
-    return { setup: makeRace(track, { vehicle: vehicleById(vehicle).id, paint }, session?.setup), session };
-  }, [raceId, trackId, vehicle, paint, online]);
+    return { setup: makeRace(track, { vehicle: vehicleById(vehicle).id, paint }, driver, session?.setup), session };
+  }, [raceId, trackId, vehicle, paint, driver, online]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {

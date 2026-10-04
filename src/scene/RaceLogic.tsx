@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { getRace, type Racer } from '../game/runtime';
+import { aiState, getRace, type Racer } from '../game/runtime';
 import { updateProgress, trackRemote, standings, currentLap, coinsForPlace } from '../game/race';
-import { readPlayer } from '../game/input';
+import { clearQueuedPresses, readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
+import { updateSpecials } from '../game/specials';
+import { driverById } from '../config/drivers';
 import { updateCritters } from '../game/critters';
 import { useGame, type Result } from '../game/store';
 import { beep, Engine, sfx } from '../game/audio';
@@ -52,6 +54,7 @@ export function RaceLogic() {
   useFrame((_, dtRaw) => {
     const race = getRace();
     const store = useGame.getState();
+    if (store.paused) clearQueuedPresses();
     // Online the race goes on while the menu is open: the other phones are still driving.
     if (!race || (store.paused && !race.net)) return;
     const dt = Math.min(dtRaw, 0.05);
@@ -83,7 +86,7 @@ export function RaceLogic() {
         unstick(r, dt, race.phase === 'racing');
       }
       else {
-        if (!r.ai) r.ai = { lane: r.progress.lateral, laneTarget: 0, skill: 0.95, itemDelay: 3, stuck: 0, reverseTime: 0 };
+        if (!r.ai) r.ai = aiState(r.progress.lateral, 0.95, 3, 0);
         driveAI(r, race, dt, r.isPlayer ? 0 : r.progress.distance - player.progress.distance);
       }
     }
@@ -105,6 +108,7 @@ export function RaceLogic() {
     race.net?.update(race);
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
+    updateSpecials(race, dt, m => store.flash(m));
 
     // Just picked something up: say what it is and, the first few times, how to use it.
     if (player.item && !heldItem.current) {
@@ -136,6 +140,7 @@ export function RaceLogic() {
         lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: order.length,
         time: race.clock, lapTime: race.clock - player.progress.lapStart, bestLap: best,
         speed: Math.abs(player.speed) * 3.6, item: player.item ? { kind: player.item, label: ITEM_LABEL[player.item] } : null, wrongWay: wrongWay.current > 1.2,
+        special: { name: driverById(player.driver).special.name, charge: player.charge, ready: player.charge >= 1 },
       });
     }
 

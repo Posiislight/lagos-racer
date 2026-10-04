@@ -7,6 +7,7 @@ import { emptyControls, type Controls } from './input';
 import type { RacerProgress } from './race';
 import type { Critter } from './critters';
 import type { SnapshotBuffer } from '../net/interpolation';
+import { DEFAULT_DRIVER, type DriverId } from '../config/drivers';
 
 /**
  * Power-ups from the glowing orbs:
@@ -28,10 +29,17 @@ export type AIState = {
   /** Seconds spent barely moving, for unsticking. */
   stuck: number;
   reverseTime: number;
+  /** Seconds until the AI fires its special once the meter is full (-1: not started yet). */
+  specialDelay: number;
+  /** Seconds the special has been ready, so it can't wait forever for the perfect moment. */
+  specialWait: number;
 };
 
 /** A car driven on another phone, drawn from its snapshot buffer. */
 export type RemoteCar = { buffer: SnapshotBuffer; dnf: boolean };
+
+export const aiState = (lane: number, skill: number, itemDelay = 2, laneTarget = lane): AIState =>
+  ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0 });
 
 export type Racer = {
   /** Online this is the netId (grid index). */
@@ -83,12 +91,25 @@ export type Racer = {
   respawns: number;
   /** Request a respawn on the track at the next physics step. */
   respawn: boolean;
+  /** The chosen driver: decides which special power this racer has. */
+  driver: DriverId;
+  /** Special meter, 0..1; at 1 the special can be fired. */
+  charge: number;
+  /** Seconds of Push Squad left. */
+  push: number;
+  /** Seconds of cough left (from a Pepper Soup patch). */
+  cough: number;
+  /** Seconds of Pepper Soup Trail still to drop. */
+  trail: number;
+  /** Metres travelled since the last soup patch, and patches dropped by this use. */
+  trailDist: number;
+  trailCount: number;
   ai: AIState | null;
 };
 
 export type Hazard = {
   id: number;
-  kind: 'oil' | 'juju';
+  kind: 'oil' | 'juju' | 'soup';
   x: number; y: number; z: number;
   vx: number; vy: number; vz: number;
   owner: number;
@@ -105,7 +126,7 @@ export type Hazard = {
 export type Pickup = { id: number; kind: ItemKind; x: number; y: number; z: number; s: number; respawn: number };
 
 /** A short-lived puff where something hit: juju's purple smoke, oil splashes. */
-export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' | 'odeshi' };
+export type Puff = { x: number; y: number; z: number; age: number; color: 'juju' | 'fuel' | 'odeshi' | 'steam' };
 
 export type RaceRuntime = {
   config: TrackConfig;
@@ -144,10 +165,11 @@ let current: RaceRuntime | null = null;
 export const getRace = () => current;
 export const setRace = (r: RaceRuntime | null) => { current = r; };
 
-export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress): Racer {
+export function makeRacer(id: number, name: string, vehicle: VehicleConfig, paint: Paint, isPlayer: boolean, progress: RacerProgress, driver: DriverId = DEFAULT_DRIVER): Racer {
   return {
     id, name, vehicle, paint, isPlayer, kind: isPlayer ? 'local' : 'ai', owner: 0, remote: null, controls: emptyControls(), body: null, visual: null, progress,
     speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, shield: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
-    bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false, ai: null,
+    bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false,
+    driver, charge: 0, push: 0, cough: 0, trail: 0, trailDist: 0, trailCount: 0, ai: null,
   };
 }

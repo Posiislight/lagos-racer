@@ -49,7 +49,7 @@ function danfoWingTex(){
   });
 }
 
-function buildDanfo(bodyColor='#f7b500'){
+function buildDanfo(bodyColor='#f7b500', driver){
   const g=new THREE.Group(), Y=paint(bodyColor), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
   const WX=1.5, WR=.42, WZ=.92, BOT=.40, AR=.55, HW=.88, TOP=1.64; // wheel x/radius/track, body bottom, arch radius (shape), half width, roof (shape)
   const add=o=>{ g.add(o); return o; };
@@ -213,8 +213,8 @@ function buildDanfo(bodyColor='#f7b500'){
   /* driver: race-suit elbow out of the left window, helmeted head leaning out */
   add(limb([1.48,1.18,.74],[1.68,1.25,.99],.06,mat('#1f8a4c'))); add(limb([1.68,1.25,.99],[1.93,1.31,.96],.05,MAT.skin2));
   add(sph(.06,mat('#111'),1.95,1.32,.96,12));
-  const drv=person({hat:'helmet', hatColor:'#f5f6f1', helmetStripe:'#19a64a', skin:MAT.skin2});
-  const head=drv.children.find(o=>o.isGroup); head.position.set(1.56,1.43,.95); head.scale.setScalar(.92); g.add(danfoMerge(head));
+  const drv=driver ? driverFigure(driver) : person({hat:'helmet', hatColor:'#f5f6f1', helmetStripe:'#19a64a', skin:MAT.skin2});
+  const head=drv.userData.head; head.position.set(1.56,1.43,.95); head.scale.setScalar(.92); g.add(danfoMerge(head));
 
   /* passenger on the extra wooden chair in the doorway */
   const ch=new THREE.Group(); ch.position.set(.22,.36,-.8); ch.rotation.y=-Math.PI/2;
