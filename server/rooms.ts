@@ -199,7 +199,7 @@ export class RoomServer {
     const targets = room.snapshotTargets(snap);
     if (!targets) return;
     room.lastActivity = this.now();
-    room.observe(snap);
+    room.observe(snap, this.now());
     for (const id of targets) this.conns.get(id)?.peer.send(data);
   }
 

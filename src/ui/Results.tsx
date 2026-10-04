@@ -10,12 +10,19 @@ export function Results() {
   const { results, coinsEarned, online, startRace, setScreen, quitRace, showAccountPrompt, dismissAccountPrompt } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
+  const dnf = results[place]?.dnf === true;
   return (
     <div className="modal results" role="dialog" aria-modal="true" aria-labelledby="results-title">
       <div className="card modal-card wide">
         <p className="eyebrow">Ojuelegba Grand Prix</p>
-        <h2 id="results-title">{PLACE[place]} place</h2>
-        <p className="cheer">{CHEER[Math.min(place, CHEER.length - 1)]}</p>
+        {dnf ? (
+          <h2 id="results-title">Network wahala</h2>
+        ) : (
+          <>
+            <h2 id="results-title">{PLACE[place]} place</h2>
+            <p className="cheer">{CHEER[Math.min(place, CHEER.length - 1)]}</p>
+          </>
+        )}
         <table className="table">
           <thead><tr><th>#</th><th>Driver</th><th>Ride</th><th>Time</th><th>Best lap</th></tr></thead>
           <tbody>

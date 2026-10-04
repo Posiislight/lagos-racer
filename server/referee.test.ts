@@ -35,11 +35,11 @@ describe('Referee', () => {
     expect(ref.firstFinishAt).toBeNull();
     drive(ref, 0, 25, 0, time);
     expect(ref.allDone()).toBe(false);
-    expect(ref.finish(0, lapsAt(25), time)).toBe(true);
+    expect(ref.finish(0, lapsAt(25), time, time)).toBe(true);
     expect(ref.firstFinishAt).toBeCloseTo(time);
     expect(ref.allDone()).toBe(true);
     // A repeat changes nothing and does not DNF the car.
-    expect(ref.finish(0, lapsAt(20), time + 5)).toBe(false);
+    expect(ref.finish(0, lapsAt(20), time + 5, time)).toBe(false);
     expect(ref.results(time)).toEqual([
       { netId: 0, slot: 1, ai: false, name: 'P0', vehicle: 'okada', place: 1, time, projected: false, best: L / 25, dnf: false },
     ]);
@@ -50,7 +50,7 @@ describe('Referee', () => {
     const time = (LAPS * L) / 25;
     drive(ref, 0, 25, 0, time);
     const fast = MIN_LAP - 0.1;
-    expect(ref.finish(0, [fast, (time - fast) / 2, (time - fast) / 2], time)).toBe(false);
+    expect(ref.finish(0, [fast, (time - fast) / 2, (time - fast) / 2], time, time)).toBe(false);
     expect(ref.allDone()).toBe(true);
     expect(ref.results(time)[0]).toMatchObject({ dnf: true, time: null, projected: false });
     expect(ref.firstFinishAt).toBeNull();
@@ -61,8 +61,8 @@ describe('Referee', () => {
     const time = (LAPS * L) / 25;
     drive(ref, 0, 25, 0, time - 31 / 25);
     drive(ref, 1, 25, 0, time - 25 / 25);
-    expect(ref.finish(0, lapsAt(25), time)).toBe(false);
-    expect(ref.finish(1, lapsAt(25), time)).toBe(true);
+    expect(ref.finish(0, lapsAt(25), time, time)).toBe(false);
+    expect(ref.finish(1, lapsAt(25), time, time)).toBe(true);
   });
 
   it('rejects lap times that do not sum to the finish time', () => {
@@ -70,8 +70,8 @@ describe('Referee', () => {
     const time = (LAPS * L) / 25;
     drive(ref, 0, 25, 0, time);
     drive(ref, 1, 25, 0, time);
-    expect(ref.finish(0, lapsAt(25), time + 0.6)).toBe(false);
-    expect(ref.finish(1, lapsAt(25), time + 0.4)).toBe(true);
+    expect(ref.finish(0, lapsAt(25), time + 0.6, time)).toBe(false);
+    expect(ref.finish(1, lapsAt(25), time + 0.4, time)).toBe(true);
     expect(ref.results(time).map(r => [r.netId, r.dnf])).toEqual([[1, false], [0, true]]);
   });
 
@@ -81,11 +81,11 @@ describe('Referee', () => {
     // Car 0 goes quiet for 10 s mid-race (a reconnect) and comes back 250 m on.
     drive(ref, 0, 25, 0, 20);
     drive(ref, 0, 25, 30, time);
-    expect(ref.finish(0, lapsAt(25), time)).toBe(true);
+    expect(ref.finish(0, lapsAt(25), time, time)).toBe(true);
     // Car 1 claims 1000 m in one second: the referee only credits what the car could have driven.
     drive(ref, 1, 25, 0, 20);
     ref.observe(at(1, LAPS * L), 21);
-    expect(ref.finish(1, lapsAt(25), time)).toBe(false);
+    expect(ref.finish(1, lapsAt(25), time, time)).toBe(false);
   });
 
   it('ignores a pose that disagrees with the reported distance', () => {
@@ -95,8 +95,26 @@ describe('Referee', () => {
     // Both report the finish line after a long gap, but car 1 is really 100 m back down the road.
     ref.observe(at(0, LAPS * L), time);
     ref.observe(at(1, LAPS * L, LAPS * L - 100), time);
-    expect(ref.finish(0, lapsAt(25), time)).toBe(true);
-    expect(ref.finish(1, lapsAt(25), time)).toBe(false);
+    expect(ref.finish(0, lapsAt(25), time, time)).toBe(true);
+    expect(ref.finish(1, lapsAt(25), time, time)).toBe(false);
+  });
+
+  it('caps the distance a burst of same-time snapshots can add up to', () => {
+    const ref = new Referee(track, LAPS, grid(1));
+    drive(ref, 0, 25, 0, 5);
+    // Thirty snapshots all stamped 5 s, each 10 m further on: the per-step slack alone would allow 300 m.
+    for (let k = 1; k <= 30; k++) ref.observe(at(0, 125 + 10 * k), 5);
+    expect(ref.distanceOf(0)).toBeCloseTo(33 * 1.6 * 5 + 50 + 30);
+  });
+
+  it('rejects a finish time more than 2 s off the server race time', () => {
+    const ref = new Referee(track, LAPS, grid(2));
+    const time = (LAPS * L) / 25;
+    drive(ref, 0, 25, 0, time);
+    drive(ref, 1, 25, 0, time);
+    expect(ref.finish(0, lapsAt(25), time, time + 2.5)).toBe(false);
+    expect(ref.finish(1, lapsAt(25), time, time + 1.5)).toBe(true);
+    expect(ref.results(time + 2.5).map(r => [r.netId, r.dnf])).toEqual([[1, false], [0, true]]);
   });
 
   it('orders results: finished by time, then by distance with projections, then DNF', () => {
@@ -108,8 +126,8 @@ describe('Referee', () => {
     drive(ref, 2, 15, 0, now);
     drive(ref, 3, 18, 0, now);
     drive(ref, 4, 20, 0, now);
-    expect(ref.finish(0, lapsAt(24), tA)).toBe(true);
-    expect(ref.finish(1, lapsAt(25), tB)).toBe(true);
+    expect(ref.finish(0, lapsAt(24), tA, tA)).toBe(true);
+    expect(ref.finish(1, lapsAt(25), tB, tB)).toBe(true);
     ref.dnf(4);
     // Finished and DNF cars stay as they are.
     ref.dnf(0);

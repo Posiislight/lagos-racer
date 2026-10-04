@@ -7,8 +7,11 @@ export type Screen = 'menu' | 'garage' | 'online' | 'lobby' | 'race';
 
 export type Settings = { quality: Quality; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
 
-/** time is the finish time, or a projection from average speed (projected: true) for racers still on track. */
-export type Result = { name: string; vehicle: VehicleId; time: number | null; projected: boolean; best: number | null; isPlayer: boolean };
+/**
+ * time is the finish time, or a projection from average speed (projected: true) for racers still on track.
+ * dnf is only set in a room race, for a car the referee threw out or that dropped.
+ */
+export type Result = { name: string; vehicle: VehicleId; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; dnf?: boolean };
 
 /** HUD values, refreshed a few times a second by the race loop (not every frame). */
 export type Hud = {

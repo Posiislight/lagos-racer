@@ -2,11 +2,10 @@
 import { create } from 'zustand';
 import type { VehicleId } from '../config/vehicles';
 import { useGame } from '../game/store';
-import { coinsForPlace } from '../game/race';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
 import { NetSession } from './session';
-import { toResults } from './results';
+import { coinsFor, toResults } from './results';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -202,7 +201,7 @@ export const useNet = create<NetState>((set, get) => {
         const mine = m.results.find(r => !r.ai && r.slot === mySlot);
         if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine) break;
         const game = useGame.getState();
-        game.finishRace(toResults(m.results, mySlot), coinsForPlace(mine.place), mine.best);
+        game.finishRace(toResults(m.results, mySlot), coinsFor(mine), mine.best);
         game.setHud({ phase: 'finished' });
         break;
       }

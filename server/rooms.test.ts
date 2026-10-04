@@ -774,8 +774,38 @@ describe('finish and results', () => {
 
     send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
     expect(room.lastActivity).toBe(now);
+    // Only an accepted finish counts as activity: a repeat does not.
+    const accepted = now;
+    now += 1;
     send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(room.lastActivity).toBe(accepted);
     expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+  });
+
+  it('does not let a snapshot stamped in the future widen what the referee credits', () => {
+    const { a, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, 20);
+    server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: 1e6, cars: [carAt(0, LAPS * L - 5)] }));
+    // Clamped to the room's race time + 1 s: one second at full speed plus the step slack, not a whole race.
+    expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + 33 * 1.6 + 10);
+  });
+
+  it('refuses (DNF) a finish whose time is more than 2 s off the room clock, and does not count it as activity', () => {
+    const { a, b, room } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, half(time));
+    // Laps that add up and are each possible, but finished 4.5 s before the room says the car got there.
+    const laps = lapsAt(25).map(t => t - 1.5);
+    const activity = room.lastActivity;
+    now += 1;
+    send(a.conn, { t: 'finish', netId: 0, laps, time: laps.reduce((x, y) => x + y, 0) });
+    expect(msgs(b.peer, 'finished')).toHaveLength(0);
+    expect(room.lastActivity).toBe(activity);
+    // Refused means DNF: an honest retry is no good now.
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toHaveLength(0);
   });
 
   it('ends a race nobody is left in: no results, back to the lobby', () => {

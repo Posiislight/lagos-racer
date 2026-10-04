@@ -224,31 +224,38 @@ export class Room {
     return this.othersOnGrid(slot);
   }
 
-  /** A relayed snapshot's cars, as the referee sees them. */
-  observe(snap: Snapshot) {
-    for (const car of snap.cars) this.referee?.observe(car, snap.time);
+  /** A relayed snapshot's cars, as the referee sees them. A phone's clock may not run ahead of the room's. */
+  observe(snap: Snapshot, now: number) {
+    const time = Math.min(snap.time, this.raceTime(now) + 1);
+    for (const car of snap.cars) this.referee?.observe(car, time);
+  }
+
+  /** Seconds since the green light, by the server's clock. */
+  private raceTime(now: number) {
+    return (now - this.startAt) / 1000;
   }
 
   /**
-   * A racer says one of its cars crossed the line for the last time. Returns false if the claim is dropped
-   * unread: outside the race, a car the sender does not drive, or the wrong number of laps.
+   * A racer says one of its cars crossed the line for the last time. Returns true only if the referee accepted it;
+   * claims outside the race, for a car the sender does not drive, or with the wrong number of laps are not even read.
    */
   finish(slot: number, netId: number, laps: number[], time: number, now: number): boolean {
     const referee = this.referee;
     if (this.phase !== 'racing' || !referee || !this.owns(slot, netId)) return false;
     if (laps.length !== trackById(this.trackId).laps) return false;
-    if (referee.finish(netId, laps, time)) {
+    const accepted = referee.finish(netId, laps, time, this.raceTime(now));
+    if (accepted) {
       this.cutoffAt ??= now + FINISH_CUTOFF_MS;
       for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'finished', netId, time });
     }
     if (referee.allDone()) this.endRace(now, true);
-    return true;
+    return accepted;
   }
 
   /** Sends the results to the racers (if asked) and goes back to the lobby for a rematch, everyone unready. */
   private endRace(now: number, withResults: boolean) {
     if (withResults && this.referee) {
-      const results = this.referee.results((now - this.startAt) / 1000);
+      const results = this.referee.results(this.raceTime(now));
       for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'results', raceSeq: this.raceSeq, results });
     }
     this.phase = 'lobby';

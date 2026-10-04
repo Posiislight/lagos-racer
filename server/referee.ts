@@ -12,6 +12,11 @@ const JUMP_SLACK = 10;
 // How far short of the line a finish may be claimed: the last snapshot can trail the finish message.
 const FINISH_SLACK = 30;
 const SUM_SLACK = 0.5;
+// However many snapshots arrive, nobody is further on than full speed from the back of the grid allows.
+const GRID_DEPTH = 50;
+const DISTANCE_SLACK = 30;
+// A finish is claimed the moment the car crosses the line, so its time must be close to the server's race time.
+const CLOCK_SLACK = 2;
 
 type Car = {
   entry: GridEntry;
@@ -39,7 +44,7 @@ export class Referee {
     }
   }
 
-  /** A car's pose from a snapshot at race time `time` (s). */
+  /** A car's pose from a snapshot at race time `time` (s), which the room keeps from running ahead of its own clock. */
   observe(state: CarState, time: number) {
     const car = this.cars.get(state.netId);
     if (!car || car.finishTime !== null || car.dnf) return;
@@ -47,12 +52,17 @@ export class Referee {
     const s = project(this.track, state.x, state.z).s;
     if (Math.abs(wrapDelta(this.track, ((state.distance % L) + L) % L, s)) > POSE_TOLERANCE) return;
     const reach = car.topSpeed * SPEED_MARGIN * Math.max(0, time - car.lastTime) + JUMP_SLACK;
-    car.distance = Math.min(car.distance + reach, Math.max(car.distance - MAX_BACK, state.distance));
+    // The step slack alone would add up over a burst of same-time snapshots.
+    const cap = car.topSpeed * SPEED_MARGIN * Math.max(0, time) + GRID_DEPTH + DISTANCE_SLACK;
+    car.distance = Math.min(car.distance + reach, cap, Math.max(car.distance - MAX_BACK, state.distance));
     car.lastTime = Math.max(car.lastTime, time);
   }
 
-  /** A finish claim. A refused claim makes the car DNF; a repeat, or a claim for a DNF car, changes nothing. */
-  finish(netId: number, laps: number[], time: number): boolean {
+  /**
+   * A finish claim, received at server race time `now` (s). A refused claim makes the car DNF; a repeat, or a
+   * claim for a DNF car, changes nothing.
+   */
+  finish(netId: number, laps: number[], time: number, now: number): boolean {
     const car = this.cars.get(netId);
     if (!car || car.finishTime !== null || car.dnf) return false;
     const L = this.track.length;
@@ -61,6 +71,7 @@ export class Referee {
       && car.distance >= this.laps * L - FINISH_SLACK
       && laps.every(t => Number.isFinite(t) && t >= minLap)
       && Number.isFinite(time)
+      && Math.abs(time - now) <= CLOCK_SLACK
       && Math.abs(laps.reduce((a, b) => a + b, 0) - time) <= SUM_SLACK;
     if (!ok) {
       car.dnf = true;
@@ -70,6 +81,11 @@ export class Referee {
     car.laps = [...laps];
     this.first ??= time;
     return true;
+  }
+
+  /** The distance the referee credits this car with, or null for a car not on the grid. */
+  distanceOf(netId: number): number | null {
+    return this.cars.get(netId)?.distance ?? null;
   }
 
   dnf(netId: number) {
