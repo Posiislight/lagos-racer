@@ -154,6 +154,38 @@ describe('Connection', () => {
     expect(log.status.at(-1)).toBe('open');
   });
 
+  it('starts the 12 s over when the page wakes up, instead of cutting the socket', () => {
+    const { conn, log } = setup();
+    const ws = last();
+    ws.open();
+    vi.advanceTimersByTime(11_000);
+    conn.wake();
+    vi.advanceTimersByTime(SILENCE_MS - 1);
+    expect(ws.closeCalls).toBe(0);
+    expect(log.status.at(-1)).toBe('open');
+    vi.advanceTimersByTime(1);
+    expect(log.status.at(-1)).toBe('reconnecting');
+  });
+
+  it('does not cut the socket when its silence check runs late because the page was asleep', () => {
+    let clock = 0;
+    const { log } = setup({ now: () => clock });
+    const ws = last();
+    ws.open();
+    // Frozen in the background for 60 s: the clock moved on, the timers did not.
+    clock += 60_000;
+    clock += 1000;
+    vi.advanceTimersByTime(1000);
+    expect(ws.closeCalls).toBe(0);
+    expect(log.status.at(-1)).toBe('open');
+    // Still nothing heard 12 s after waking: now it is dead.
+    for (let i = 0; i < 12; i++) {
+      clock += 1000;
+      vi.advanceTimersByTime(1000);
+    }
+    expect(log.status.at(-1)).toBe('reconnecting');
+  });
+
   it('stops watching for silence after close()', () => {
     const { conn, log } = setup();
     last().open();

@@ -81,6 +81,11 @@ export class Connection implements NetLink {
     this.shutDown();
   }
 
+  /** The page is visible again: give the open socket a fresh 12 s to be heard from before judging it dead. */
+  wake() {
+    if (this.ws && this.status === 'open') this.watchSilence(this.ws);
+  }
+
   private shutDown() {
     this.intentional = true;
     this.clearTimers();
@@ -133,15 +138,20 @@ export class Connection implements NetLink {
 
   /**
    * Mobile data can vanish without the socket ever closing. The server pongs every ping (5 s), so silence this long
-   * means the link is dead: drop it ourselves and let the reconnect take over.
+   * means the link is dead: drop it ourselves and let the reconnect take over. A page that was asleep in the
+   * background (timers frozen) gets a fresh 12 s instead: its own silence is not the link's fault.
    */
   private watchSilence(ws: WebSocket) {
     this.stopSilenceWatch();
     this.lastHeardAt = this.now();
+    let checkedAt = this.now();
     const check = () => {
       this.silenceTimer = null;
       if (ws !== this.ws) return;
-      if (this.now() - this.lastHeardAt < SILENCE_MS) {
+      const now = this.now();
+      if (now - checkedAt > SILENCE_CHECK_MS * 3) this.lastHeardAt = now;
+      checkedAt = now;
+      if (now - this.lastHeardAt < SILENCE_MS) {
         this.silenceTimer = this.setTimer(check, SILENCE_CHECK_MS);
         return;
       }

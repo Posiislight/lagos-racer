@@ -102,6 +102,16 @@ function startPings() {
   next();
 }
 
+// Back from another app (sharing the room link, say): the page's timers may have been frozen, so do not judge the
+// socket on that silence, and let the server hear from us straight away.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !conn) return;
+    conn.wake();
+    conn.sendJson({ t: 'ping', c: performance.now() });
+  });
+}
+
 /** Forget the socket without telling the server anything. */
 function drop() {
   generation++;
@@ -220,8 +230,10 @@ export const useNet = create<NetState>((set, get) => {
         // The room is back in the lobby; the next grid starts a fresh session.
         const mySlot = get().mySlot;
         const mine = m.results.find(r => !r.ai && r.slot === mySlot);
-        if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine || !session.onResults()) break;
         const game = useGame.getState();
+        // Too late: the stranded fallback has already taken us back to the lobby.
+        if (game.screen !== 'race') break;
+        if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine || !session.onResults()) break;
         game.finishRace(toResults(m.results, mySlot), coinsFor(mine), mine.best);
         game.setHud({ phase: 'finished' });
         break;
