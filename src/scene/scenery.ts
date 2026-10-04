@@ -4,8 +4,8 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SceneryZone, TrackConfig } from '../config/tracks';
-import { roadSpan, roadToS } from '../game/outAndBack';
-import { church, directionSign, parkedOkada, petrolStation, tejuoshoBlock } from './landmarks';
+import { axisPoint, roadSpan, roadToS } from '../game/outAndBack';
+import { church, directionSign, parkedOkada, petrolStation, statueIsland, tejuoshoBlock } from './landmarks';
 import { distanceToCentre, heightAt, sampleAt, type Track } from '../game/track';
 import { mergeStatic } from '../models/optimize';
 import { canvasTex, rng } from './trackGeometry';
@@ -423,6 +423,11 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
 
   // Flyovers, the start gantry, and a ring of buildings in front of the painted skyline.
   bridgeAt.forEach(b => root.add(bridge(track, cfg, b.s, b.name, m, { depth: b.width, median: cfg.median?.width })));
+  for (const isl of cfg.islands ?? []) {
+    const c = axisPoint(cfg.axis!, isl.road), g = statueIsland(m, isl.radius);
+    g.position.set(c.x, heightAt(track, c.x, c.z), c.z);
+    root.add(g);
+  }
   for (const sg of cfg.signs ?? []) {
     const g = directionSign(m, sg.text, 2 * (hw + 1.2));
     // Spot frames run x along the road; the sign spans across it.

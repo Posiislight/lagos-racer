@@ -25,6 +25,7 @@ for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
   if (mask[i] && mask[j] && d >= medianGap) continue;
   if (d < closest.d) closest = { d, a: pts[i].s, b: pts[j].s };
 }
+if (cfg.invented?.length) console.log('INVENTED geometry (not from the map):', JSON.stringify(cfg.invented));
 console.log(JSON.stringify({ id, length: +track.length.toFixed(1), samples: n, minRadius: +minRadius.toFixed(1), maxGradePct: +(maxGrade * 100).toFixed(1), medianSamples: mask.filter(Boolean).length, heightRange: [+Math.min(...heights).toFixed(1), +Math.max(...heights).toFixed(1)],
   closestSections: { gap: +closest.d.toFixed(1), atS: [+closest.a.toFixed(0), +closest.b.toFixed(0)] } }, null, 2));
 

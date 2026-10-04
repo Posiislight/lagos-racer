@@ -114,3 +114,29 @@ export function parkedOkada(m: MatFn, r: () => number) {
   [-0.68, 0.68].forEach(x => { const w = new Mesh(new CylinderGeometry(0.3, 0.3, 0.12, 10), tyre); w.rotation.x = Math.PI / 2; w.position.set(x, 0.3, 0); g.add(w); });
   return g;
 }
+
+/**
+ * A roundabout island: a kerbed disc with a plinth, a stone figure with one arm raised, and a blue
+ * direction-arrow plate. Centred on the origin, ground at y = 0.
+ */
+export function statueIsland(m: MatFn, radius: number) {
+  const g = new Group(), stone = m('#b9b3a6', { roughness: 0.9, shadow: true });
+  const kerb = new Mesh(new CylinderGeometry(radius, radius + 0.1, 0.32, 24), m('#c9c7c0', { roughness: 0.95 }));
+  kerb.position.y = 0.16; g.add(kerb);
+  const top = new Mesh(new CylinderGeometry(radius - 0.35, radius - 0.35, 0.06, 24), m('#6f8f45', { roughness: 1 }));
+  top.position.y = 0.33; g.add(top);
+  g.add(box(2.2, 0.5, 2.2, stone, 0, 0.6, 0));
+  g.add(box(1.5, 2.2, 1.5, stone, 0, 1.95, 0));
+  const body = new Mesh(new CylinderGeometry(0.28, 0.4, 1.6, 10), stone); body.position.y = 3.85; g.add(body);
+  const head = new Mesh(new CylinderGeometry(0.26, 0.26, 0.4, 10), stone); head.position.y = 4.85; g.add(head);
+  const arm = box(0.2, 0.9, 0.2, stone, 0.45, 4.5, 0); arm.rotation.z = -0.5; g.add(arm);
+  const arrow = new Mesh(new PlaneGeometry(1.6, 1.0), new MeshStandardMaterial({
+    roughness: 0.6, map: canvasTex(128, 80, (x, w, h) => {
+      x.fillStyle = '#1f5fb0'; x.fillRect(0, 0, w, h);
+      x.fillStyle = '#ffffff'; x.beginPath(); x.moveTo(w * 0.2, h * 0.5); x.lineTo(w * 0.55, h * 0.15); x.lineTo(w * 0.55, h * 0.38); x.lineTo(w * 0.85, h * 0.38);
+      x.lineTo(w * 0.85, h * 0.62); x.lineTo(w * 0.55, h * 0.62); x.lineTo(w * 0.55, h * 0.85); x.closePath(); x.fill();
+    }),
+  }));
+  arrow.position.set(0, 1.2, radius - 0.9); g.add(box(0.12, 1.9, 0.12, m('#555a5e', { metalness: 0.5 }), 0, 0.95, radius - 0.95)); arrow.position.y = 1.8; g.add(arrow);
+  return g;
+}

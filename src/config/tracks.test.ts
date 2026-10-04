@@ -4,6 +4,7 @@ import { project, sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
 import { medianMask, roadRangeMask } from '../game/outAndBack';
 import { IKORODU_AXIS } from './ikoroduAxis';
+import { axisPoint } from '../game/outAndBack';
 
 describe('every track', () => {
   it('builds with a length and at least one lap', () => {
@@ -73,5 +74,22 @@ describe('ikorodu track', () => {
     const both = mask.filter((m, i) => m && med[i]).length;
     expect(both).toBeGreaterThan(50);
     expect(both).toBeLessThan(med.filter(Boolean).length / 2);
+  });
+
+  it('has a roundabout island that fits inside the U-turn, statue and all', () => {
+    const isl = cfg.islands![0], c = axisPoint(cfg.axis!, isl.road);
+    expect(isl.statue).toBe(true);
+    const nearest = Math.min(...tr.points.map(p => Math.hypot(p.pos.x - c.x, p.pos.z - c.z)));
+    // The road's inner edge is its centre line minus the half width.
+    expect(isl.radius + cfg.halfWidth).toBeLessThanOrEqual(nearest + 0.01);
+    expect(isl.radius).toBeGreaterThan(5);
+  });
+
+  it('flags the constructed hospital U-turn as invented geometry', () => {
+    expect(cfg.invented).toHaveLength(1);
+    const [a, b] = cfg.invented![0].road;
+    expect(a).toBeGreaterThanOrEqual(0);
+    expect(b).toBeGreaterThan(a);
+    expect(cfg.invented![0].why).toMatch(/hospital/);
   });
 });

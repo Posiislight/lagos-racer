@@ -8,7 +8,7 @@
 //   --shots=2,6,12                 screenshot times (s) after the race starts
 //   --out=dir                      where to save screenshots (default: scratch dir)
 //   --gpu                          try the real GPU instead of SwiftShader
-//   --vehicle=okada --paint=blue --quality=high --unlock
+//   --vehicle=okada --paint=blue --quality=high --unlock --track=ikorodu
 //   --eval="js"                    run once the race is ready and print the result
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
@@ -59,7 +59,7 @@ const params = new URLSearchParams();
 if (args.autopilot) params.set('autopilot', '1');
 if (args.unlock) params.set('unlock', 'all');
 // Seed settings before the app loads.
-const settings = { settings: { quality: args.quality || 'high', sound: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt'], accountPromptDismissed: false, paint: args.paint ? { [args.vehicle || 'okada']: args.paint } : {}, itemHints: 0 };
+const settings = { settings: { quality: args.quality || 'high', sound: false, showFps: false }, coins: 0, best: {}, races: 0, vehicle: args.vehicle || 'okada', unlocked: ['brt'], accountPromptDismissed: false, paint: args.paint ? { [args.vehicle || 'okada']: args.paint } : {}, itemHints: 0, track: args.track || 'ojuelegba' };
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('lagos-racer:v2', ${JSON.stringify(JSON.stringify(settings))});` });
 await send('Page.navigate', { url: base + (params.toString() ? '?' + params : '') });
 // Wait for the menu (a busy machine can take well over a few seconds), not a fixed time.
