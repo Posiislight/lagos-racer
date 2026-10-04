@@ -2,7 +2,7 @@ import { MathUtils } from 'three';
 import type { RaceRuntime, Racer } from './runtime';
 import { sampleAt } from './track';
 
-export const AI_NAMES = ['Odogwu Rider', 'Starboy-ish', 'Mama Danfo', 'Conductor Sule', 'Aunty Bisi', 'Area Fada', 'Oga Landlord'];
+export { AI_NAMES } from './names';
 
 /** Speed (m/s) a vehicle can hold through a bend of curvature k with the given grip (m/s²). */
 export function cornerSpeed(k: number, grip: number) {

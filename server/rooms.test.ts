@@ -346,6 +346,18 @@ describe('race start', () => {
     expect(msgs(a.peer, 'grid')[0].seed).toBe(msgs(b.peer, 'grid')[0].seed);
   });
 
+  it('fills the grid with host-owned AI when fillAI is on', () => {
+    const { a, b } = pair();
+    send(a.conn, { t: 'lobby', fillAI: true });
+    send(a.conn, { t: 'start' });
+    const grid = msgs(b.peer, 'grid')[0].grid;
+    expect(grid).toHaveLength(6);
+    expect(grid.filter(e => e.ai).every(e => e.slot === 1)).toBe(true);
+    expect(grid.filter(e => !e.ai).map(e => e.slot)).toEqual([1, 2]);
+  });
+
+  it.todo('when the host drops for 15 s mid-race, their AI cars are DNF too');
+
   it('ignores a second start once the race has begun', () => {
     const { a } = pair();
     send(a.conn, { t: 'start' });
@@ -745,6 +757,27 @@ describe('finish and results', () => {
     const [res] = msgs(a.peer, 'results');
     expect(res.results.map(r => [r.netId, r.dnf, r.time === null])).toEqual([[0, false, false], [1, false, false], [2, true, true]]);
     expect(room.phase).toBe('lobby');
+  });
+
+  it('lets the host finish AI cars, and the results include them', () => {
+    const a = create();
+    const b = join(a.welcome.code);
+    send(a.conn, { t: 'lobby', fillAI: true });
+    for (const p of [a, b]) send(p.conn, { t: 'lobby', ready: true });
+    send(a.conn, { t: 'start' });
+    for (const p of [a, b]) send(p.conn, { t: 'loaded' });
+    now += START_LEAD_MS;
+    server.tick();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    // AI cars are netIds 0-3 on the host's connection, then the host (4) and the guest (5).
+    const drivers: Driver[] = [0, 1, 2, 3, 4].map(netId => ({ conn: a.conn, slot: 1, netId, speed: 25 - netId }));
+    drivers.push({ conn: b.conn, slot: 2, netId: 5, speed: 20 });
+    drive(startAt, drivers, 0, half((LAPS * L) / 20));
+    const [res] = msgs(b.peer, 'results');
+    expect(res.results).toHaveLength(6);
+    expect(res.results.map(r => r.netId)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(res.results.map(r => r.ai)).toEqual([true, true, true, true, false, false]);
+    expect(res.results.every(r => !r.dnf && !r.projected)).toBe(true);
   });
 
   it('drops finish messages that are forged, malformed, repeated or outside the race', () => {

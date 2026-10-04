@@ -147,7 +147,7 @@ export class Room {
 
     const config = trackById(this.trackId);
     this.raceSeq++;
-    this.grid = buildGrid(here);
+    this.grid = buildGrid(here, this.fillAI, this.hostSlot, random);
     this.referee = new Referee(buildTrack(config.control, 2, config.hills), config.laps, this.grid);
     this.cutoffAt = null;
     this.loaded.clear();

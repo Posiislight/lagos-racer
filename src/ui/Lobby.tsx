@@ -80,8 +80,7 @@ export function Lobby() {
         </button>
         {isHost && (
           <div className="row lobby-host">
-            {/* Filling empty places with AI is not built yet. */}
-            <button className="btn" disabled aria-pressed={room.fillAI} onClick={() => setFillAI(!room.fillAI)}>Fill with AI</button>
+            <button className="btn" aria-pressed={room.fillAI} onClick={() => setFillAI(!room.fillAI)}>Fill with AI</button>
             <button className="btn primary" disabled={!canStart} onClick={start}>Start</button>
           </div>
         )}
