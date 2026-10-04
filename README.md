@@ -22,6 +22,7 @@ Other commands:
 | `node scripts/sync-models.mjs` | Re-import the vehicle models after changing the showroom in `reference/sporty/` |
 | `node scripts/track-report.ts ojuelegba out.svg` | Check a track layout: length, tightest bend, overlapping sections, top-down SVG |
 | `node scripts/playtest.mjs --gpu --autopilot --seconds=30` | Headless play-test with screenshots and a log of positions, speeds and FPS (dev server must be running) |
+| `node scripts/net-race.mjs --tabs=3 [--lag=250 --jitter=80 --loss=5] [--timeout=300]` | Online race between headless tabs; exits 0 only if every tab shows identical standings. Needs the dev server on the `--url` (default `http://localhost:5175/`, e.g. `npx vite --port 5175 --strictPort`); starts and stops the room server itself |
 
 Handy URL flags: `?unlock=all` opens the locked BRTs, `?autopilot=1` lets the AI drive your vehicle.
 
