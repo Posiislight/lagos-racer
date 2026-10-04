@@ -42,7 +42,7 @@ function okadaBox(w,h,d,r,m,x,y,z){
   return mesh(geo,m,x,y,z);
 }
 
-function buildOkada(body){
+function buildOkada(body, driver){
   const g=new THREE.Group();
   const RED=body||'#b8000c', GOLD='#e09a00', WHITE='#f6f6f2';
   const BODY=paint(RED), BK=MAT.blackGloss, CF=MAT.carbon, ALU=MAT.alu;
@@ -176,8 +176,9 @@ function buildOkada(body){
 
   /* --- rider (race helmet, tucked), madam side-saddle, Ghana Must Go bag --- */
   const RP=[-.12,.92], LEAN=.38;
-  const rider=person({shirt:'#1c1c1e', pants:'#1c1c1e', arms:'long', hat:'helmet', hatColor:WHITE, helmetStripe:RED, vest:'#f25c05', vestText:'247',
-    hands:{L:okadaLocal([.46,.928,.27],RP,LEAN), R:okadaLocal([.46,.928,-.27],RP,LEAN)}, ankle:okadaLocal([.0,.61,0],RP,LEAN).slice(0,2)});
+  const riderHands={L:okadaLocal([.46,.928,.27],RP,LEAN), R:okadaLocal([.46,.928,-.27],RP,LEAN)}, riderAnkle=okadaLocal([.0,.61,0],RP,LEAN).slice(0,2);
+  const rider=driver ? driverFigure(driver,{hands:riderHands, ankle:riderAnkle})
+    : person({shirt:'#1c1c1e', pants:'#1c1c1e', arms:'long', hat:'helmet', hatColor:WHITE, helmetStripe:RED, vest:'#f25c05', vestText:'247', hands:riderHands, ankle:riderAnkle});
   fixedChild(g,rider,RP[0],RP[1],0,0,LEAN);
   const kn=[RP[0]+.32*Math.cos(LEAN)+.12*Math.sin(LEAN), RP[1]-.32*Math.sin(LEAN)+.12*Math.cos(LEAN)];   // person() knee, leaned
   [-1,1].forEach(s=>{ const k=okadaBox(.085,.055,.025,.012,paint('#ffd400'),kn[0]+.01,kn[1]-.005,.178*s); k.rotation.z=-.3; g.add(k); });

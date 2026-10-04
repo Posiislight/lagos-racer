@@ -383,7 +383,7 @@ function okadaBox(w,h,d,r,m,x,y,z){
   return mesh(geo,m,x,y,z);
 }
 
-function buildOkada(body){
+function buildOkada(body, driver){
   const g=new THREE.Group();
   const RED=body||'#b8000c', GOLD='#e09a00', WHITE='#f6f6f2';
   const BODY=paint(RED), BK=MAT.blackGloss, CF=MAT.carbon, ALU=MAT.alu;
@@ -517,8 +517,9 @@ function buildOkada(body){
 
   /* --- rider (race helmet, tucked), madam side-saddle, Ghana Must Go bag --- */
   const RP=[-.12,.92], LEAN=.38;
-  const rider=person({shirt:'#1c1c1e', pants:'#1c1c1e', arms:'long', hat:'helmet', hatColor:WHITE, helmetStripe:RED, vest:'#f25c05', vestText:'247',
-    hands:{L:okadaLocal([.46,.928,.27],RP,LEAN), R:okadaLocal([.46,.928,-.27],RP,LEAN)}, ankle:okadaLocal([.0,.61,0],RP,LEAN).slice(0,2)});
+  const riderHands={L:okadaLocal([.46,.928,.27],RP,LEAN), R:okadaLocal([.46,.928,-.27],RP,LEAN)}, riderAnkle=okadaLocal([.0,.61,0],RP,LEAN).slice(0,2);
+  const rider=driver ? driverFigure(driver,{hands:riderHands, ankle:riderAnkle})
+    : person({shirt:'#1c1c1e', pants:'#1c1c1e', arms:'long', hat:'helmet', hatColor:WHITE, helmetStripe:RED, vest:'#f25c05', vestText:'247', hands:riderHands, ankle:riderAnkle});
   fixedChild(g,rider,RP[0],RP[1],0,0,LEAN);
   const kn=[RP[0]+.32*Math.cos(LEAN)+.12*Math.sin(LEAN), RP[1]-.32*Math.sin(LEAN)+.12*Math.cos(LEAN)];   // person() knee, leaned
   [-1,1].forEach(s=>{ const k=okadaBox(.085,.055,.025,.012,paint('#ffd400'),kn[0]+.01,kn[1]-.005,.178*s); k.rotation.z=-.3; g.add(k); });
@@ -603,11 +604,12 @@ function kekeRB(w,h,d,r,m,x,y,z,seg=2){
   return mesh(kekeGC[k],m,x,y,z);
 }
 function kekeWheel(r,w,rim,o){ const wh=sportWheel(r,w,rim,o); kekeMerge(wh.children[0]); return wh; }
-function kekeRider(o){ return kekeMerge(person(o)); }
+// With a `driver` id the figure is that character, seated with the same hands and feet.
+function kekeRider(o,driver){ return kekeMerge(driver ? driverFigure(driver,{hands:o.hands, ankle:o.ankle}) : person(o)); }
 // Tilt a decal about z after its facing turn (lets text lie on raked faces and on the roof).
 function kekeTilt(d,t){ d.rotation.order='ZYX'; d.rotation.z=t; return d; }
 
-function buildKeke(bodyColor='#ffb000'){
+function buildKeke(bodyColor='#ffb000', driver){
   const g=new THREE.Group(), body=new THREE.Group(), add=o=>{ body.add(o); return o; };
   const Y=paint(bodyColor), BK=MAT.blackGloss, CF=MAT.carbon, TOP=paint('#121212');
   const LED=glow('#eaf8ff',2.2), RED=glow('#ff1a0a',1.0), NEON=glow('#25ff8a',1.8), TI=mat('#5a5fd0',{metalness:.9,roughness:.25});
@@ -784,7 +786,7 @@ function buildKeke(bodyColor='#ffb000'){
 
   /* crew: helmeted driver, the extra squeezed in beside him, three at the back */
   fixedChild(g,kekeRider({shirt:'#1f8a4c', pants:'#1f8a4c', arms:'long', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:'#1f8a4c',
-    hands:{L:[.39,.34,.25],R:[.39,.34,-.29]}, ankle:[.34,-.22]}),.27,.70,.02);
+    hands:{L:[.39,.34,.25],R:[.39,.34,-.29]}, ankle:[.34,-.22]}, driver),.27,.70,.02);
   const eh=fixedChild(g,kekeRider({shirt:'#c62828', skin:MAT.skin2, hat:'cap', hatColor:'#1e88e5', hands:{L:[.3,.2,.08],R:[.27,.18,-.17]}, ankle:[.3,-.22]}),.12,.70,-.44);
   eh.rotation.x=-.17;
   [['#8e44ad',-.38,MAT.skin1,{wave:'R',cash:true}],['#16a085',0,MAT.skin2,{}],['#e67e22',.38,MAT.skin1,{}]].forEach(([c,z,sk,o])=>{
@@ -847,7 +849,7 @@ function danfoWingTex(){
   });
 }
 
-function buildDanfo(bodyColor='#f7b500'){
+function buildDanfo(bodyColor='#f7b500', driver){
   const g=new THREE.Group(), Y=paint(bodyColor), BK=MAT.black, BG=MAT.blackGloss, CF=MAT.carbon, b=.1;
   const WX=1.5, WR=.42, WZ=.92, BOT=.40, AR=.55, HW=.88, TOP=1.64; // wheel x/radius/track, body bottom, arch radius (shape), half width, roof (shape)
   const add=o=>{ g.add(o); return o; };
@@ -1011,8 +1013,8 @@ function buildDanfo(bodyColor='#f7b500'){
   /* driver: race-suit elbow out of the left window, helmeted head leaning out */
   add(limb([1.48,1.18,.74],[1.68,1.25,.99],.06,mat('#1f8a4c'))); add(limb([1.68,1.25,.99],[1.93,1.31,.96],.05,MAT.skin2));
   add(sph(.06,mat('#111'),1.95,1.32,.96,12));
-  const drv=person({hat:'helmet', hatColor:'#f5f6f1', helmetStripe:'#19a64a', skin:MAT.skin2});
-  const head=drv.children.find(o=>o.isGroup); head.position.set(1.56,1.43,.95); head.scale.setScalar(.92); g.add(danfoMerge(head));
+  const drv=driver ? driverFigure(driver) : person({hat:'helmet', hatColor:'#f5f6f1', helmetStripe:'#19a64a', skin:MAT.skin2});
+  const head=drv.userData.head; head.position.set(1.56,1.43,.95); head.scale.setScalar(.92); g.add(danfoMerge(head));
 
   /* passenger on the extra wooden chair in the doorway */
   const ch=new THREE.Group(); ch.position.set(.22,.36,-.8); ch.rotation.y=-Math.PI/2;
@@ -1133,7 +1135,7 @@ function brtGlowTex(){
   });
 }
 
-function buildBRT(lowerColor, number){
+function buildBRT(lowerColor, number, driver){
   number=String(number||'01');
   const g=new THREE.Group(), body=new THREE.Group(); g.add(body);
   const add=o=>{ body.add(o); return o; }, dec=o=>{ g.add(o); return o; };
@@ -1294,8 +1296,9 @@ function buildBRT(lowerColor, number){
   ug.rotation.x=-PI/2; ug.position.y=.012; g.add(ug);
 
   /* ---- conductor in race helmet, leaning out of the open front door, waving and shouting the stop ---- */
-  const con=person({shirt:YEL, pants:'#1f2a44', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:lowerColor, pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'});
-  con.scale.setScalar(1.1);
+  const con=driver ? driverFigure(driver,{pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'})
+    : person({shirt:YEL, pants:'#1f2a44', hat:'helmet', hatColor:'#f6f6f2', helmetStripe:lowerColor, pose:'stand', hands:{L:[-.19,.87,.37]}, wave:'R'});
+  con.scale.multiplyScalar(1.1);
   con.userData.wave.userData.noBake=true;
   brtBake(con);
   fixedChild(g,con,4.84,1.068,-1.42,PI/2,.15);
