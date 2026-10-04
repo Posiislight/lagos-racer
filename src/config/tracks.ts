@@ -1,6 +1,7 @@
 import { buildTrack, type Hills, type Track } from '../game/track.ts';
 import { axisDistance, outAndBack } from '../game/outAndBack.ts';
 import { OJUELEGBA_AXIS, OJUELEGBA_START } from './ojuelegbaAxis.ts';
+import { IKORODU_AXIS, IKORODU_START } from './ikoroduAxis.ts';
 
 export type ZoneKind =
   | 'market' | 'buildings' | 'danfoPark' | 'palms' | 'billboards'
@@ -51,6 +52,8 @@ const START = OJUELEGBA_START + 47.4;
 const north = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'north' });
 const south = (kind: ZoneKind, a: number, b: number): SceneryZone => ({ kind, road: [a, b], street: 'south' });
 
+const IKORODU_LENGTH = IKORODU_AXIS.reduce((L, p, i) => (i ? L + Math.hypot(p[0] - IKORODU_AXIS[i - 1][0], p[1] - IKORODU_AXIS[i - 1][1]) : 0), 0);
+
 export const TRACKS: TrackConfig[] = [
   {
     id: 'ojuelegba',
@@ -82,6 +85,33 @@ export const TRACKS: TrackConfig[] = [
       north('church', 190, 205), north('buildings', 205, 240), north('sportsShops', 240, 324), north('market', 331, 356),
       south('tejuosho', 20, 80), south('danfoRow', 80, 118), south('buildings', 118, 187), south('market', 187, 240),
       south('buildings', 240, 324), south('market', 331, 356),
+    ],
+    ground: '#a87d5c',
+  },
+  {
+    id: 'ikorodu',
+    name: 'Ikorodu Garage',
+    blurb: 'From the General Hospital to the garage roundabout and back. Mind the okadas.',
+    // Axis runs hospital to roundabout, so street 'north' is the right-hand (outbound) side going to the roundabout.
+    // U-turns 13 m round the centre line: the BRT needs at least 12 m.
+    control: outAndBack(IKORODU_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 13, splay: 30, startAt: IKORODU_START }),
+    axis: IKORODU_AXIS,
+    median: { width: MEDIAN },
+    hills: [[0.3, 2, 0.4], [0.18, 5, 1.3], [0.06, 13, 2.1]],
+    hillsAxis: 'road',
+    halfWidth: HALF_WIDTH,
+    laps: 3,
+    bridges: [],
+    items: [60, 260, 520, 720],
+    critters: [
+      { s: 160, kind: 'goat', count: 3 },
+      { s: 360, kind: 'chicken', count: 5 },
+      { s: 620, kind: 'goat', count: 2 },
+      { s: 820, kind: 'chicken', count: 4 },
+    ],
+    zones: [
+      { kind: 'buildings', road: [0, IKORODU_LENGTH], street: 'north' },
+      { kind: 'buildings', road: [0, IKORODU_LENGTH], street: 'south' },
     ],
     ground: '#a87d5c',
   },
