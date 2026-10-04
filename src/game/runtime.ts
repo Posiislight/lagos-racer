@@ -83,6 +83,8 @@ export type Racer = {
   respawns: number;
   /** Request a respawn on the track at the next physics step. */
   respawn: boolean;
+  /** Race clock time this racer was knocked out (elimination mode), or null while still in. */
+  outAt: number | null;
   /** The chosen driver: decides which special power this racer has. */
   driver: DriverId;
   /** Special meter, 0..1; at 1 the special can be fired. */
@@ -145,7 +147,7 @@ export function makeRacer(id: number, name: string, vehicle: VehicleConfig, pain
   return {
     id, name, vehicle, paint, isPlayer, controls: emptyControls(), body: null, visual: null, progress,
     speed: 0, topBoost: 1, item: null, boost: 0, slip: 0, curse: 0, shield: 0, wobble: 0, immune: 0, scraping: false, knock: 0,
-    bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false,
+    bump: { x: 0, z: 0 }, touching: new Set(), contactNormal: new Map(), trouble: 0, respawns: 0, respawn: false, outAt: null,
     driver, charge: 0, push: 0, cough: 0, trail: 0, trailDist: 0, trailCount: 0, ai: null,
   };
 }

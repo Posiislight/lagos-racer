@@ -70,7 +70,7 @@ export function currentLap(r: RacerProgress, totalLaps: number) {
 }
 
 /** Race order: finished racers by finish time, then everyone else by distance driven. */
-export function standings<T extends { progress: RacerProgress }>(racers: T[]): T[] {
+export function standings<T extends { progress: Pick<RacerProgress, 'distance' | 'finishTime'> }>(racers: T[]): T[] {
   return [...racers].sort((a, b) => {
     const fa = a.progress.finishTime, fb = b.progress.finishTime;
     if (fa !== null && fb !== null) return fa - fb;
