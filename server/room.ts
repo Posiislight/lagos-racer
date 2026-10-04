@@ -47,7 +47,7 @@ export class Room {
   private gridMsg: Extract<ServerMessage, { t: 'grid' }> | null = null;
   /** The last race's results, re-sent to a racer from its grid who missed them in a drop. */
   private resultsMsg: Extract<ServerMessage, { t: 'results' }> | null = null;
-  /** Cars out of the current race because their phone dropped or left. */
+  /** Cars out of the current race: their phone dropped or left, or the referee refused their finish. */
   private dropped = new Set<number>();
   private loaded = new Set<number>();
   private gridAt = 0;
@@ -300,10 +300,15 @@ export class Room {
     const referee = this.referee;
     if (this.phase !== 'racing' || !referee || !this.owns(slot, netId)) return false;
     if (laps.length !== trackById(this.trackId).laps) return false;
+    const open = referee.running(netId);
     const accepted = referee.finish(netId, laps, time, this.raceTime(now));
     if (accepted) {
       this.cutoffAt ??= now + FINISH_CUTOFF_MS;
       for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'finished', netId, time });
+    } else if (open) {
+      // Refused: the car is out, and everyone (a racer who resumes later too) should know.
+      this.dropped.add(netId);
+      for (const conn of this.othersOnGrid(0)) this.send(conn, { t: 'dnf', netIds: [netId] });
     }
     if (referee.allDone()) this.endRace(now, true);
     return accepted;

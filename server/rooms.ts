@@ -41,6 +41,12 @@ const CODE_SPACE = CODE_ALPHABET.length ** 4;
 const isVehicle = (v: unknown): v is VehicleId => typeof v === 'string' && Object.hasOwn(VEHICLE_IDS, v);
 
 const HAZARD_NUMBERS = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'armed', 'ground'] as const;
+// A relayed hazard may not outlive or out-wait these (s), nor sit or fly outside these (m, m/s).
+const HAZARD_LIFE = 22;
+const HAZARD_ARMED = 2;
+const HAZARD_REACH = 5000;
+const HAZARD_HEIGHT = 500;
+const HAZARD_SPEED = 200;
 
 /** A well-formed hazard, rebuilt field by field so nothing extra is relayed. Who may send it is the room's call. */
 function parseHazard(v: unknown): Hazard | null {
@@ -51,9 +57,13 @@ function parseHazard(v: unknown): Hazard | null {
   if (o.target !== null && !Number.isInteger(o.target)) return null;
   if (!HAZARD_NUMBERS.every(k => typeof o[k] === 'number' && Number.isFinite(o[k]))) return null;
   const n = o as Record<(typeof HAZARD_NUMBERS)[number], number>;
+  // Nowhere near a track, or faster than anything can be thrown.
+  if (Math.abs(n.x) > HAZARD_REACH || Math.abs(n.z) > HAZARD_REACH || Math.abs(n.y) > HAZARD_HEIGHT) return null;
+  if (Math.hypot(n.vx, n.vy, n.vz) > HAZARD_SPEED) return null;
   return {
     id: o.id as number, kind: o.kind, owner: o.owner as number, target: o.target as number | null,
-    x: n.x, y: n.y, z: n.z, vx: n.vx, vy: n.vy, vz: n.vz, life: n.life, armed: n.armed, ground: n.ground,
+    x: n.x, y: n.y, z: n.z, vx: n.vx, vy: n.vy, vz: n.vz,
+    life: Math.min(n.life, HAZARD_LIFE), armed: Math.min(n.armed, HAZARD_ARMED), ground: n.ground,
   };
 }
 

@@ -97,6 +97,12 @@ export class Referee {
     return this.cars.get(netId)?.distance ?? null;
   }
 
+  /** Still racing: on the grid, not finished and not DNF. */
+  running(netId: number): boolean {
+    const car = this.cars.get(netId);
+    return !!car && car.finishTime === null && !car.dnf;
+  }
+
   dnf(netId: number) {
     const car = this.cars.get(netId);
     if (car && car.finishTime === null) car.dnf = true;

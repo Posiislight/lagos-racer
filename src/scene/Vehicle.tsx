@@ -96,8 +96,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     const vc = controller.current, b = body.current, race = getRace();
     if (!vc || !b || !race) return;
     const dt = w.timestep, t = racer.vehicle.tuning, c = racer.controls;
-    const lv0 = b.linvel();
-    push.current.pre = Math.hypot(lv0.x, lv0.z);
+    // Only a room race needs the pre-step speed: it caps a shove from a remote car.
+    if (race.net) {
+      const lv0 = b.linvel();
+      push.current.pre = Math.hypot(lv0.x, lv0.z);
+    }
 
     if (racer.respawn || b.translation().y < race.track.points[racer.progress.index].pos.y - 5) { respawn(racer, b); racer.respawn = false; return; }
 

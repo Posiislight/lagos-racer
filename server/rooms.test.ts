@@ -665,6 +665,18 @@ describe('item events', () => {
     expect(events(b.peer).length + events(c.peer).length).toBe(before);
   });
 
+  it('caps how long a thrown hazard lives and arms, and drops ones far off the map or impossibly fast', () => {
+    const { a, b } = racers();
+    send(a.conn, { t: 'use', hazard: hazard({ life: 1e6, armed: 50 }) });
+    expect(msgs(b.peer, 'use').map(m => [m.hazard.life, m.hazard.armed])).toEqual([[22, 2]]);
+    for (const far of [{ x: 5001 }, { z: -5001 }, { y: 501 }, { vx: 201 }, { vx: 150, vz: 150 }]) {
+      send(a.conn, { t: 'use', hazard: hazard({ id: 100006, ...far }) });
+    }
+    expect(msgs(b.peer, 'use')).toHaveLength(1);
+    send(a.conn, { t: 'use', hazard: hazard({ id: 100006, x: -5000, y: 500, z: 5000, vx: 0, vy: 0, vz: 200 }) });
+    expect(msgs(b.peer, 'use')).toHaveLength(2);
+  });
+
   it('only relays item events while racing, and only from grid members', () => {
     const { a, b, d2 } = racers('countdown');
     send(a.conn, { t: 'pickup', orb: 1 });
@@ -995,9 +1007,12 @@ describe('finish and results', () => {
     send(a.conn, { t: 'finish', netId: 0, laps, time: laps.reduce((x, y) => x + y, 0) });
     expect(msgs(b.peer, 'finished')).toHaveLength(0);
     expect(room.lastActivity).toBe(activity);
-    // Refused means DNF: an honest retry is no good now.
+    // Everyone on the grid, the claimer too, hears that the car is out.
+    for (const p of [a, b]) expect(msgs(p.peer, 'dnf')).toEqual([{ t: 'dnf', netIds: [0] }]);
+    // Refused means DNF: an honest retry is no good now, and is not announced again.
     send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
     expect(msgs(b.peer, 'finished')).toHaveLength(0);
+    expect(msgs(b.peer, 'dnf')).toHaveLength(1);
   });
 
   it('keeps the race going while the only racer left has a short blip', () => {
