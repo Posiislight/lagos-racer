@@ -12,6 +12,10 @@ export const MAX_HUMANS = 6;
 export const GRID_SIZE = 6;
 export const MAX_MESSAGE_BYTES = 4096;
 export const RATE_LIMIT_PER_S = 30;
+// Either end gives up on a socket it has heard nothing from for this long (pings go out every 5 s).
+export const SILENCE_MS = 12000;
+// A socket that never takes a seat is closed after this long.
+export const UNSEATED_MS = 30000;
 
 // No I or O, so codes survive being read out over a voice note.
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

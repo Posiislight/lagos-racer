@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Connection, parseLagSim, type ConnStatus } from './connection';
-import { RECONNECT_GRACE_MS, type ServerMessage } from './protocol';
+import { RECONNECT_GRACE_MS, SILENCE_MS, type ServerMessage } from './protocol';
 
 class FakeSocket {
   static all: FakeSocket[] = [];
@@ -121,6 +121,45 @@ describe('Connection', () => {
     const n = FakeSocket.all.length;
     vi.advanceTimersByTime(60_000);
     expect(FakeSocket.all).toHaveLength(n);
+  });
+
+  it('gives up on a socket silent for 12 s and reconnects, ignoring the dead one', () => {
+    const { log } = setup();
+    const ws = last();
+    ws.open();
+    vi.advanceTimersByTime(SILENCE_MS - 1);
+    expect(log.status.at(-1)).toBe('open');
+    vi.advanceTimersByTime(1);
+    expect(ws.closeCalls).toBe(1);
+    expect(log.status.at(-1)).toBe('reconnecting');
+    vi.advanceTimersByTime(500);
+    expect(FakeSocket.all).toHaveLength(2);
+    ws.serverSend(JSON.stringify({ t: 'pong', c: 1, s: 0 }));
+    expect(log.msgs).toEqual([]);
+    last().open();
+    expect(log.opens).toEqual([false, true]);
+  });
+
+  it('keeps a socket that hears something at least every 12 s', () => {
+    const { log } = setup();
+    const ws = last();
+    ws.open();
+    for (let i = 0; i < 12; i++) {
+      vi.advanceTimersByTime(5000);
+      ws.serverSend(JSON.stringify({ t: 'pong', c: i, s: 0 }));
+    }
+    vi.advanceTimersByTime(SILENCE_MS - 1);
+    expect(ws.closeCalls).toBe(0);
+    expect(FakeSocket.all).toHaveLength(1);
+    expect(log.status.at(-1)).toBe('open');
+  });
+
+  it('stops watching for silence after close()', () => {
+    const { conn, log } = setup();
+    last().open();
+    conn.close();
+    vi.advanceTimersByTime(60_000);
+    expect(log.status).toEqual(['connecting', 'open', 'closed']);
   });
 
   it('does not reconnect after close()', () => {

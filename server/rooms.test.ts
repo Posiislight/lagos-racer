@@ -17,11 +17,13 @@ import {
 class FakePeer implements Peer {
   sent: (string | ArrayBuffer)[] = [];
   closed = false;
+  dead = false;
   send(data: string | ArrayBuffer) {
     this.sent.push(data);
   }
-  close() {
+  close(dead = false) {
     this.closed = true;
+    this.dead ||= dead;
   }
 }
 
@@ -39,8 +41,13 @@ beforeEach(() => {
   now = 1_000_000;
   let seed = 7;
   const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  server = new RoomServer({ now: () => now, random });
+  // Most tests jump the clock without pings; the liveness tests below build a server that checks for silence.
+  server = new RoomServer({ now: () => now, random, silenceMs: Infinity, unseatedMs: Infinity });
 });
+
+const withLiveness = () => {
+  server = new RoomServer({ now: () => now });
+};
 
 function connect() {
   const peer = new FakePeer();
@@ -290,6 +297,58 @@ describe('RoomServer', () => {
     const c = connect();
     send(c.conn, { t: 'ping', c: 123 });
     expect(msgs(c.peer, 'pong')[0]).toEqual({ t: 'pong', c: 123, s: now });
+  });
+
+  it('closes a connection silent for 12 s, and its member drops into the reconnect grace', () => {
+    withLiveness();
+    const a = create();
+    const b = join(a.welcome.code);
+    const room = server.rooms.get(a.welcome.code)!;
+    for (let t = 0; t < 4; t++) {
+      now += 5000;
+      send(a.conn, { t: 'ping', c: t });
+      server.tick();
+    }
+    // b went quiet 20 s ago; a pinged every 5 s.
+    expect(a.peer.closed).toBe(false);
+    expect(b.peer.closed).toBe(true);
+    expect(b.peer.dead).toBe(true);
+    expect(lastRoom(a.peer).players.map(p => [p.slot, p.connected])).toEqual([[1, true], [2, false]]);
+    expect(room.size).toBe(2);
+    // A closed connection says nothing more.
+    const sent = b.peer.sent.length;
+    send(b.conn, { t: 'ping', c: 1 });
+    expect(b.peer.sent).toHaveLength(sent);
+  });
+
+  it('keeps a quiet connection open until 12 s have passed', () => {
+    withLiveness();
+    const c = connect();
+    now += 11_999;
+    server.tick();
+    expect(c.peer.closed).toBe(false);
+    send(c.conn, { t: 'ping', c: 1 });
+    now += 11_999;
+    server.tick();
+    expect(c.peer.closed).toBe(false);
+    now += 1;
+    server.tick();
+    expect(c.peer.closed).toBe(true);
+  });
+
+  it('closes a connection that never creates, joins or resumes within 30 s, even if it pings', () => {
+    withLiveness();
+    const idle = connect();
+    const seated = create();
+    send(seated.conn, { t: 'leave' });
+    for (let t = 0; t < 6; t++) {
+      now += 5000;
+      for (const p of [idle, seated]) send(p.conn, { t: 'ping', c: t });
+      server.tick();
+    }
+    expect(idle.peer.closed).toBe(true);
+    // Once seated, leaving the room does not start that clock again.
+    expect(seated.peer.closed).toBe(false);
   });
 
   it('refuses create or join from a connection already in a room', () => {

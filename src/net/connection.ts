@@ -1,5 +1,5 @@
 // Browser side of the room socket: reconnects after drops and can fake a bad network for testing.
-import { RECONNECT_GRACE_MS, type ClientMessage, type ServerMessage } from './protocol';
+import { RECONNECT_GRACE_MS, SILENCE_MS, type ClientMessage, type ServerMessage } from './protocol';
 
 export type ConnStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -26,6 +26,7 @@ type Opts = {
 };
 
 const BACKOFF_MS = [500, 1000, 2000, 4000];
+const SILENCE_CHECK_MS = 1000;
 
 /** Reads ?lag=&jitter=&loss= (ms, ms, percent); null when none are present. */
 export function parseLagSim(search: string): LagSim | null {
@@ -47,6 +48,8 @@ export class Connection implements NetLink {
   private droppedAt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private giveUpTimer: ReturnType<typeof setTimeout> | null = null;
+  private silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastHeardAt = 0;
   private lastOutAt = 0;
   private lastInAt = 0;
   private readonly now: () => number;
@@ -81,6 +84,7 @@ export class Connection implements NetLink {
   private shutDown() {
     this.intentional = true;
     this.clearTimers();
+    this.stopSilenceWatch();
     const ws = this.ws;
     this.ws = null;
     ws?.close();
@@ -99,10 +103,12 @@ export class Connection implements NetLink {
       this.attempt = 0;
       this.clearTimers();
       this.setStatus('open');
+      this.watchSilence(ws);
       this.h.onOpen(reconnect);
     };
     ws.onmessage = (e) => {
       if (ws !== this.ws) return;
+      this.lastHeardAt = this.now();
       this.deliverIn(() => {
         if (ws !== this.ws) return;
         const data = e.data as unknown;
@@ -120,8 +126,35 @@ export class Connection implements NetLink {
     ws.onclose = () => {
       if (ws !== this.ws || this.intentional) return;
       this.ws = null;
+      this.stopSilenceWatch();
       this.onDrop();
     };
+  }
+
+  /**
+   * Mobile data can vanish without the socket ever closing. The server pongs every ping (5 s), so silence this long
+   * means the link is dead: drop it ourselves and let the reconnect take over.
+   */
+  private watchSilence(ws: WebSocket) {
+    this.stopSilenceWatch();
+    this.lastHeardAt = this.now();
+    const check = () => {
+      this.silenceTimer = null;
+      if (ws !== this.ws) return;
+      if (this.now() - this.lastHeardAt < SILENCE_MS) {
+        this.silenceTimer = this.setTimer(check, SILENCE_CHECK_MS);
+        return;
+      }
+      this.ws = null;
+      ws.close();
+      this.onDrop();
+    };
+    this.silenceTimer = this.setTimer(check, SILENCE_CHECK_MS);
+  }
+
+  private stopSilenceWatch() {
+    if (this.silenceTimer) clearTimeout(this.silenceTimer);
+    this.silenceTimer = null;
   }
 
   private onDrop() {

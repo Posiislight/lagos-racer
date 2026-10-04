@@ -4,6 +4,8 @@ import {
   MAX_MESSAGE_BYTES,
   RATE_LIMIT_PER_S,
   ROOM_IDLE_MS,
+  SILENCE_MS,
+  UNSEATED_MS,
   cleanNick,
   decodeSnapshot,
   normalizeCode,
@@ -17,7 +19,8 @@ import { Room, type LobbyChange } from './room';
 
 export interface Peer {
   send(data: string | ArrayBuffer): void;
-  close(): void;
+  /** `dead`: the other end has gone quiet, so do not wait on a closing handshake. */
+  close(dead?: boolean): void;
 }
 
 type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
@@ -31,6 +34,10 @@ type Conn = {
   slot: number;
   snapshots: Budget;
   messages: Budget;
+  openedAt: number;
+  lastHeard: number;
+  /** Has ever created, joined or resumed a seat. */
+  seated: boolean;
 };
 
 // Record keeps this list exhaustive when a vehicle is added.
@@ -127,23 +134,32 @@ export class RoomServer {
   private now: () => number;
   private random: () => number;
   private trackId: string;
+  private silenceMs: number;
+  private unseatedMs: number;
 
-  constructor(opts: { now?: () => number; random?: () => number; trackId?: string } = {}) {
+  /** silenceMs and unseatedMs are only changed by tests that are not about liveness. */
+  constructor(opts: { now?: () => number; random?: () => number; trackId?: string; silenceMs?: number; unseatedMs?: number } = {}) {
     this.now = opts.now ?? Date.now;
     this.random = opts.random ?? Math.random;
     this.trackId = opts.trackId ?? 'ojuelegba';
+    this.silenceMs = opts.silenceMs ?? SILENCE_MS;
+    this.unseatedMs = opts.unseatedMs ?? UNSEATED_MS;
   }
 
   open(peer: Peer): number {
     const id = this.nextConn++;
     const now = this.now();
-    this.conns.set(id, { peer, room: null, slot: 0, snapshots: { start: now, count: 0 }, messages: { start: now, count: 0 } });
+    this.conns.set(id, {
+      peer, room: null, slot: 0, snapshots: { start: now, count: 0 }, messages: { start: now, count: 0 },
+      openedAt: now, lastHeard: now, seated: false,
+    });
     return id;
   }
 
   message(conn: number, data: string | ArrayBuffer) {
     const c = this.conns.get(conn);
     if (!c) return;
+    c.lastHeard = this.now();
     const bytes = typeof data === 'string' ? (data.length > MAX_MESSAGE_BYTES ? Infinity : Buffer.byteLength(data)) : data.byteLength;
     // A burst of buffered snapshots must not use up the budget for the finish that follows it.
     if (bytes > MAX_MESSAGE_BYTES || !this.withinRate(typeof data === 'string' ? c.messages : c.snapshots)) return;
@@ -185,6 +201,12 @@ export class RoomServer {
 
   tick() {
     const now = this.now();
+    // A phone that vanished without a close (mobile data gone) is only noticed by its silence.
+    for (const [id, c] of this.conns) {
+      if (now - c.lastHeard < this.silenceMs && (c.seated || now - c.openedAt < this.unseatedMs)) continue;
+      c.peer.close(true);
+      this.close(id);
+    }
     for (const [code, room] of this.rooms) {
       const changed = room.expire(now);
       if (room.size === 0) this.rooms.delete(code);
@@ -256,6 +278,7 @@ export class RoomServer {
   private seat(conn: number, c: Conn, room: Room, name: string, vehicle: VehicleId) {
     const token = randomBytes(18).toString('base64url');
     c.room = room;
+    c.seated = true;
     c.slot = room.add(conn, name, vehicle, token);
     this.send(conn, { t: 'welcome', code: room.code, slot: c.slot, token });
     room.broadcastRoom();
@@ -296,6 +319,7 @@ export class RoomServer {
       room.attach(slot, conn);
       room.lastActivity = this.now();
       c.room = room;
+      c.seated = true;
       c.slot = slot;
       this.send(conn, { t: 'welcome', code: room.code, slot, token });
       room.broadcastRoom();

@@ -19,7 +19,7 @@ const wss = new WebSocketServer({ server: http, maxPayload: MAX_MESSAGE_BYTES })
 wss.on('connection', (ws) => {
   const id = rooms.open({
     send: (data) => ws.send(data),
-    close: () => ws.close(),
+    close: (dead) => (dead ? ws.terminate() : ws.close()),
   });
   ws.on('message', (raw, isBinary) => {
     if (!isBinary) return rooms.message(id, raw.toString());
