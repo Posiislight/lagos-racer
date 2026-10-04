@@ -5,6 +5,8 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { SceneryZone, TrackConfig } from '../config/tracks';
 import { axisPoint, roadSpan, roadToS } from '../game/outAndBack';
+import { zoneSign } from './zoneSign';
+import { flyerHoarding, hospitalBlocks, kioskRow, mosque, parkedKeke, redBlock, shopfront, solarLight, tankerTruck, terminalCanopy, yellowBlock } from './ikoroduLandmarks';
 import { church, directionSign, parkedOkada, petrolStation, statueIsland, tejuoshoBlock } from './landmarks';
 import { distanceToCentre, heightAt, sampleAt, type Track } from '../game/track';
 import { mergeStatic } from '../models/optimize';
@@ -335,11 +337,57 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
         for (let s = s0 + 1; s < s1; s += 2.6 / density) { const p = spot(s, side, hw + 1.2 + r() * 1.6); person(p.x, p.y + PAVE_Y, p.z); }
       } else if (zone.kind === 'petrol') {
         const mid = (s0 + s1) / 2;
-        place(petrolStation(m), spot(mid, side, FRONT + 4), 0);
+        const ap = zoneSign(cfg, 'ap');
+        place(petrolStation(m, ap ? { name: { text: ap.text[0], bg: ap.colors.bg, fg: ap.colors.fg } } : {}), spot(mid, side, FRONT + 4), 0);
         // Okadas parked in a row on the pavement after the forecourt, riders waiting for passengers.
         for (let s = mid + 9; s < s1 + 4; s += 1.4) {
           place(parkedOkada(m, r), spot(s, side, hw + 1.6), PAVE_Y);
           if (r() < 0.35) { const p = spot(s, side, hw + 2.4); person(p.x, p.y + PAVE_Y, p.z, 4); }
+        }
+      } else if (zone.kind === 'lowrise') {
+        street(s0, s1, side, () => (r() < 0.5 ? 'shops' : r() < 0.75 ? 'house' : 'concrete'), { rows: 2, ads: 0.04 });
+      } else if (zone.kind === 'beach') {
+        // Beach Road: wide and quiet, solar lights, big trees; blue kiosks on the right, generic low houses on the left.
+        const northSide = 'street' in zone && zone.street === 'north';
+        if (northSide) {
+          for (let s = s0 + 6; s < s1 - 6; s += 30) place(kioskRow(m, 3 + Math.floor(r() * 2)), spot(s, side, FRONT + 1), PAVE_Y);
+        } else street(s0, s1, side, () => (r() < 0.55 ? 'house' : 'shops'), { rows: 1 });
+        for (let s = s0 + 3; s < s1; s += 36 / Math.max(0.5, density)) place(solarLight(m), spot(s, side, hw + 0.9), PAVE_Y);
+        for (let s = s0 + 10; s < s1 - 4; s += 17) {
+          const sp = spot(s + r() * 6, side, FRONT + 3 + r() * 3);
+          if (clearOf(sp.x, sp.z, 1)) { const g = palm(m, r); g.position.set(sp.x, sp.y, sp.z); g.rotation.y = r() * 6.28; root.add(g); }
+        }
+      } else if (zone.kind === 'hospital') {
+        place(hospitalBlocks(m, zoneSign(cfg, 'paypoint')), spot((s0 + s1) / 2, side, FRONT + 1), PAVE_Y);
+        for (let s = s0; s < s1; s += 4) { const p = spot(s + r() * 3, side, hw + 1.2 + r() * 1.4); person(p.x, p.y + PAVE_Y, p.z); }
+      } else if (zone.kind === 'mosque') {
+        place(mosque(m, zoneSign(cfg, 'mosque')), spot((s0 + s1) / 2, side, FRONT + 2), PAVE_Y);
+        for (let s = s0; s < s1; s += 3) { const p = spot(s + r() * 2, side, hw + 1.2 + r() * 1.6); person(p.x, p.y + PAVE_Y, p.z); }
+      } else if (zone.kind === 'hoarding') {
+        place(flyerHoarding(m, zoneSign(cfg, 'autocad')), spot((s0 + s1) / 2, side, FRONT + 1), PAVE_Y);
+      } else if (zone.kind === 'kfc' || zone.kind === 'tailoring') {
+        const sign = zoneSign(cfg, zone.kind);
+        place(shopfront(m, { sign, w: s1 - s0, color: zone.kind === 'kfc' ? '#e6d8bd' : '#dfe3e6' }), spot((s0 + s1) / 2, side, FRONT), PAVE_Y);
+        for (let s = s0; s < s1; s += 3.5) { const p = spot(s + r() * 2, side, hw + 1.2 + r() * 1.4); person(p.x, p.y + PAVE_Y, p.z); }
+      } else if (zone.kind === 'tanker') {
+        const sp = spot((s0 + s1) / 2, side, hw + 2.4);
+        place(tankerTruck(m), sp, PAVE_Y).rotation.y = sp.yaw + Math.PI / 2;
+        // A stall of colourful plastic goods under a zinc roof, and the rebar of an unfinished building.
+        const st = spot(s1 + 4, side, FRONT + 0.5), goods = new Group();
+        goods.add(box(4, 0.12, 2, zinc, 0, 2.4, -1)); [-1.8, 1.8].forEach(x => goods.add(box(0.1, 2.4, 0.1, m('#6d6d6d'), x, 1.2, -0.1)));
+        ['#e53935', '#1e88e5', '#fdd835', '#43a047'].forEach((c, i) => goods.add(box(0.7, 0.9, 0.6, m(c), -1.4 + i * 0.95, 0.45, -1)));
+        place(goods, st, PAVE_Y);
+        const rb = spot(s1 + 12, side, FRONT + 3), frame = new Group();
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) frame.add(box(0.4, 7, 0.4, m('#8f8b84'), -3 + i * 2, 3.5, -2 - j * 4));
+        frame.add(box(6.4, 0.3, 8.4, m('#8f8b84'), 0, 3.6, -4)); place(frame, rb, PAVE_Y);
+      } else if (zone.kind === 'yellowBlock') {
+        place(yellowBlock(m), spot((s0 + s1) / 2, side, FRONT), PAVE_Y);
+      } else if (zone.kind === 'kekeRow') {
+        // Yellow keke nose to tail along the kerb of the dual carriageway, and the shops behind.
+        street(s0, s1, side, () => (r() < 0.6 ? 'shops' : 'house'), { rows: 2, ads: 0.04 });
+        for (let s = s0 + 2; s < s1 - 2; s += 3.2) {
+          place(parkedKeke(m), spot(s, side, hw + 1.9), PAVE_Y);
+          if (r() < 0.4) { const p = spot(s + 1.5, side, hw + 1.1); person(p.x, p.y + PAVE_Y, p.z, 4); }
         }
       } else if (zone.kind === 'danfoRow') {
         // The shopping complex with yellow danfos lined up nose to tail along the kerb.
@@ -427,6 +475,17 @@ export function buildScenery(cfg: TrackConfig, track: Track, density: number, me
     const c = axisPoint(cfg.axis!, isl.road), g = statueIsland(m, isl.radius);
     g.position.set(c.x, heightAt(track, c.x, c.z), c.z);
     root.add(g);
+    if (isl.backdrop) {
+      // Seen across the roundabout: the red TCL building to the west and the blue bus-terminal canopy to the east.
+      const aim = (lx: number, ln: number, g2: Group) => {
+        const x = c.x + c.tx * lx + c.nx * ln, z = c.z + c.tz * lx + c.nz * ln;
+        g2.position.set(x, heightAt(track, c.x, c.z), z);
+        g2.rotation.y = Math.atan2(c.x - x, c.z - z);
+        root.add(g2);
+      };
+      aim(34, -24, redBlock(m, zoneSign(cfg, 'tcl')));
+      aim(32, 26, terminalCanopy());
+    }
   }
   for (const sg of cfg.signs ?? []) {
     const g = directionSign(m, sg.text, 2 * (hw + 1.2));

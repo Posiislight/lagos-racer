@@ -92,4 +92,24 @@ describe('ikorodu track', () => {
     expect(b).toBeGreaterThan(a);
     expect(cfg.invented![0].why).toMatch(/hospital/);
   });
+
+  it('keeps every zone inside the axis and covers both streets for most of the road', () => {
+    const L = IKORODU_AXIS.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - IKORODU_AXIS[i - 1][0], p[1] - IKORODU_AXIS[i - 1][1]) : 0), 0);
+    for (const street of ['north', 'south'] as const) {
+      const zs = cfg.zones.filter((z): z is Extract<typeof z, { road: [number, number] }> => 'road' in z && z.street === street);
+      let covered = 0;
+      for (const z of zs) {
+        expect(z.road[0]).toBeGreaterThanOrEqual(0);
+        expect(z.road[1]).toBeLessThanOrEqual(L + 0.01);
+        expect(z.road[1]).toBeGreaterThan(z.road[0]);
+        covered += z.road[1] - z.road[0];
+      }
+      expect(covered / L).toBeGreaterThan(0.7);
+    }
+  });
+
+  it('puts each real sign on a zone of its own kind', () => {
+    const kinds = new Set(cfg.zones.map(z => z.kind));
+    for (const k of ['mosque', 'petrol', 'hoarding', 'kfc', 'tailoring', 'hospital'] as const) expect(kinds.has(k)).toBe(true);
+  });
 });

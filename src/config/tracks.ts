@@ -5,7 +5,9 @@ import { IKORODU_AXIS, IKORODU_START } from './ikoroduAxis.ts';
 
 export type ZoneKind =
   | 'market' | 'buildings' | 'danfoPark' | 'palms' | 'billboards'
-  | 'tejuosho' | 'petrol' | 'danfoRow' | 'church' | 'sportsShops';
+  | 'tejuosho' | 'petrol' | 'danfoRow' | 'church' | 'sportsShops'
+  // Ikorodu Garage
+  | 'lowrise' | 'beach' | 'hospital' | 'mosque' | 'hoarding' | 'kfc' | 'tailoring' | 'tanker' | 'yellowBlock' | 'kekeRow';
 
 /**
  * A stretch of scenery. Either by lap fraction (0..1) with a side of the road (-1 left, 1 right,
@@ -44,7 +46,7 @@ export type TrackConfig = {
   /** 'real': draw the real signs listed in src/config/signs (lettering only). Default 'generic': no real names. */
   signage?: 'real' | 'generic';
   /** Raised islands inside a U-turn, centred this far along the axis (a roundabout). */
-  islands?: { road: number; radius: number; statue?: boolean }[];
+  islands?: { road: number; radius: number; statue?: boolean; /** Buildings beyond the roundabout, seen across it. */ backdrop?: boolean }[];
   /** Axis ranges whose road shape is constructed, not taken from the map. track-report lists them. */
   invented?: { road: [number, number]; why: string }[];
   /** Ground colour around the road (laterite). */
@@ -116,13 +118,20 @@ export const TRACKS: TrackConfig[] = [
       { s: 620, kind: 'goat', count: 2 },
       { s: 820, kind: 'chicken', count: 4 },
     ],
+    // Distances along the axis from the hospital; the real stops are in the spec (metres south of the roundabout x 0.3).
+    // North is the right-hand side going to the roundabout (east), south the left (west).
     zones: [
-      { kind: 'buildings', road: [0, IKORODU_LENGTH], street: 'north' },
-      { kind: 'buildings', road: [0, IKORODU_LENGTH], street: 'south' },
+      north('hospital', 8, 50), south('hospital', 8, 50),
+      north('beach', 50, 178), south('beach', 50, 178),
+      north('lowrise', 178, 246), north('kfc', 246, 261), north('tailoring', 262, 277), north('lowrise', 277, 297),
+      north('kekeRow', 297, 335), north('mosque', IKORODU_LENGTH - 75, IKORODU_LENGTH - 40), north('lowrise', IKORODU_LENGTH - 40, IKORODU_LENGTH - 30),
+      north('hoarding', IKORODU_LENGTH - 30, IKORODU_LENGTH - 14),
+      south('tanker', 176, 190), south('lowrise', 190, 288), south('yellowBlock', 288, 302),
+      south('lowrise', 302, IKORODU_LENGTH - 75), south('petrol', IKORODU_LENGTH - 75, IKORODU_LENGTH - 45), south('lowrise', IKORODU_LENGTH - 45, IKORODU_LENGTH - 12),
     ],
     // The real ring is about 5.4 m in radius at this scale, too tight for the BRT; the road round it is 13 m.
     signage: 'real',
-    islands: [{ road: IKORODU_LENGTH, radius: 6.2, statue: true }],
+    islands: [{ road: IKORODU_LENGTH, radius: 6.2, statue: true, backdrop: true }],
     invented: [{ road: [0, 20], why: 'OSM shows only a 34 m service road inside the hospital gate; the U-turn there is a constructed 13 m turning circle in the forecourt' }],
     ground: '#a87d5c',
   },

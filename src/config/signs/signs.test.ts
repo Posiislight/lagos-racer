@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { signsFor } from './ikorodu';
 import { trackById } from '../tracks';
+import { zoneSign } from '../../scene/zoneSign';
 
 describe('ikorodu signs', () => {
   const ik = trackById('ikorodu');
@@ -34,5 +35,11 @@ describe('ikorodu signs', () => {
 
   it('ojuelegba has no signs from this file', () => {
     expect(signsFor(trackById('ojuelegba'))).toEqual([]);
+  });
+
+  it('zoneSign finds a real sign only with real signage', () => {
+    expect(zoneSign(ik, 'kfc')?.text).toEqual(['KFC']);
+    expect(zoneSign({ ...ik, signage: 'generic' }, 'kfc')).toBeUndefined();
+    expect(zoneSign(ik, 'ikor')).toBeUndefined();
   });
 });

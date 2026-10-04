@@ -63,14 +63,14 @@ export function tejuoshoBlock(m: MatFn, length: number) {
 }
 
 /** A petrol station: white canopy with a green band, two pumps, a price board. */
-export function petrolStation(m: MatFn) {
+export function petrolStation(m: MatFn, o: { name?: { text: string; bg: string; fg: string } } = {}) {
   const g = new Group(), white = m('#f4f4f0', { roughness: 0.4, shadow: true }), green = m('#1e8a46', { roughness: 0.4 });
   g.add(box(16, 0.06, 12, m('#9a9890', { roughness: 0.95 }), 0, 0.2, -2));
   g.add(box(14, 0.7, 9, white, 0, 5.6, -2));
   g.add(box(14.2, 0.35, 9.2, green, 0, 5.15, -2));
   for (const [x, z] of [[-5.5, 1], [5.5, 1], [-5.5, -5], [5.5, -5]]) g.add(box(0.4, 5, 0.4, white, x, 2.7, z));
   for (const x of [-2.5, 2.5]) { g.add(box(0.9, 1.7, 0.6, white, x, 1.05, -2)); g.add(box(0.92, 0.35, 0.62, green, x, 1.6, -2)); }
-  const board = new Mesh(new PlaneGeometry(2.2, 3), label('OGA PETROL', '#1e8a46', '#ffffff', 256, 340));
+  const board = new Mesh(new PlaneGeometry(2.2, 3), o.name ? label(o.name.text, o.name.bg, o.name.fg, 256, 340) : label('OGA PETROL', '#1e8a46', '#ffffff', 256, 340));
   const post = box(0.25, 5, 0.25, m('#555a5e', { metalness: 0.5 }), 7.6, 2.5, 1.5);
   board.position.set(7.6, 5.4, 1.65); g.add(post); g.add(board);
   return g;
