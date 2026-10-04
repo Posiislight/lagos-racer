@@ -109,3 +109,17 @@ describe('catchUpGap', () => {
     expect(gap('laps', me, me)).toBe(0);
   });
 });
+
+describe('aiSpecial with a rival who is out', () => {
+  const run = (rivalOut: boolean) => {
+    const r = racerAt(1, 40);
+    r.driver = 'mamaput'; r.charge = 1; r.ai = aiState(0, 1, 2, 0, true);
+    const behind = racerAt(2, 20);
+    if (rivalOut) behind.outAt = 5;
+    const race = raceWith([r, behind]);
+    aiSpecial(r, race, 0.3, () => 0);
+    return aiSpecial(r, race, 0.3, () => 0);
+  };
+  it('does not count a knocked-out racer behind as a target', () => expect(run(true)).toBe(false));
+  it('still fires at a racer behind who is in', () => expect(run(false)).toBe(true));
+});

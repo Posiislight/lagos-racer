@@ -1,6 +1,7 @@
 import type { RaceRuntime } from './runtime';
 import { sampleAt } from './track';
 import { sfx } from './audio';
+import { isIn } from './modes';
 
 /**
  * Goats and chickens wandering across the road: Lagos's answer to Beach Buggy's beach critters.
@@ -109,7 +110,7 @@ export function updateCritters(race: RaceRuntime, dt: number) {
 
 function checkHits(race: RaceRuntime, c: Critter) {
   for (const r of race.racers) {
-    if (!r.body) continue;
+    if (!r.body || !isIn(r)) continue;
     const t = r.body.translation(), q = r.body.rotation();
     const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
     const fx = Math.cos(yaw), fz = -Math.sin(yaw);

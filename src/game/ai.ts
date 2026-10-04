@@ -1,6 +1,7 @@
 import { MathUtils } from 'three';
 import type { RaceRuntime, Racer } from './runtime';
 import { sampleAt } from './track';
+import { isIn } from './modes';
 import { SPECIALS, driverById } from '../config/drivers';
 
 export const AI_NAMES = ['Odogwu Rider', 'Starboy-ish', 'Mama Danfo', 'Conductor Sule', 'Aunty Bisi', 'Area Fada', 'Oga Landlord'];
@@ -60,7 +61,7 @@ export function aiSpecial(r: Racer, race: RaceRuntime, dt: number, rand: () => n
     return Math.abs(race.track.points[sampleAt(race.track, r.progress.s + 25).index].curvature) < 0.02;
   }
   return race.racers.some(o => {
-    if (o === r) return false;
+    if (o === r || !isIn(o)) return false;
     const gap = o.progress.distance - r.progress.distance;
     return gap < -3 && gap > -30;
   });
@@ -89,7 +90,7 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
   // Wander between lanes now and then, and dodge whoever is just ahead in our lane.
   if (Math.random() < dt * 0.25) ai.laneTarget = (Math.random() * 2 - 1) * hw * 0.45;
   for (const o of race.racers) {
-    if (o === r || !o.body) continue;
+    if (o === r || !o.body || !isIn(o)) continue;
     const ahead = o.progress.distance - r.progress.distance;
     if (ahead > 0 && ahead < 12 && Math.abs(o.progress.lateral - ai.lane) < 2.6) {
       ai.laneTarget = MathUtils.clamp(o.progress.lateral + (o.progress.lateral > 0 ? -3.5 : 3.5), -hw * 0.55, hw * 0.55);
@@ -108,7 +109,7 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
     if (along > 4 && along < 28 && Math.abs(side) < 3 && Math.random() < 0.85) ai.laneTarget = MathUtils.clamp(r.progress.lateral - Math.sign(side || 1) * 4.5, -hw * 0.75, hw * 0.75);
   }
   // Someone right alongside: move over to clear them, briskly.
-  const step = sideStep(footprint(r), race.racers.filter(o => o !== r && o.body).map(footprint), hw);
+  const step = sideStep(footprint(r), race.racers.filter(o => o !== r && o.body && isIn(o)).map(footprint), hw);
   if (step !== null) ai.laneTarget = step;
   ai.lane += (ai.laneTarget - ai.lane) * Math.min(1, dt * (step !== null ? 3 : 0.8));
 
@@ -169,7 +170,7 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
     }
     if (r.item === 'odeshi' && race.hazards.some(h => h.kind === 'juju' && h.target === r.id)) use = true;
     for (const o of race.racers) {
-      if (o === r) continue;
+      if (o === r || !isIn(o)) continue;
       const gap = o.progress.distance - r.progress.distance;
       if (r.item === 'juju' && gap > 5 && gap < 120) use ||= ai.itemDelay < 0;
       if ((r.item === 'oil' || r.item === 'odeshi') && gap < -3 && gap > -25) use ||= ai.itemDelay < 0;

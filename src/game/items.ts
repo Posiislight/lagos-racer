@@ -1,6 +1,7 @@
 import type { Hazard, ItemKind, Pickup, RaceRuntime, Racer } from './runtime';
 import { heightAt, sampleAt } from './track';
 import { standings } from './race';
+import { isIn } from './modes';
 import { sfx } from './audio';
 
 export const ITEM_LABEL: Record<ItemKind, string> = { fuel: 'Fuel', oil: 'Crude oil', juju: 'Juju', odeshi: 'Odeshi' };
@@ -31,7 +32,7 @@ export function makePickups(race: Pick<RaceRuntime, 'config' | 'track'>, nextId:
 
 /** The racer a juju should fly at: whoever is directly ahead, or second place if you lead. */
 export function jujuTarget(race: RaceRuntime, from: Racer): Racer | null {
-  const order = standings(race.racers).filter(r => r.progress.finishTime === null);
+  const order = standings(race.racers).filter(r => r.progress.finishTime === null && isIn(r));
   const i = order.indexOf(from);
   if (i > 0) return order[i - 1];
   return order[i + 1] ?? null;
@@ -42,7 +43,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
   for (const p of race.pickups) {
     if (p.respawn > 0) { p.respawn -= dt; continue; }
     for (const r of race.racers) {
-      if (!r.body || r.item) continue;
+      if (!r.body || r.item || !isIn(r)) continue;
       const t = r.body.translation();
       const reach = PICKUP_RADIUS + r.vehicle.chassis.width * r.vehicle.scale * 0.5;
       if ((t.x - p.x) ** 2 + (t.z - p.z) ** 2 < reach * reach) {
@@ -57,7 +58,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
 
   // Use items.
   for (const r of race.racers) {
-    if (!r.controls.useItem || !r.item || !r.body || race.phase === 'countdown') continue;
+    if (!r.controls.useItem || !r.item || !r.body || !isIn(r) || race.phase === 'countdown') continue;
     const t = r.body.translation(), q = r.body.rotation(), lv = r.body.linvel();
     const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
     const fx = Math.cos(yaw), fz = -Math.sin(yaw);
@@ -99,7 +100,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
     if (h.kind === 'juju') updateJuju(race, h, dt, flash);
     else if (h.kind === 'oil') {
       for (const r of race.racers) {
-        if (!r.body || r.immune > 0 || r.shield > 0 || (h.armed > 0 && r.id === h.owner)) continue;
+        if (!r.body || !isIn(r) || r.immune > 0 || r.shield > 0 || (h.armed > 0 && r.id === h.owner)) continue;
         const t = r.body.translation();
         if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 < OIL_RADIUS * OIL_RADIUS) {
           r.slip = Math.max(r.slip, lasting(r, 2.6));
@@ -117,7 +118,7 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
 
 /** A juju homes in on its target, skimming over the road, and slows them down when it lands. */
 function updateJuju(race: RaceRuntime, h: Hazard, dt: number, flash: (m: string) => void) {
-  const target = race.racers.find(r => r.id === h.target && r.body);
+  const target = race.racers.find(r => r.id === h.target && r.body && isIn(r));
   h.ground = heightAt(race.track, h.x, h.z);
   if (target?.body) {
     const t = target.body.translation();
@@ -131,7 +132,7 @@ function updateJuju(race: RaceRuntime, h: Hazard, dt: number, flash: (m: string)
   h.y += ((h.ground + 1.6 + Math.sin(h.life * 9) * 0.25) - h.y) * Math.min(1, dt * 6);
 
   for (const r of race.racers) {
-    if (!r.body || r.id === h.owner) continue;
+    if (!r.body || !isIn(r) || r.id === h.owner) continue;
     const t = r.body.translation(), reach = JUJU_HIT + r.vehicle.chassis.width * r.vehicle.scale * 0.5;
     if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 > reach * reach) continue;
     if (r.shield > 0) {

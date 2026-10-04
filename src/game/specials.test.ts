@@ -174,3 +174,22 @@ describe('speedFactors', () => {
     expect(f.top).toBeCloseTo(1.534, 3);
   });
 });
+
+describe('a racer who is out (knocked out of an elimination)', () => {
+  it('stops charging its meter, while one still in keeps charging', () => {
+    const out = racerAt(1, 40), inRace = racerAt(2, 40, true);
+    out.outAt = 5;
+    updateSpecials(raceWith([out, inRace]), 1, vi.fn());
+    expect(out.charge).toBe(0);
+    expect(inRace.charge).toBeGreaterThan(0);
+  });
+
+  it('does not cough on a soup patch', () => {
+    const owner = racerAt(1, 80), out = racerAt(2, 40);
+    out.outAt = 5;
+    const race = raceWith([owner, out]);
+    race.hazards.push(soupAt(out.body!.translation(), owner.id));
+    updateSpecials(race, 0.016, vi.fn());
+    expect(out.cough).toBe(0);
+  });
+});

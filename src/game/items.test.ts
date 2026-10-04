@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { type Hazard, type RaceRuntime } from './runtime';
-import { ITEM_LABEL, makePickups, updateItems } from './items';
+import { ITEM_LABEL, jujuTarget, makePickups, updateItems } from './items';
 import { racerAt, raceWith, track } from './testkit';
 
 const slick = (at: { x: number; z: number }, owner: number): Hazard =>
@@ -75,5 +75,55 @@ describe('soup patches', () => {
     race.hazards.push({ id: 97, kind: 'soup', x: at.x, y: 0, z: at.z, vx: 0, vy: 0, vz: 0, owner: owner.id, target: null, life: 9, armed: 0, ground: 0 });
     updateItems(race, 0.016, vi.fn());
     expect(caught.slip).toBe(0);
+  });
+});
+
+describe('a racer who is out (knocked out of an elimination)', () => {
+  it('is never the target of a juju', () => {
+    const last = racerAt(1, 20), middle = racerAt(2, 40), leader = racerAt(3, 60);
+    middle.outAt = 5;
+    expect(jujuTarget(raceWith([last, middle, leader]), last)).toBe(leader);
+  });
+
+  it('does not pick up an item, while a racer still in takes it from the same orb', () => {
+    const out = racerAt(1, 40), inRace = racerAt(2, 40);
+    out.outAt = 5;
+    const at = out.body!.translation();
+    const orb = () => ({ id: 1, kind: 'fuel' as const, x: at.x, y: at.y, z: at.z, s: 40, respawn: 0 });
+    const a = raceWith([out]);
+    a.pickups.push(orb());
+    updateItems(a, 0.016, vi.fn());
+    expect(out.item).toBeNull();
+    expect(a.pickups[0].respawn).toBe(0);
+    const b = raceWith([out, inRace]);
+    b.pickups.push(orb());
+    updateItems(b, 0.016, vi.fn());
+    expect(inRace.item).toBe('fuel');
+  });
+
+  it('is not cursed by a juju that reaches it', () => {
+    const thrower = racerAt(1, 20), out = racerAt(2, 40);
+    out.outAt = 5;
+    const race = raceWith([thrower, out]);
+    race.hazards.push(juju(out.body!.translation(), thrower.id, out.id));
+    updateItems(race, 0.016, vi.fn());
+    expect(out.curse).toBe(0);
+    expect(out.setLinvel).not.toHaveBeenCalled();
+  });
+
+  it('is not slicked by crude oil', () => {
+    const owner = racerAt(1, 80), out = racerAt(2, 40);
+    out.outAt = 5;
+    const race = raceWith([owner, out]);
+    race.hazards.push(slick(out.body!.translation(), owner.id));
+    updateItems(race, 0.016, vi.fn());
+    expect(out.slip).toBe(0);
+  });
+
+  it('cannot use an item it was holding', () => {
+    const out = racerAt(1, 40);
+    out.outAt = 5; out.item = 'fuel'; out.controls.useItem = true;
+    updateItems(raceWith([out]), 0.016, vi.fn());
+    expect(out.boost).toBe(0);
   });
 });

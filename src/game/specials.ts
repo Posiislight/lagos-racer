@@ -2,6 +2,7 @@ import type { RaceRuntime, Racer } from './runtime';
 import { SPECIALS, driverById } from '../config/drivers';
 import { lasting } from './items';
 import { sfx } from './audio';
+import { isIn } from './modes';
 
 /**
  * Driver special powers. Each racer has a meter that fills while the race is on; at full, the special
@@ -21,8 +22,8 @@ export function speedFactors(r: Pick<Racer, 'boost' | 'curse' | 'push' | 'cough'
 
 export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string) => void) {
   for (const r of race.racers) {
-    // The race is on for everyone but during the countdown; a racer who has finished stops charging.
-    const on = race.phase !== 'countdown' && r.progress.finishTime === null;
+    // The race is on for everyone but during the countdown; a racer who has finished or is out stops charging.
+    const on = race.phase !== 'countdown' && r.progress.finishTime === null && isIn(r);
     const special = driverById(r.driver).special;
     if (on) r.charge = Math.min(1, r.charge + dt / special.chargeTime);
 
@@ -44,7 +45,7 @@ export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string)
     r.cough = Math.max(0, r.cough - dt);
     r.trail = Math.max(0, r.trail - dt);
     if (r.progress.finishTime !== null) { r.push = 0; r.trail = 0; }
-    if (r.trail > 0 && r.body) dropSoup(race, r, dt);
+    if (r.trail > 0 && r.body && isIn(r)) dropSoup(race, r, dt);
   }
 
   // Anyone who drives through a patch coughs: slower and swerving, with a second's grace afterwards.
@@ -56,7 +57,7 @@ export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string)
     spots ??= race.racers.map(v => { const t = v.body?.translation(); return { x: t?.x ?? 0, z: t?.z ?? 0 }; });
     for (let i = 0; i < race.racers.length; i++) {
       const v = race.racers[i];
-      if (!v.body || v.id === h.owner || v.shield > 0 || v.immune > 0) continue;
+      if (!v.body || !isIn(v) || v.id === h.owner || v.shield > 0 || v.immune > 0) continue;
       const t = spots[i];
       if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 >= reach2) continue;
       v.cough = Math.max(v.cough, lasting(v, SPECIALS.soup.cough));
