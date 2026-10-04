@@ -2,6 +2,7 @@ import {
   FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
   MAX_HUMANS,
+  LOBBY_GRACE_MS,
   RECONNECT_GRACE_MS,
   START_LEAD_MS,
   type ClientMessage,
@@ -30,6 +31,8 @@ type Member = {
   /** Null while disconnected and waiting out the reconnect grace. */
   conn: number | null;
   leftAt: number | null;
+  /** How long the seat is kept from leftAt: longer if the drop happened in the lobby. */
+  grace: number;
 };
 
 export type LobbyChange = { vehicle?: VehicleId; ready?: boolean; fillAI?: boolean };
@@ -77,7 +80,7 @@ export class Room {
   add(conn: number, name: string, vehicle: VehicleId, token: string): number {
     let slot = 1;
     while (this.members.has(slot)) slot++;
-    this.members.set(slot, { slot, name, vehicle, ready: false, token, conn, leftAt: null });
+    this.members.set(slot, { slot, name, vehicle, ready: false, token, conn, leftAt: null, grace: RECONNECT_GRACE_MS });
     if (this.members.size === 1) this.hostSlot = slot;
     return slot;
   }
@@ -115,6 +118,7 @@ export class Room {
     if (!m) return;
     m.conn = null;
     m.leftAt = now;
+    m.grace = this.phase === 'lobby' ? LOBBY_GRACE_MS : RECONNECT_GRACE_MS;
   }
 
   /** Gone for good: in a race their cars are out of it at once. */
@@ -141,7 +145,7 @@ export class Room {
   }
 
   private expired(m: Member, now: number) {
-    return m.leftAt !== null && now - m.leftAt >= RECONNECT_GRACE_MS;
+    return m.leftAt !== null && now - m.leftAt >= m.grace;
   }
 
   /** Left the room, or away longer than the grace period. */

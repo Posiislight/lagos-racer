@@ -5,6 +5,9 @@ import { buildTrack, sampleAt } from '../src/game/track';
 import {
   FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
+  LOBBY_GRACE_MS,
+  LOBBY_SILENCE_MS,
+  SILENCE_MS,
   RECONNECT_GRACE_MS,
   ROOM_IDLE_MS,
   START_LEAD_MS,
@@ -42,12 +45,20 @@ beforeEach(() => {
   let seed = 7;
   const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // Most tests jump the clock without pings; the liveness tests below build a server that checks for silence.
-  server = new RoomServer({ now: () => now, random, silenceMs: Infinity, unseatedMs: Infinity });
+  server = new RoomServer({ now: () => now, random, liveness: false });
 });
 
 const withLiveness = () => {
   server = new RoomServer({ now: () => now });
 };
+/** Advances the clock in steps of at most 5 s, with only `alive` pinging. */
+function quiet(ms: number, alive: number[]) {
+  for (let t = 0; t < ms; t += 5000) {
+    now += Math.min(5000, ms - t);
+    for (const conn of alive) send(conn, { t: 'ping', c: t });
+    server.tick();
+  }
+}
 
 function connect() {
   const peer = new FakePeer();
@@ -181,12 +192,13 @@ describe('RoomServer', () => {
     expect(msgs(c.peer, 'error')[0].error).toBe('expired');
   });
 
-  it('frees the slot after 15 s without a resume and hands host to the lowest slot', () => {
+  it('in the lobby, frees the slot after 120 s without a resume and hands host to the lowest slot', () => {
     const a = create();
     const b = join(a.welcome.code);
     join(a.welcome.code);
     server.close(a.conn);
-    now += RECONNECT_GRACE_MS - 1;
+    // Long enough to go and share the room link in another app.
+    now += LOBBY_GRACE_MS - 1;
     server.tick();
     expect(lastRoom(b.peer).players.map(p => p.slot)).toEqual([1, 2, 3]);
 
@@ -279,7 +291,7 @@ describe('RoomServer', () => {
 
     const c = create();
     server.close(c.conn);
-    now += RECONNECT_GRACE_MS;
+    now += LOBBY_GRACE_MS;
     server.tick();
     expect(server.rooms.size).toBe(0);
   });
@@ -299,26 +311,39 @@ describe('RoomServer', () => {
     expect(msgs(c.peer, 'pong')[0]).toEqual({ t: 'pong', c: 123, s: now });
   });
 
-  it('closes a connection silent for 12 s, and its member drops into the reconnect grace', () => {
+  it('in the lobby, closes a connection only after 90 s of silence, and keeps its seat for 120 s', () => {
     withLiveness();
     const a = create();
     const b = join(a.welcome.code);
     const room = server.rooms.get(a.welcome.code)!;
-    for (let t = 0; t < 4; t++) {
-      now += 5000;
-      send(a.conn, { t: 'ping', c: t });
-      server.tick();
-    }
-    // b went quiet 20 s ago; a pinged every 5 s.
+    // b is off in another app sharing the link; a keeps pinging.
+    quiet(LOBBY_SILENCE_MS - 1, [a.conn]);
+    expect(b.peer.closed).toBe(false);
+    quiet(1, [a.conn]);
     expect(a.peer.closed).toBe(false);
     expect(b.peer.closed).toBe(true);
     expect(b.peer.dead).toBe(true);
     expect(lastRoom(a.peer).players.map(p => [p.slot, p.connected])).toEqual([[1, true], [2, false]]);
-    expect(room.size).toBe(2);
     // A closed connection says nothing more.
     const sent = b.peer.sent.length;
     send(b.conn, { t: 'ping', c: 1 });
     expect(b.peer.sent).toHaveLength(sent);
+    quiet(LOBBY_GRACE_MS - 5000, [a.conn]);
+    expect(room.size).toBe(2);
+    const back = connect();
+    send(back.conn, { t: 'resume', token: msgs(b.peer, 'welcome')[0].token });
+    expect(msgs(back.peer, 'welcome')[0].slot).toBe(2);
+  });
+
+  it('in a race, closes a connection silent for 12 s', () => {
+    withLiveness();
+    const { a, b, c, d2 } = racers();
+    for (const p of [a, b, c, d2]) send(p.conn, { t: 'ping', c: 0 });
+    quiet(SILENCE_MS - 1, [a.conn, c.conn, d2.conn]);
+    expect(b.peer.closed).toBe(false);
+    quiet(1, [a.conn, c.conn, d2.conn]);
+    expect(b.peer.closed).toBe(true);
+    expect(a.peer.closed).toBe(false);
   });
 
   it('keeps a quiet connection open until 12 s have passed', () => {
@@ -975,8 +1000,38 @@ describe('finish and results', () => {
     }
     send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
     expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
-    // Snapshots keep their own limit.
-    expect(b.peer.sent.filter(d => typeof d !== 'string').length - relayed).toBeLessThanOrEqual(30);
+    expect(b.peer.sent.filter(d => typeof d !== 'string').length - relayed).toBe(40);
+  });
+
+  it('accepts an honest finish after a 6 s stall delivers 90 snapshots at once', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const time = (LAPS * L) / 25;
+    const T = half(time);
+    drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, T - 6);
+    // 6 s of snapshots at 15 a second, all arriving in the same millisecond, then the finish.
+    now = startAt + (T + 1) * 1000;
+    for (let i = 1; i <= 90; i++) {
+      const t = T - 6 + i / 15;
+      server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: t, cars: [carAt(0, 25 * t)] }));
+    }
+    send(a.conn, { t: 'finish', netId: 0, laps: lapsAt(25), time });
+    expect(msgs(b.peer, 'finished')).toEqual([{ t: 'finished', netId: 0, time }]);
+  });
+
+  it('still limits a sustained flood of snapshots', () => {
+    const { a, b } = racers();
+    const startAt = msgs(a.peer, 'start')[0].at;
+    const relayed = () => b.peer.sent.filter(d => typeof d !== 'string').length;
+    const before = relayed();
+    // 100 a second for 10 s: the burst allowance, then 30 a second.
+    for (let ms = 0; ms < 10_000; ms += 10) {
+      now = startAt + 1000 + ms;
+      const t = 1 + ms / 1000;
+      server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: t, cars: [carAt(0, 5 * t)] }));
+    }
+    expect(relayed() - before).toBeLessThanOrEqual(150 + 30 * 10 + 1);
+    expect(relayed() - before).toBeGreaterThanOrEqual(150 + 30 * 10 - 1);
   });
 
   it('refuses a finish claimed from the future', () => {

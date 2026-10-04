@@ -16,6 +16,9 @@ export const RATE_LIMIT_PER_S = 30;
 export const SILENCE_MS = 12000;
 // A socket that never takes a seat is closed after this long.
 export const UNSEATED_MS = 30000;
+// In the lobby a phone may be off in another app sharing the link: be much more patient there.
+export const LOBBY_SILENCE_MS = 90000;
+export const LOBBY_GRACE_MS = 120000;
 
 // No I or O, so codes survive being read out over a voice note.
 export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

@@ -4,6 +4,7 @@ import {
   MAX_MESSAGE_BYTES,
   RATE_LIMIT_PER_S,
   ROOM_IDLE_MS,
+  LOBBY_SILENCE_MS,
   SILENCE_MS,
   UNSEATED_MS,
   cleanNick,
@@ -25,14 +26,21 @@ export interface Peer {
 
 type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
 
-/** One second's message count; snapshots and JSON messages each get their own. */
+/** One second's count of JSON messages. */
 type Budget = { start: number; count: number };
+
+/**
+ * Snapshots get a token bucket instead: a socket that stalled for a few seconds delivers them all at once, and the
+ * referee needs every one to see the car reach the line. A steady flood is still held to 30 a second.
+ */
+type Bucket = { tokens: number; at: number };
+const SNAPSHOT_BURST = 150;
 
 type Conn = {
   peer: Peer;
   room: Room | null;
   slot: number;
-  snapshots: Budget;
+  snapshots: Bucket;
   messages: Budget;
   openedAt: number;
   lastHeard: number;
@@ -134,23 +142,21 @@ export class RoomServer {
   private now: () => number;
   private random: () => number;
   private trackId: string;
-  private silenceMs: number;
-  private unseatedMs: number;
+  private liveness: boolean;
 
-  /** silenceMs and unseatedMs are only changed by tests that are not about liveness. */
-  constructor(opts: { now?: () => number; random?: () => number; trackId?: string; silenceMs?: number; unseatedMs?: number } = {}) {
+  /** liveness is only turned off by tests that jump the clock without pinging. */
+  constructor(opts: { now?: () => number; random?: () => number; trackId?: string; liveness?: boolean } = {}) {
     this.now = opts.now ?? Date.now;
     this.random = opts.random ?? Math.random;
     this.trackId = opts.trackId ?? 'ojuelegba';
-    this.silenceMs = opts.silenceMs ?? SILENCE_MS;
-    this.unseatedMs = opts.unseatedMs ?? UNSEATED_MS;
+    this.liveness = opts.liveness ?? true;
   }
 
   open(peer: Peer): number {
     const id = this.nextConn++;
     const now = this.now();
     this.conns.set(id, {
-      peer, room: null, slot: 0, snapshots: { start: now, count: 0 }, messages: { start: now, count: 0 },
+      peer, room: null, slot: 0, snapshots: { tokens: SNAPSHOT_BURST, at: now }, messages: { start: now, count: 0 },
       openedAt: now, lastHeard: now, seated: false,
     });
     return id;
@@ -162,7 +168,8 @@ export class RoomServer {
     c.lastHeard = this.now();
     const bytes = typeof data === 'string' ? (data.length > MAX_MESSAGE_BYTES ? Infinity : Buffer.byteLength(data)) : data.byteLength;
     // A burst of buffered snapshots must not use up the budget for the finish that follows it.
-    if (bytes > MAX_MESSAGE_BYTES || !this.withinRate(typeof data === 'string' ? c.messages : c.snapshots)) return;
+    if (bytes > MAX_MESSAGE_BYTES) return;
+    if (typeof data === 'string' ? !this.withinRate(c.messages) : !this.takeToken(c.snapshots)) return;
     if (typeof data !== 'string') return this.relay(c, data);
     const m = parse(data);
     if (!m) return;
@@ -203,7 +210,10 @@ export class RoomServer {
     const now = this.now();
     // A phone that vanished without a close (mobile data gone) is only noticed by its silence.
     for (const [id, c] of this.conns) {
-      if (now - c.lastHeard < this.silenceMs && (c.seated || now - c.openedAt < this.unseatedMs)) continue;
+      if (!this.liveness) break;
+      // A phone in the lobby may be off sharing the link; in a race, silence means the link is gone.
+      const silence = c.room?.phase === 'lobby' ? LOBBY_SILENCE_MS : SILENCE_MS;
+      if (now - c.lastHeard < silence && (c.seated || now - c.openedAt < UNSEATED_MS)) continue;
       c.peer.close(true);
       this.close(id);
     }
@@ -216,6 +226,15 @@ export class RoomServer {
         room.tick(now);
       }
     }
+  }
+
+  private takeToken(b: Bucket): boolean {
+    const now = this.now();
+    b.tokens = Math.min(SNAPSHOT_BURST, b.tokens + ((now - b.at) / 1000) * RATE_LIMIT_PER_S);
+    b.at = now;
+    if (b.tokens < 1) return false;
+    b.tokens--;
+    return true;
   }
 
   private withinRate(b: Budget): boolean {
