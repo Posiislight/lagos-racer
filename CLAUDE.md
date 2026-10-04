@@ -88,6 +88,8 @@ Milestones 1–3 are built, and milestone 4 is partly done.
 
 **Current milestone: multiplayer, friends' private rooms** (2–6 players by room code or link, with optional AI fill). Design: `docs/superpowers/specs/2026-10-03-multiplayer-design.md`. Public matchmaking is still out of scope.
 
+**Single-player campaign** (started on 4 October at the user's request, separate from the multiplayer milestone): Chapter 1 is four races, two per map (Ojuelegba, Ikorodu Garage): a normal race, a normal race, an elimination race (LASTMA clamps whoever is last on a timer), and a hard 1-on-1 duel with Mama Put. Finishing the duel unlocks Mama Put as a playable driver; she stays locked in the Garage until `campaign-1-4` is cleared. Config in `src/config/campaign.ts`, rules in `src/game/campaign.ts`, race modes in `src/game/modes.ts`, race setup in `src/game/setup.ts`. In the campaign only the duel's AI (Mama Put) uses its driver special. Spec `docs/superpowers/specs/2026-10-04-campaign-design.md`, plan `docs/superpowers/plans/2026-10-04-campaign.md`, GitHub issue #4.
+
 Do not start a later milestone until the earlier one feels fun.
 
 ## Working style
