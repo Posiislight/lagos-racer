@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
+import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
 import { loadSave, writeSave, type Saved, type Settings } from './save';
 
@@ -43,6 +44,7 @@ export type State = Saved & {
   setScreen: (s: Screen) => void;
   setVehicle: (v: VehicleId) => void;
   setPaint: (v: VehicleId, paint: string) => void;
+  setDriver: (d: DriverId) => void;
   /** One more pickup has shown its how-to hint. */
   countItemHint: () => void;
   unlock: (v: VehicleId) => void;
@@ -74,6 +76,7 @@ export const useGame = create<State>((set, get) => ({
   setScreen: screen => set({ screen }),
   setVehicle: vehicle => { set({ vehicle }); save(); },
   setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
+  setDriver: driver => { set({ driver }); save(); },
   countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), price = VEHICLES.find(x => x.id === v)?.locked?.coins ?? 0;
@@ -104,6 +107,6 @@ function save() {
   const s = useGame.getState();
   writeSave({
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
-    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints,
+    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints, driver: s.driver,
   });
 }

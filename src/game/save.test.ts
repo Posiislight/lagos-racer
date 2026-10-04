@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { migrateSave } from './save';
+import { defaultSave, migrateSave } from './save';
 
 describe('migrateSave (v1 → v2)', () => {
   it('migrates the blue okada to an okada painted blue', () => {
@@ -34,5 +34,16 @@ describe('migrateSave (v1 → v2)', () => {
       expect(s.unlocked).toEqual([]);
       expect(s.itemHints).toBe(0);
     }
+  });
+});
+
+describe('driver', () => {
+  it('keeps a saved driver', () => {
+    expect(migrateSave({ driver: 'mamaput' }).driver).toBe('mamaput');
+  });
+
+  it('falls back to Moshood when the driver is missing or junk', () => {
+    for (const raw of [{}, { driver: 7 }, { driver: null }, { driver: 'bob' }]) expect(migrateSave(raw).driver).toBe('moshood');
+    expect(defaultSave().driver).toBe('moshood');
   });
 });

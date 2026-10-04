@@ -1,4 +1,5 @@
 import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
 
 /**
  * What the game keeps in localStorage between visits. Version 2 has four vehicles with paints; a
@@ -19,6 +20,8 @@ export type Saved = {
   paint: Partial<Record<VehicleId, string>>;
   /** How many power-up pickups have shown the full how-to hint. */
   itemHints: number;
+  /** The chosen driver (who sits in the vehicle and which special power you get). */
+  driver: DriverId;
 };
 
 export const SAVE_KEY = 'lagos-racer:v2';
@@ -34,7 +37,7 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0,
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER,
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -62,6 +65,7 @@ function normalise(raw: Record<string, unknown>): Saved {
     accountPromptDismissed: raw.accountPromptDismissed === true,
     paint: isObj(raw.paint) ? raw.paint as Saved['paint'] : {},
     itemHints: num(raw.itemHints, 0),
+    driver: sanitizeDriver(raw.driver),
   };
 }
 
