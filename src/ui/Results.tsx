@@ -1,6 +1,7 @@
 import { useGame } from '../game/store';
 import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
+import { formatNaira } from '../config/economy';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
@@ -29,7 +30,7 @@ export function Results() {
             ))}
           </tbody>
         </table>
-        <p className="earned">+ ₦ {coinsEarned} coins</p>
+        <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time. Finish top 3 to earn'}</p>
         {showAccountPrompt && (
           <div className="account">
             <p><b>Keep your coins safe.</b> Create an account to save your coins and high score on any phone.</p>

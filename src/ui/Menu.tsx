@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { vehicleById } from '../config/vehicles';
 import { trackById } from '../config/tracks';
+import { formatNaira } from '../config/economy';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
 import { enableTilt } from '../game/input';
@@ -30,7 +31,7 @@ export function Menu() {
           <small>Ojuelegba Grand Prix</small>
           <h1>LAGOS RACER</h1>
         </div>
-        <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
+        <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
       </header>
       <div className="menu-preview">
         <Suspense fallback={null}><Preview id={vehicle} /></Suspense>
