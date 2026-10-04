@@ -317,3 +317,45 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .track-picker { display: flex; gap: 6px; margin: 8px 0 0; flex-wrap: wrap; }
 .track-chip { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.25); color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
 .track-chip.on { background: #f5b400; color: #1a1a1a; border-color: #f5b400; }
+
+/* ---------- campaign ---------- */
+.campaign {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+  background: linear-gradient(180deg, #26324a, #4a3a2c);
+  padding: calc(12px + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
+  color: var(--paper);
+}
+.stops-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; align-content: center; }
+@media (max-width: 720px) and (orientation: portrait) { .stops-list { grid-template-columns: 1fr; align-content: start; } }
+.stop {
+  width: 100%; min-height: 76px; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  background: var(--chip); color: var(--ink); border: 2px solid var(--ink); border-radius: 12px; padding: 10px 14px; box-shadow: 0 3px 0 var(--ink);
+}
+.stop.open { background: var(--yellow); }
+.stop.cleared { background: #d9f0de; }
+.stop.locked { background: #8b8378; color: #2b2620; cursor: default; box-shadow: none; opacity: .75; }
+.stop .num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--board); color: var(--led); display: grid; place-items: center; font-family: Bungee, Impact, sans-serif; font-size: 18px; }
+.stop .what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stop .what b { font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 17px; line-height: 1.15; }
+.stop .what small { font-size: 13px; font-weight: 700; opacity: .8; }
+.stop .state { flex: none; font-weight: 900; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.modal-card .story { margin: 4px 0; line-height: 1.4; }
+.modal-card .rule { margin: 4px 0 8px; }
+.modal-card .taunt { margin: 4px 0 10px; font-style: italic; color: var(--muted); }
+.result-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.result-head h2 { margin-right: 0; }
+.verdict { display: inline-block; margin: 12px 0 0; padding: 2px 12px; border-radius: 8px; font-family: Bungee, Impact, sans-serif; font-size: 16px; color: #fff; }
+.verdict.passed { background: var(--green); }
+.verdict.failed { background: var(--red); }
+.unlocked { background: #fff1c2; border: 2px solid var(--ink); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.unlocked p { margin: 0; }
+.drivers button.locked { opacity: .65; cursor: default; }
+.drivers button.locked small { display: block; font-weight: 800; opacity: 1; }
+@media (max-height: 480px) {
+  .stop { min-height: 64px; padding: 6px 12px; }
+  .stop .what b { font-size: 15px; }
+  .menu-row .btn { padding: 8px 12px; min-height: 44px; font-size: 15px; }
+}
+.menu-row { flex-wrap: nowrap; }
+.menu-row .btn { flex: 1 1 0; padding-left: 8px; padding-right: 8px; }
+.campaign .card { color: var(--ink); }

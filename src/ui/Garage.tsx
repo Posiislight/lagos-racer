@@ -2,6 +2,7 @@ import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { VEHICLES, paintOf, type VehicleId } from '../config/vehicles';
 import { DRIVERS } from '../config/drivers';
+import { driverAvailable } from '../game/campaign';
 
 const Preview = lazy(() => import('./Preview'));
 
@@ -15,7 +16,7 @@ function Bar({ label, value }: { label: string; value: number }) {
 }
 
 export function Garage() {
-  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock, paint, setPaint, driver, setDriver } = useGame();
+  const { vehicle, setVehicle, setScreen, coins, unlocked, unlock, paint, setPaint, driver, setDriver, campaign } = useGame();
   const [looking, setLooking] = useState<VehicleId>(vehicle);
   const v = VEHICLES.find(x => x.id === looking)!;
   const isLocked = !!v.locked && !unlocked.includes(v.id);
@@ -74,13 +75,16 @@ export function Garage() {
         })}
       </div>
       <div className="drivers" role="tablist" aria-label="Drivers">
-        {DRIVERS.map(d => (
-          <button key={d.id} role="tab" aria-selected={d.id === driver} onClick={() => setDriver(d.id)}>
-            <b>{d.name}</b><span className="role"> · {d.role}</span>
-            <span className="special">{d.special.name} · charges in {d.special.chargeTime} s</span>
-            <small>{d.blurb}</small>
-          </button>
-        ))}
+        {DRIVERS.map(d => {
+          const open = driverAvailable(d.id, campaign.cleared);
+          return (
+            <button key={d.id} role="tab" aria-selected={d.id === driver} aria-disabled={!open} className={open ? undefined : 'locked'} onClick={() => { if (open) setDriver(d.id); }}>
+              <b>{d.name}</b><span className="role"> · {d.role}</span>{!open && <span className="lock" aria-label="locked"> 🔒</span>}
+              <span className="special">{d.special.name} · charges in {d.special.chargeTime} s</span>
+              <small>{open ? d.blurb : `Beat ${d.name} in the campaign to unlock`}</small>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

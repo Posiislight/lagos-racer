@@ -4,6 +4,7 @@ import { setSoundEnabled, unlockAudio } from './game/audio';
 import { startKeyboard } from './game/input';
 import { Menu } from './ui/Menu';
 import { Garage } from './ui/Garage';
+import { Campaign } from './ui/Campaign';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
 const Race = lazy(() => import('./ui/Race'));
@@ -26,6 +27,7 @@ export function App() {
     <div className="app">
       {screen === 'menu' && <Menu />}
       {screen === 'garage' && <Garage />}
+      {screen === 'campaign' && <Campaign />}
       {screen === 'race' && (
         <Suspense fallback={<Loading />}>
           <Race />

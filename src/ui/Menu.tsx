@@ -6,6 +6,7 @@ import { driverById } from '../config/drivers';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
 import { enableTilt } from '../game/input';
+import type { RaceSpec } from '../config/campaign';
 
 const Preview = lazy(() => import('./Preview'));
 
@@ -19,8 +20,15 @@ export function goFullscreen() {
   }
 }
 
+/** Start a race from a button press: fullscreen and tilt need the tap, then the quick race or the campaign race. */
+export function launchRace(spec?: RaceSpec) {
+  goFullscreen();
+  if (useGame.getState().settings.steering === 'tilt') void enableTilt();
+  useGame.getState().startRace(spec);
+}
+
 export function Menu() {
-  const { vehicle, coins, startRace, setScreen, best, track, paint, driver, setTrack } = useGame();
+  const { vehicle, coins, setScreen, best, track, paint, driver, setTrack } = useGame();
   const [settings, setSettings] = useState(false);
   const v = vehicleById(vehicle), t = trackOrDefault(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
   return (
@@ -51,8 +59,9 @@ export function Menu() {
           <p className="muted">{t.blurb}</p>
           <p className="credit muted">Road layout © OpenStreetMap contributors</p>
         </div>
-        <button className="btn primary big" onClick={() => { goFullscreen(); if (useGame.getState().settings.steering === 'tilt') void enableTilt(); startRace(); }}>OYA, RACE!</button>
-        <div className="row">
+        <button className="btn primary big" onClick={() => setScreen('campaign')}>CAMPAIGN</button>
+        <div className="row menu-row">
+          <button className="btn" onClick={() => launchRace()}>OYA, RACE!</button>
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
         </div>
