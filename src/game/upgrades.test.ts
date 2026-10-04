@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { vehicleById } from '../config/vehicles';
-import { NO_UPGRADES, UPGRADE_KINDS, applyUpgrades, displayStats, levelsFor, sanitizeUpgrades } from './upgrades';
+import { NO_UPGRADES, UPGRADE_KINDS, applyUpgrades, displayStats, levelsFor, maxTopSpeed, sanitizeUpgrades } from './upgrades';
 
 const okada = vehicleById('okada');
 
@@ -53,6 +53,13 @@ describe('applyUpgrades', () => {
     const v = applyUpgrades(okada, { speed: 5, handling: 5, toughness: 5 });
     expect(JSON.stringify(okada)).toBe(before);
     expect(v).not.toBe(okada);
+  });
+});
+
+describe('maxTopSpeed', () => {
+  it('is the fastest the vehicle can ever go with every upgrade bought (for the lap-time referee)', () => {
+    expect(maxTopSpeed(okada)).toBeCloseTo(33 * 1.2);
+    expect(maxTopSpeed(vehicleById('keke'))).toBeCloseTo(27 * 1.2);
   });
 });
 

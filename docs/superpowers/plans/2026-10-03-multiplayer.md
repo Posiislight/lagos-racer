@@ -4,6 +4,11 @@
 
 **Goal:** 2–6 friends race live on Ojuelegba from their own phones, joined by a room code or link, with optional AI fill.
 
+> **Merge checklist for the vehicle-upgrades work** (`2026-10-04-vehicle-upgrades-design.md`, branch `worktree-vehicle-upgrades`):
+> - `makeRace` moves to `src/game/setup.ts` here. Keep the upgrade parameter too: the player's racer (offline, and the local car online) is built with `applyUpgrades(vehicleById(id), levelsFor(upgrades, id))`; AI and remote cars stay stock.
+> - Payouts: replace `coinsForPlace` and `DNF_COINS` with `payoutForPlace` (0-based place; a DNF earns ₦0).
+> - Referee: use `maxTopSpeed(vehicleById(id))` from `src/game/upgrades.ts` wherever it uses a vehicle's `tuning.topSpeed` (for example `server/referee.ts`). An upgraded car with a fuel boost can reach 1.56 × the base top speed, almost the 1.6 allowance, so the base value would flag honest players as DNF.
+
 **Architecture:**
 - Each phone simulates the cars it owns (its human car, plus AI cars if it is the host) with the existing Rapier code.
 - It streams 15 Hz binary snapshots through a small Node WebSocket server.
@@ -52,7 +57,7 @@ plan touches. Execute this plan after that work lands, and check these points ag
   - finish distance must be at least `laps × track.length − 30` m;
   - every lap must be at least `track.length / (maxTopSpeed × 1.6)` s, where `maxTopSpeed` is the vehicle's top speed with all upgrades at level 5 (`applyUpgrades(base, { speed: 5, handling: 5, toughness: 5 }).tuning.topSpeed`);
   - the lap times must sum to the finish time within 0.5 s.
-- Coins by place: `[150, 100, 60, 30]`, then 20.
+- Naira by place: use `payoutForPlace(place)` from `src/config/economy.ts` (0-based place: 1st ₦200,000, 2nd ₦150,000, 3rd ₦100,000, everyone else including a DNF ₦0). See `2026-10-04-vehicle-upgrades-design.md`.
 - Player-facing copy (verbatim):
   - "Race with friends", "Create room", "Join room", "Share", "Ready", "Fill with AI", "Start", "Leave race";
   - errors: "Room not found", "Room full", "Race don start already", "Network wahala" (DNF label), "Connection don cut".
@@ -660,8 +665,8 @@ it('relays item events with from, and drops forged hazard ids and hits on cars n
 - Create: `server/referee.ts`, `src/net/results.ts`.
 - Modify:
   - `server/room.ts`;
-  - `src/game/race.ts` (add `coinsForPlace`);
-  - `src/scene/RaceLogic.tsx` (use `coinsForPlace` offline too);
+  - `src/game/race.ts` (no payout code: payouts live in `src/config/economy.ts`);
+  - `src/scene/RaceLogic.tsx` (already uses `payoutForPlace(place)` offline; use the same call online);
   - `src/net/session.ts`;
   - `src/net/store.ts`;
   - `src/ui/Results.tsx`.
@@ -678,7 +683,7 @@ it('relays item events with from, and drops forged hazard ids and hits on cars n
     - `get firstFinishAt(): number | null`;
     - `allDone(): boolean`;
     - `results(now: number): NetResult[]`. Finished cars come first by time, then unfinished cars by distance with projected times (`now + remaining / average speed`, the same formula as RaceLogic), with DNF last and `time: null`.
-  - `coinsForPlace(place: number): number` in `race.ts` (the table `[150, 100, 60, 30]`, else 20).
+  - No `coinsForPlace`: use `payoutForPlace(place)` from `src/config/economy.ts`. The place is 0-based, so pass the player's index in the results order, not index + 1. A DNF earns ₦0 (drop any `DNF_COINS` constant).
   - `toResults(net: NetResult[], mySlot: number): Result[]` in `src/net/results.ts`. It sets `isPlayer = !ai && slot === mySlot`, and DNF gives `time: null`.
   - **Server:**
     - snapshots also feed `referee.observe` with the snapshot's time;
@@ -688,7 +693,7 @@ it('relays item events with from, and drops forged hazard ids and hits on cars n
   - **Client:**
     - RaceLogic calls `race.net.finish(r)` when a non-remote racer's `updateProgress` reports `finished`;
     - `finished` sets that remote racer's `progress.finishTime`;
-    - `results` → `useGame.finishRace(toResults(...), coinsForPlace(myPlace), myBest)`.
+    - `results` → `useGame.finishRace(toResults(...), payoutForPlace(myPlace), myBest)`.
   - **Results online:** buttons are **Back to lobby** (`setScreen('lobby')`) and **Leave** (`useNet.leave()`, then `quitRace()`), and the account prompt is hidden.
 
 - [ ] **Step 1: Write the failing tests**

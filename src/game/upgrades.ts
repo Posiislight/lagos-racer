@@ -39,6 +39,10 @@ export function applyUpgrades(base: VehicleConfig, levels: UpgradeLevels): Vehic
   };
 }
 
+/** Top speed with every upgrade bought. Anything that judges "too fast to be real" (the room referee) must use this, not the base. */
+export const maxTopSpeed = (base: VehicleConfig): number =>
+  applyUpgrades(base, { speed: MAX_UPGRADE_LEVEL, handling: MAX_UPGRADE_LEVEL, toughness: MAX_UPGRADE_LEVEL }).tuning.topSpeed;
+
 /** Garage stat bars: the base value out of 10 plus what upgrades add, never past 10 in total. */
 export function displayStats(base: VehicleConfig, levels: UpgradeLevels) {
   const bar = (value: number, level: number) => ({ base: value, bonus: Math.min(10 - value, STAT_BAR_STEP * level) });

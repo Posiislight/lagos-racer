@@ -10,7 +10,7 @@ function Bar({ label, base, bonus }: { label: string; base: number; bonus: numbe
   const total = Math.round((base + bonus) * 10) / 10;
   return (
     <>
-      <span>{label}</span>
+      <span className="stat-name">{label}</span>
       <div className="bar" role="img" aria-label={`${label}: ${total} out of 10`}>
         <i style={{ width: `${base * 10}%` }} />
         {bonus > 0 && <i className="up" style={{ width: `${bonus * 10}%` }} />}
