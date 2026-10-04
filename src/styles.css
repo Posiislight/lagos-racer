@@ -89,6 +89,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side .card h2 { margin-bottom: 2px; }
 .menu-side .row { flex-wrap: nowrap; gap: 8px; }
 .menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
+.track-pick { display: flex; gap: 6px; margin-top: 8px; }
+.track-pick .btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; font-size: 13px; }
 .track-line { margin: 8px 0 0; font-size: 14px; }
 .credit { margin: 4px 0 0; font-size: 11px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }

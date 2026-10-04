@@ -1,4 +1,5 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
+import type { Branch } from './shortcuts';
 
 export type TrackPoint = {
   /** Position on the centre line (y = 0). */
@@ -18,6 +19,8 @@ export type Track = {
   length: number;
   spacing: number;
   curve: CatmullRomCurve3;
+  /** Optional side roads that leave the main road and rejoin it later (see shortcuts.ts). */
+  branches?: Branch[];
 };
 
 export type Projection = {
@@ -41,6 +44,30 @@ export function hillHeight(hills: Hills | undefined, s: number, length: number) 
   if (!hills?.length) return 0;
   const at = (d: number) => hills.reduce((y, [a, k, ph]) => y + a * Math.sin((d / length) * Math.PI * 2 * k + ph), 0);
   return at(s) - at(0);
+}
+
+/**
+ * A road height profile: [metres along the lap, height] knots. Heights ease smoothly (cosine) from
+ * one knot to the next, and stay level before the first and after the last. For ramps, flyovers
+ * and bridge decks, where sine hills would be the wrong shape.
+ */
+export type HeightProfile = [number, number][];
+
+export function profileHeight(profile: HeightProfile, s: number): number {
+  if (!profile.length) return 0;
+  if (s <= profile[0][0]) return profile[0][1];
+  for (let i = 1; i < profile.length; i++) {
+    const [s1, y1] = profile[i];
+    if (s > s1) continue;
+    const [s0, y0] = profile[i - 1], t = (s - s0) / (s1 - s0 || 1);
+    return y0 + (y1 - y0) * (1 - Math.cos(Math.PI * t)) / 2;
+  }
+  return profile[profile.length - 1][1];
+}
+
+/** Set the height of every sample on the track from a profile. */
+export function applyProfile(track: Track, profile: HeightProfile) {
+  for (const p of track.points) p.pos.y = profileHeight(profile, p.s);
 }
 
 /**

@@ -68,6 +68,12 @@ The driver is picked separately from the vehicle (Garage, saved) and sits in eve
 
 Ojuelegba, Third Mainland Bridge, Oshodi under the bridge, flooded Lekki in rainy season, Balogun market. Hazards: LASTMA ambush, goats crossing, danfos cutting in, open gutters, potholes.
 
+Every track has its own look, set in `src/config/tracks.ts` (`setting`: sky, haze, light, the painted horizon and, for tracks over water, the lagoon). A new track should get a different setting and different scenery, not the same buildings with a new road. Tracks are loops of hand-drawn control points; their length, bends and grades are checked by `src/config/tracks.test.ts` and `scripts/track-report.ts`.
+
+Third Mainland Bridge is built: a hand-drawn 2.6 km journey, 2 laps (`src/config/thirdMainland.ts`). Mainland street, a ramp that climbs onto the bridge, a long span over the lagoon with the other carriageway jammed with traffic, the island end, then a low causeway through a stilt-house water village. The road's height comes from `heights` (a profile along the lap); the lagoon, deck and props are in `src/scene/lagoon.ts`.
+
+Shortcuts are supported as data but none are placed yet: a track's `shortcuts` list gives a fork and a rejoin lap distance and the waypoints between (`src/game/shortcuts.ts`, which also checks a shortcut is shorter and doesn't hit the road). Lap counting and positions already follow a car through one. Not yet built: drawing a branch, a gap in the walls at the fork and rejoin, and the AI choosing a branch.
+
 Ojuelegba is laid out on the real road from OpenStreetMap (`scripts/osm-track.mjs`, credit "© OpenStreetMap contributors" in the menu); the buildings and props stay stylised and hand-built. Never derive layouts or models from Google Maps or Street View imagery (their terms forbid it); Street View is only for looking.
 
 ## Accounts

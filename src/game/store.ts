@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { TRACKS } from '../config/tracks';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
@@ -49,6 +50,7 @@ export type State = Saved & {
   coinsEarned: number;
   showAccountPrompt: boolean;
   setScreen: (s: Screen) => void;
+  setTrack: (id: string) => void;
   setVehicle: (v: VehicleId) => void;
   setPaint: (v: VehicleId, paint: string) => void;
   setDriver: (d: DriverId) => void;
@@ -84,6 +86,7 @@ export const useGame = create<State>((set, get) => ({
   coinsEarned: 0,
   showAccountPrompt: false,
   setScreen: screen => set({ screen }),
+  setTrack: track => set({ track }),
   setVehicle: vehicle => { set({ vehicle }); save(); },
   setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
   setDriver: driver => { set({ driver }); save(); },
@@ -96,7 +99,8 @@ export const useGame = create<State>((set, get) => ({
   },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
   startRace: () => set(s => ({ screen: 'race', online: false, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
-  startOnlineRace: () => set(s => ({ screen: 'race', online: true, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  // Room races are always on the server's track (the first one), whichever track is picked for solo play.
+  startOnlineRace: () => set(s => ({ screen: 'race', online: true, track: TRACKS[0].id, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
   quitRace: () => set({ screen: 'menu', online: false, paused: false, results: null }),
   setPaused: paused => set({ paused }),
   setHud: h => set(s => ({ hud: { ...s.hud, ...h } })),

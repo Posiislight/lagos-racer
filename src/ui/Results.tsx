@@ -1,20 +1,21 @@
 import { useGame } from '../game/store';
 import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
+import { trackById } from '../config/tracks';
 import { useNet } from '../net/store';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
 
 export function Results() {
-  const { results, coinsEarned, online, startRace, setScreen, quitRace, showAccountPrompt, dismissAccountPrompt } = useGame();
+  const { results, coinsEarned, online, startRace, setScreen, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   const dnf = results[place]?.dnf === true;
   return (
     <div className="modal results" role="dialog" aria-modal="true" aria-labelledby="results-title">
       <div className="card modal-card wide">
-        <p className="eyebrow">Ojuelegba Grand Prix</p>
+        <p className="eyebrow">{trackById(track).name} Grand Prix</p>
         {dnf ? (
           <h2 id="results-title">Network wahala</h2>
         ) : (

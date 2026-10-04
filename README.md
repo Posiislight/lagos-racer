@@ -20,7 +20,7 @@ Other commands:
 | `npm run build` | Typecheck and build the installable PWA into `dist/` (deploy that folder to Vercel) |
 | `npm test` | Unit tests (track geometry, lap counting, standings, bumps, saves, line-up, hints) |
 | `node scripts/sync-models.mjs` | Re-import the vehicle models after changing the showroom in `reference/sporty/` |
-| `node scripts/track-report.ts ojuelegba out.svg` | Check a track layout: length, tightest bend, overlapping sections (the median between the two legs is allowed), top-down SVG |
+| `node scripts/track-report.ts ojuelegba out.svg` (or `third-mainland`) | Check a track layout: length, tightest bend, overlapping sections (the median between the two legs is allowed), top-down SVG |
 | `node scripts/osm-track.mjs` | Re-derive the Ojuelegba Road layout from OpenStreetMap into `src/config/ojuelegbaAxis.ts` (only needed to change the layout) |
 | `node scripts/playtest.mjs --gpu --autopilot --seconds=30` | Headless play-test with screenshots and a log of positions, speeds and FPS, plus respawns and the longest vehicle-to-vehicle contact (dev server must be running). `--vehicle=brt --paint=red`, `--eval="js"` |
 | `node scripts/net-race.mjs --tabs=3 [--lag=250 --jitter=80 --loss=5] [--timeout=900]` | Online race between headless tabs; exits 0 only if every tab shows identical standings. Needs the dev server on the `--url` (default `http://localhost:5175/`, e.g. `npx vite --port 5175 --strictPort`); starts and stops the room server itself |
@@ -75,13 +75,21 @@ Four vehicles, each with six paint colours in the garage (paint is cosmetic): **
 flimsy), **Keke Marwa**, **Danfo**, and the **BRT** (slow tank, unlocks for ₦500). Six racers
 are on the grid, so you will meet more than one of some vehicles, in different paint.
 
-## The track
+## The tracks
 
-Ojuelegba Road as it really runs, from [OpenStreetMap](https://www.openstreetmap.org/) (road
+Pick one on the menu.
+
+**Ojuelegba Road** as it really runs, from [OpenStreetMap](https://www.openstreetmap.org/) (road
 layout © OpenStreetMap contributors, ODbL), scaled to 0.38 so a lap is about 790 m: west along the
 north carriageway past the Tejuosho market, the danfos and the petrol station, the church and the
 sports shops, U-turn under the Western Avenue bridge, and back east on the other side of the
 median. Screenshots: `docs/screenshots/ojuelegba-road/`.
+
+**Third Mainland Bridge** is a different place: a hand-drawn 2.6 km journey over a lagoon, two laps. From the
+mainland street up a curling ramp onto the bridge, a long sweeping span with the other carriageway jammed with
+danfos, round the island end, then a low causeway through a stilt-house water village and home. Each track has
+its own sky, haze and horizon (`setting` in `src/config/tracks.ts`), and this one has water. Tracks can take
+shortcuts as data (`src/game/shortcuts.ts`); none are placed yet.
 
 ## How it's built
 

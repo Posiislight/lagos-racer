@@ -4,7 +4,7 @@ import { Physics } from '@react-three/rapier';
 import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
-import { TRACKS } from '../config/tracks';
+import { STREET, TRACKS, type Setting } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
@@ -18,6 +18,7 @@ import { FxBridge } from './FxBridge';
 import { RaceLogic } from './RaceLogic';
 import { Effects } from './Effects';
 import { makeSkyline } from './art/skyline';
+import { makeShore } from './art/shore';
 import { Critters } from './Critters';
 
 // View distance matters most on tight streets: what's beyond it is never drawn.
@@ -57,10 +58,10 @@ export function RaceScene() {
 
   return (
     <>
-      <SkyAndLight shadows={q.shadows} far={q.far} />
+      <SkyAndLight shadows={q.shadows} far={q.far} setting={setup.race.config.setting ?? STREET} />
       {/* A room race never stops for one phone's menu. */}
       <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
-        <Track cfg={setup.race.config} track={setup.race.track} density={q.density} />
+        <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={quality !== 'low'} />
         {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} />)}
       </Physics>
       <Effects />
@@ -72,13 +73,13 @@ export function RaceScene() {
   );
 }
 
-function skyTexture() {
+function skyTexture(stops: Setting['sky']) {
   const c = document.createElement('canvas');
   c.width = 2048; c.height = 512;
   const x = c.getContext('2d')!, w = c.width, h = c.height;
   // The sphere maps the top of the image to the zenith and the middle to the horizon.
   const g = x.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#2f7fd0'); g.addColorStop(0.32, '#6fb0e6'); g.addColorStop(0.48, '#e9e0cc'); g.addColorStop(0.5, '#f1e4c9'); g.addColorStop(1, '#e8d6b6');
+  g.addColorStop(0, stops[0]); g.addColorStop(0.32, stops[1]); g.addColorStop(0.48, stops[2]); g.addColorStop(0.5, stops[3]); g.addColorStop(1, stops[4]);
   x.fillStyle = g; x.fillRect(0, 0, w, h);
   let seed = 5;
   const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -101,18 +102,18 @@ function skyTexture() {
 }
 
 /** Painted sky dome, image-based reflections from it, hazy fog, and a sun whose shadow follows the player. */
-function SkyAndLight({ shadows, far }: { shadows: number; far: number }) {
+function SkyAndLight({ shadows, far, setting }: { shadows: number; far: number; setting: Setting }) {
   const { gl, scene, camera } = useThree();
   const sun = useRef<DirectionalLight>(null);
 
   // Painted sky: blue overhead fading to a warm hazy horizon, with fat cumulus clouds.
   const sky = useMemo(() => {
-    const m = new Mesh(new SphereGeometry(1, 32, 16), new MeshBasicMaterial({ map: skyTexture(), side: BackSide, fog: false, depthWrite: false }));
+    const m = new Mesh(new SphereGeometry(1, 32, 16), new MeshBasicMaterial({ map: skyTexture(setting.sky), side: BackSide, fog: false, depthWrite: false }));
     m.frustumCulled = false; m.renderOrder = -2;
     return m;
-  }, []);
+  }, [setting]);
   // The painted skyline rides along with the camera, like a backdrop at the horizon.
-  const skyline = useMemo(() => { const s = makeSkyline(0, 0, far * 0.8, far * 0.24); s.frustumCulled = false; return s; }, [far]);
+  const skyline = useMemo(() => { const s = (setting.backdrop === 'shore' ? makeShore : makeSkyline)(0, 0, far * 0.8, far * 0.24); s.frustumCulled = false; return s; }, [far, setting]);
   useEffect(() => {
     (camera as PerspectiveCamera).far = far; (camera as PerspectiveCamera).updateProjectionMatrix();
   }, [camera, far]);
@@ -126,9 +127,9 @@ function SkyAndLight({ shadows, far }: { shadows: number; far: number }) {
     const rt = pm.fromScene(env, 0.04);
     scene.environment = rt.texture;
     scene.environmentIntensity = 0.7;
-    scene.fog = new Fog('#efdcbc', far * 0.3, far * 0.97);
+    scene.fog = new Fog(setting.fog, far * 0.3, far * 0.97);
     return () => { rt.dispose(); pm.dispose(); scene.environment = null; scene.fog = null; };
-  }, [gl, scene, sky, far]);
+  }, [gl, scene, sky, far, setting]);
 
   useFrame(() => {
     sky.position.copy(camera.position); sky.scale.setScalar(far * 0.9);
@@ -146,11 +147,11 @@ function SkyAndLight({ shadows, far }: { shadows: number; far: number }) {
     <>
       <primitive object={sky} />
       <primitive object={skyline} />
-      <hemisphereLight args={['#dbeeff', '#9a6b48', 1.1]} />
+      <hemisphereLight args={[setting.light.sky, setting.light.ground, 1.1]} />
       <directionalLight
         ref={sun}
         intensity={3.2}
-        color="#fff1dc"
+        color={setting.light.sun}
         castShadow={shadows > 0}
         shadow-mapSize={[shadows || 512, shadows || 512]}
         shadow-bias={-0.0004}
