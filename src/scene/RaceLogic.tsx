@@ -5,6 +5,8 @@ import { updateProgress, standings, currentLap } from '../game/race';
 import { readPlayer } from '../game/input';
 import { driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
+import { updateSpecials } from '../game/specials';
+import { driverById } from '../config/drivers';
 import { updateCritters } from '../game/critters';
 import { useGame, type Result } from '../game/store';
 import { beep, Engine, sfx } from '../game/audio';
@@ -90,6 +92,7 @@ export function RaceLogic() {
     }
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
+    updateSpecials(race, dt, m => store.flash(m));
 
     // Just picked something up: say what it is and, the first few times, how to use it.
     if (player.item && !heldItem.current) {
@@ -121,6 +124,7 @@ export function RaceLogic() {
         lap: currentLap(player.progress, laps), laps, position: order.indexOf(player) + 1, racers: race.racers.length,
         time: race.clock, lapTime: race.clock - player.progress.lapStart, bestLap: best,
         speed: Math.abs(player.speed) * 3.6, item: player.item ? { kind: player.item, label: ITEM_LABEL[player.item] } : null, wrongWay: wrongWay.current > 1.2,
+        special: { name: driverById(player.driver).special.name, charge: player.charge, ready: player.charge >= 1 },
       });
     }
 

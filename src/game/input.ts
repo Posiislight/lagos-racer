@@ -15,10 +15,10 @@ export type Controls = {
 export const emptyControls = (): Controls => ({ throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, useItem: false, special: false });
 
 /** Raw touch state written by the on-screen buttons. */
-export const touch = { left: false, right: false, gas: false, brake: false, drift: false, horn: false, item: false };
+export const touch = { left: false, right: false, gas: false, brake: false, drift: false, horn: false, item: false, special: false };
 
 const keys = new Set<string>();
-let itemQueued = false;
+let itemQueued = false, specialQueued = false;
 
 /** Keys the page should swallow: arrows and Space would scroll it. Browser shortcuts are left alone. */
 export function swallowKey(e: { key: string }): boolean {
@@ -32,6 +32,7 @@ export function startKeyboard() {
   window.addEventListener('keydown', e => {
     if (swallowKey(e)) e.preventDefault();
     if (!e.repeat && ['Space', 'KeyE', 'KeyF', 'ShiftLeft', 'ShiftRight'].includes(e.code)) itemQueued = true;
+    if (!e.repeat && e.code === 'KeyQ') specialQueued = true;
     keys.add(e.code);
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -39,6 +40,7 @@ export function startKeyboard() {
 }
 
 export function queueItem() { itemQueued = true; }
+export function queueSpecial() { specialQueued = true; }
 
 let steerSmooth = 0;
 
@@ -80,6 +82,9 @@ export function readPlayer(out: Controls, dt: number, opts: { tilt: boolean; inv
   out.useItem = itemQueued || touch.item;
   itemQueued = false;
   touch.item = false;
+  out.special = specialQueued || touch.special;
+  specialQueued = false;
+  touch.special = false;
 }
 
 export function resetPlayerInput() { steerSmooth = 0; keys.clear(); Object.keys(touch).forEach(k => ((touch as Record<string, boolean>)[k] = false)); }

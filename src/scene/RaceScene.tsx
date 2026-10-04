@@ -4,6 +4,7 @@ import { Physics } from '@react-three/rapier';
 import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
+import { randomDriver, type DriverId } from '../config/drivers';
 import { trackById, trackFor } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { pickRivals, type Pick } from '../game/lineup';
@@ -31,7 +32,7 @@ const QUALITY: Record<Quality, { density: number; shadows: number; far: number }
   high: { density: 1, shadows: 2048, far: 300 },
 };
 
-export function makeRace(trackId: string, player: Pick): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
+export function makeRace(trackId: string, player: Pick, playerDriver: DriverId): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
   const config = trackById(trackId);
   const track = trackFor(config);
   // Five rivals (every vehicle at least once, all in different paints), then you at the back.
@@ -48,7 +49,7 @@ export function makeRace(trackId: string, player: Pick): { race: RaceRuntime; sp
     spawns.push({ x, y: at.pos.y, z, yaw: Math.atan2(-at.tangent.z, at.tangent.x) });
     const isPlayer = k === lineup.length - 1;
     const v = vehicleById(vid);
-    const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, createProgress(track, x, z));
+    const r = makeRacer(k, isPlayer ? 'You' : names[k], v, paintOf(v, paint), isPlayer, createProgress(track, x, z), isPlayer ? playerDriver : randomDriver());
     if (!isPlayer) r.ai = aiState(lane, 0.9 + k * 0.035 + Math.random() * 0.03, 2);
     return r;
   });
@@ -64,13 +65,14 @@ export function RaceScene() {
   const raceId = useGame(s => s.raceId);
   const trackId = useGame(s => s.track);
   const vehicle = useGame(s => s.vehicle);
+  const driver = useGame(s => s.driver);
   const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
   const q = QUALITY[quality];
 
   // A fresh race whenever a new one is started.
-  const setup = useMemo(() => makeRace(trackId, { vehicle: vehicleById(vehicle).id, paint }), [raceId, trackId, vehicle, paint]);
+  const setup = useMemo(() => makeRace(trackId, { vehicle: vehicleById(vehicle).id, paint }, driver), [raceId, trackId, vehicle, paint, driver]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {
