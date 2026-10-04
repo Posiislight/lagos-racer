@@ -11,6 +11,8 @@ export type DriverConfig = {
   role: string;
   blurb: string;
   special: { kind: SpecialKind; name: string; /** Seconds of racing to fill the meter. */ chargeTime: number };
+  /** Not pickable until this campaign race (an id from `CHAPTER_1`) has been cleared. */
+  locked?: { race: string };
 };
 
 export const DRIVERS: DriverConfig[] = [
@@ -23,6 +25,7 @@ export const DRIVERS: DriverConfig[] = [
     id: 'mamaput', name: 'Mama Put', role: 'Food seller',
     blurb: 'Stern and not to be argued with. She leaves a long trail of scalding pepper soup behind her.',
     special: { kind: 'soup', name: 'Pepper Soup Trail', chargeTime: 30 },
+    locked: { race: 'campaign-1-4' },
   },
 ];
 
@@ -58,6 +61,9 @@ export function sanitizeDriver(v: unknown): DriverId {
   return DRIVERS.some(d => d.id === v) ? (v as DriverId) : DEFAULT_DRIVER;
 }
 
-export function randomDriver(rand: () => number = Math.random): DriverId {
-  return DRIVERS[Math.min(DRIVERS.length - 1, Math.floor(rand() * DRIVERS.length))].id;
+/** A random driver, skipping `exclude` (unless that would leave nobody, then it is ignored). */
+export function randomDriver(rand: () => number = Math.random, exclude: DriverId[] = []): DriverId {
+  const left = DRIVERS.filter(d => !exclude.includes(d.id));
+  const pool = left.length ? left : DRIVERS;
+  return pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))].id;
 }

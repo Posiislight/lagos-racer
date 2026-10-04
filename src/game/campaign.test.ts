@@ -1,0 +1,121 @@
+import { describe, expect, it } from 'vitest';
+import { CHAPTER_1, QUICK_COINS } from '../config/campaign';
+import { TRACKS } from '../config/tracks';
+import { campaignStatus, coinsForPlace, driverAvailable, evaluatePass, nextRace, sanitizeCleared, settle } from './campaign';
+
+describe('CHAPTER_1', () => {
+  it('has the four races in order, two per map', () => {
+    expect(CHAPTER_1.map(r => r.id)).toEqual(['campaign-1-1', 'campaign-1-2', 'campaign-1-3', 'campaign-1-4']);
+    expect(new Set(CHAPTER_1.map(r => r.id)).size).toBe(4);
+    expect(CHAPTER_1.map(r => r.track)).toEqual(['ojuelegba', 'ikorodu', 'ojuelegba', 'ikorodu']);
+    for (const r of CHAPTER_1) expect(TRACKS.some(t => t.id === r.track)).toBe(true);
+    expect(CHAPTER_1.map(r => r.mode.kind)).toEqual(['laps', 'laps', 'elimination', 'duel']);
+  });
+
+  it('pins the pass rules and bonuses', () => {
+    expect(CHAPTER_1.map(r => r.pass.place)).toEqual([3, 3, 3, 1]);
+    expect(CHAPTER_1.map(r => r.firstClearCoins)).toEqual([100, 100, 100, 300]);
+    expect(CHAPTER_1.map(r => r.coins)).toEqual([QUICK_COINS, QUICK_COINS, QUICK_COINS, [200, 40]]);
+  });
+
+  it('keeps Mama Put out of races 1-3 and rewards her for race 4', () => {
+    expect(CHAPTER_1.slice(0, 3).map(r => r.excludeDrivers)).toEqual([['mamaput'], ['mamaput'], ['mamaput']]);
+    expect(CHAPTER_1[3].excludeDrivers).toBeUndefined();
+    expect(CHAPTER_1.map(r => r.reward)).toEqual([undefined, undefined, undefined, { driver: 'mamaput' }]);
+    expect(CHAPTER_1.map(r => r.taunts !== undefined)).toEqual([false, false, false, true]);
+  });
+
+  it('pins the mode numbers', () => {
+    expect(CHAPTER_1[0].mode).toEqual({ kind: 'laps', laps: 3 });
+    expect(CHAPTER_1[1].mode).toEqual({ kind: 'laps', laps: 3 });
+    expect(CHAPTER_1[2].mode).toEqual({ kind: 'elimination', first: 20, step: 2, floor: 10 });
+    expect(CHAPTER_1[3].mode).toEqual({ kind: 'duel', laps: 2, skill: 1.06 });
+  });
+
+  it('has story and rule text on every race', () => {
+    for (const r of CHAPTER_1) {
+      expect(r.title.length).toBeGreaterThan(0);
+      expect(r.story.length).toBeGreaterThan(0);
+      expect(r.rule.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('coinsForPlace', () => {
+  it('reads the table by 1-based place and repeats the last entry', () => {
+    expect([1, 2, 3, 4, 5, 6].map(p => coinsForPlace(QUICK_COINS, p))).toEqual([150, 100, 60, 30, 20, 20]);
+  });
+  it('gives the last entry for a place that makes no sense', () => {
+    for (const p of [0, -1, NaN, 2.5]) expect(coinsForPlace(QUICK_COINS, p)).toBe(20);
+  });
+  it('works on the duel table', () => {
+    expect(coinsForPlace([200, 40], 1)).toBe(200);
+    expect(coinsForPlace([200, 40], 2)).toBe(40);
+    expect(coinsForPlace([200, 40], 6)).toBe(40);
+  });
+});
+
+describe('evaluatePass', () => {
+  const six = [10, 11, 12, 13, 14, 15];
+  it('passes inside the place limit', () => {
+    expect(evaluatePass({ pass: { place: 3 } }, six, 12)).toEqual({ place: 3, passed: true });
+    expect(evaluatePass({ pass: { place: 3 } }, six, 13)).toEqual({ place: 4, passed: false });
+  });
+  it('a duel needs the win', () => {
+    expect(evaluatePass({ pass: { place: 1 } }, [10, 11], 10)).toEqual({ place: 1, passed: true });
+    expect(evaluatePass({ pass: { place: 1 } }, [10, 11], 11)).toEqual({ place: 2, passed: false });
+  });
+  it('a player missing from the ranking is last and fails', () => {
+    expect(evaluatePass({ pass: { place: 3 } }, six, 99)).toEqual({ place: 7, passed: false });
+  });
+});
+
+describe('settle', () => {
+  const [r1, , , r4] = CHAPTER_1;
+  it('pays place coins plus the first-clear bonus once', () => {
+    expect(settle(r1, 2, [])).toEqual({ coins: 200, passed: true, firstClear: true, cleared: ['campaign-1-1'], unlocked: null });
+    expect(settle(r1, 2, ['campaign-1-1'])).toEqual({ coins: 100, passed: true, firstClear: false, cleared: ['campaign-1-1'], unlocked: null });
+  });
+  it('pays a failed attempt its place coins and clears nothing', () => {
+    expect(settle(r1, 4, [])).toEqual({ coins: 30, passed: false, firstClear: false, cleared: [], unlocked: null });
+  });
+  it('unlocks Mama Put the first time the duel is won', () => {
+    expect(settle(r4, 1, ['campaign-1-1'])).toEqual({ coins: 500, passed: true, firstClear: true, cleared: ['campaign-1-1', 'campaign-1-4'], unlocked: 'mamaput' });
+    expect(settle(r4, 2, [])).toEqual({ coins: 40, passed: false, firstClear: false, cleared: [], unlocked: null });
+    expect(settle(r4, 1, ['campaign-1-4'])).toEqual({ coins: 200, passed: true, firstClear: false, cleared: ['campaign-1-4'], unlocked: null });
+  });
+  it('a quick race (no spec) only pays place coins', () => {
+    expect(settle(null, 3, [])).toEqual({ coins: 60, passed: false, firstClear: false, cleared: [], unlocked: null });
+  });
+});
+
+describe('campaignStatus and nextRace', () => {
+  const states = (c: string[]) => campaignStatus(c).map(s => s.state);
+  it('opens races in order', () => {
+    expect(states([])).toEqual(['open', 'locked', 'locked', 'locked']);
+    expect(states(['campaign-1-1'])).toEqual(['cleared', 'open', 'locked', 'locked']);
+    expect(states(CHAPTER_1.map(r => r.id))).toEqual(['cleared', 'cleared', 'cleared', 'cleared']);
+  });
+  it('finds the following race', () => {
+    expect(nextRace(CHAPTER_1[0])?.id).toBe('campaign-1-2');
+    expect(nextRace(CHAPTER_1[3])).toBeNull();
+  });
+});
+
+describe('sanitizeCleared', () => {
+  it('keeps known unique ids in chapter order', () => {
+    expect(sanitizeCleared(['campaign-1-3', 'campaign-1-1', 'campaign-1-1', 'nope', 7, null])).toEqual(['campaign-1-1', 'campaign-1-3']);
+  });
+  it('turns junk into an empty list', () => {
+    for (const junk of [undefined, 'x', {}, 5, null]) expect(sanitizeCleared(junk)).toEqual([]);
+  });
+});
+
+describe('driverAvailable', () => {
+  it('locks Mama Put until race 4 is cleared', () => {
+    expect(driverAvailable('moshood', [])).toBe(true);
+    expect(driverAvailable('mamaput', [])).toBe(false);
+    expect(driverAvailable('mamaput', ['campaign-1-3'])).toBe(false);
+    expect(driverAvailable('mamaput', ['campaign-1-4'])).toBe(true);
+  });
+});

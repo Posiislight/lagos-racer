@@ -39,4 +39,19 @@ describe('randomDriver', () => {
     expect(randomDriver(() => 0)).toBe('moshood');
     expect(randomDriver(() => 0.99)).toBe('mamaput');
   });
+
+  it('skips excluded drivers', () => {
+    expect(randomDriver(() => 0.99, ['mamaput'])).toBe('moshood');
+  });
+
+  it('ignores the exclusion when it would leave nobody', () => {
+    expect(randomDriver(() => 0.99, ['moshood', 'mamaput'])).toBe('mamaput');
+  });
+});
+
+describe('driver lock', () => {
+  it('locks Mama Put behind the last race of chapter 1 and nobody else', () => {
+    expect(driverById('mamaput').locked).toEqual({ race: 'campaign-1-4' });
+    expect(driverById('moshood').locked).toBeUndefined();
+  });
 });
