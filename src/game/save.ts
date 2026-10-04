@@ -1,6 +1,7 @@
 import { VEHICLES, type VehicleId } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
 import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
+import { driverAvailable, sanitizeCleared } from './campaign';
 
 /**
  * What the game keeps in localStorage between visits. Version 2 has four vehicles with paints; a
@@ -25,6 +26,8 @@ export type Saved = {
   driver: DriverId;
   /** The chosen track id. */
   track: string;
+  /** Campaign progress: ids of the races passed so far. */
+  campaign: { cleared: string[] };
 };
 
 export const SAVE_KEY = 'lagos-racer:v2';
@@ -40,7 +43,7 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba',
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -58,6 +61,8 @@ const OLD_IDS: Record<string, { vehicle: VehicleId; paint?: string }> = {
 export function normaliseSave(raw: Record<string, unknown>): Saved {
   const d = defaultSave();
   const unlocked = Array.isArray(raw.unlocked) ? [...new Set(raw.unlocked.filter((v): v is VehicleId => typeof v === 'string' && IDS.has(v)))] : [];
+  const cleared = sanitizeCleared(isObj(raw.campaign) ? raw.campaign.cleared : undefined);
+  const driver = sanitizeDriver(raw.driver);
   return {
     settings: { ...d.settings, ...(isObj(raw.settings) ? raw.settings : {}) } as Settings,
     coins: num(raw.coins, 0),
@@ -68,8 +73,10 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     accountPromptDismissed: raw.accountPromptDismissed === true,
     paint: isObj(raw.paint) ? raw.paint as Saved['paint'] : {},
     itemHints: num(raw.itemHints, 0),
-    driver: sanitizeDriver(raw.driver),
+    // A driver the campaign has not unlocked yet falls back to the default.
+    driver: driverAvailable(driver, cleared) ? driver : DEFAULT_DRIVER,
     track: typeof raw.track === 'string' && TRACKS.some(t => t.id === raw.track) ? raw.track : d.track,
+    campaign: { cleared },
   };
 }
 

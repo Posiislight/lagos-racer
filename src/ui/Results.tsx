@@ -40,7 +40,7 @@ export function Results() {
           </div>
         )}
         <div className="row">
-          <button className="btn primary" onClick={startRace}>Race again</button>
+          <button className="btn primary" onClick={() => startRace(useGame.getState().spec ?? undefined)}>Race again</button>
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setScreen('menu')}>Menu</button>
         </div>

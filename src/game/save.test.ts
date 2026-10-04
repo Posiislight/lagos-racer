@@ -38,13 +38,36 @@ describe('migrateSave (v1 → v2)', () => {
 });
 
 describe('driver', () => {
-  it('keeps a saved driver', () => {
-    expect(migrateSave({ driver: 'mamaput' }).driver).toBe('mamaput');
+  it('keeps a saved driver who is unlocked', () => {
+    expect(normaliseSave({ driver: 'mamaput', campaign: { cleared: ['campaign-1-4'] } }).driver).toBe('mamaput');
+    expect(normaliseSave({ driver: 'moshood' }).driver).toBe('moshood');
+  });
+
+  it('falls back to Moshood when the saved driver is still locked', () => {
+    expect(normaliseSave({ driver: 'mamaput' }).driver).toBe('moshood');
+    expect(migrateSave({ driver: 'mamaput' }).driver).toBe('moshood');
   });
 
   it('falls back to Moshood when the driver is missing or junk', () => {
     for (const raw of [{}, { driver: 7 }, { driver: null }, { driver: 'bob' }]) expect(migrateSave(raw).driver).toBe('moshood');
     expect(defaultSave().driver).toBe('moshood');
+  });
+});
+
+describe('campaign progress', () => {
+  it('starts with nothing cleared, also for saves from before the campaign', () => {
+    expect(defaultSave().campaign).toEqual({ cleared: [] });
+    expect(normaliseSave({}).campaign).toEqual({ cleared: [] });
+  });
+
+  it('survives junk', () => {
+    for (const junk of [null, 5, 'x', { cleared: 'all' }, { cleared: [7, null] }]) {
+      expect(normaliseSave({ campaign: junk }).campaign).toEqual({ cleared: [] });
+    }
+  });
+
+  it('keeps known race ids once each', () => {
+    expect(normaliseSave({ campaign: { cleared: ['nope', 'campaign-1-1', 'campaign-1-1'] } }).campaign).toEqual({ cleared: ['campaign-1-1'] });
   });
 });
 

@@ -1,14 +1,22 @@
 import { create } from 'zustand';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { driverAvailable, settle } from './campaign';
+import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
 import { loadSave, writeSave, type Saved, type Settings } from './save';
 
 export type { Quality, Settings } from './save';
-export type Screen = 'menu' | 'garage' | 'race';
+export type Screen = 'menu' | 'garage' | 'race' | 'campaign';
 
-/** time is the finish time, or a projection from average speed (projected: true) for racers still on track. color: their paint. */
-export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean };
+/**
+ * time is the finish time, or a projection from average speed (projected: true) for racers still on track.
+ * color: their paint. out: race clock seconds when knocked out (elimination), else null.
+ */
+export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; out: number | null };
+
+/** What a finished campaign race meant for the player (null for a quick race). */
+export type Outcome = { place: number; passed: boolean; firstClear: boolean; unlocked: DriverId | null };
 
 /** HUD values, refreshed a few times a second by the race loop (not every frame). */
 export type Hud = {
@@ -33,10 +41,15 @@ export type Hud = {
 const initial = loadSave();
 // Reviewer shortcut: ?unlock=all opens every vehicle without grinding coins.
 if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('unlock') === 'all') initial.unlocked = ['brt'];
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('unlock') === 'all') initial.campaign = { cleared: CHAPTER_1.map(s => s.id) };
 
 export type State = Saved & {
   screen: Screen;
   raceId: number;
+  /** The campaign race being run (null for a quick race). */
+  spec: RaceSpec | null;
+  /** How the last race went, for the results card (null for a quick race). */
+  outcome: Outcome | null;
   paused: boolean;
   hud: Hud;
   results: Result[] | null;
@@ -51,12 +64,14 @@ export type State = Saved & {
   countItemHint: () => void;
   unlock: (v: VehicleId) => void;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
-  startRace: () => void;
+  /** Start a campaign race, or a quick race when no spec is given. */
+  startRace: (spec?: RaceSpec) => void;
   quitRace: () => void;
   setPaused: (p: boolean) => void;
   setHud: (h: Partial<Hud>) => void;
   flash: (message: string) => void;
-  finishRace: (results: Result[], coins: number, bestLap: number | null) => void;
+  /** `place` is the player's 1-based finishing place. */
+  finishRace: (results: Result[], place: number, bestLap: number | null) => void;
   dismissAccountPrompt: () => void;
 };
 
@@ -70,6 +85,8 @@ export const useGame = create<State>((set, get) => ({
   ...initial,
   screen: 'menu',
   raceId: 0,
+  spec: null,
+  outcome: null,
   paused: false,
   hud: emptyHud(),
   results: null,
@@ -79,7 +96,11 @@ export const useGame = create<State>((set, get) => ({
   setTrack: track => { set({ track }); save(); },
   setVehicle: vehicle => { set({ vehicle }); save(); },
   setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
-  setDriver: driver => { set({ driver }); save(); },
+  setDriver: driver => {
+    if (!driverAvailable(driver, get().campaign.cleared)) return;
+    set({ driver });
+    save();
+  },
   countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), price = VEHICLES.find(x => x.id === v)?.locked?.coins ?? 0;
@@ -88,19 +109,23 @@ export const useGame = create<State>((set, get) => ({
     save();
   },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
-  startRace: () => set(s => ({ screen: 'race', raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  startRace: spec => set(s => ({ screen: 'race', spec: spec ?? null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
   quitRace: () => set({ screen: 'menu', paused: false, results: null }),
   setPaused: paused => set({ paused }),
   setHud: h => set(s => ({ hud: { ...s.hud, ...h } })),
   flash: message => set(s => ({ hud: { ...s.hud, message, messageKey: s.hud.messageKey + 1 } })),
-  finishRace: (results, coins, bestLap) => {
+  finishRace: (results, place, bestLap) => {
     const s = get();
+    const settled = settle(s.spec, place, s.campaign.cleared);
+    // The best lap belongs to the track the race was run on, which a campaign race picks for itself.
+    const trackId = s.spec?.track ?? s.track;
     const best = { ...s.best };
-    if (bestLap !== null && (best[s.track] === undefined || bestLap < best[s.track])) best[s.track] = bestLap;
+    if (bestLap !== null && (best[trackId] === undefined || bestLap < best[trackId])) best[trackId] = bestLap;
     const races = s.races + 1;
     // Let people play straight away; after their second race, suggest an account to keep coins.
     const showAccountPrompt = races >= 2 && !s.accountPromptDismissed;
-    set({ results, coins: s.coins + coins, coinsEarned: coins, best, races, showAccountPrompt });
+    const outcome = s.spec ? { place, passed: settled.passed, firstClear: settled.firstClear, unlocked: settled.unlocked } : null;
+    set({ results, coins: s.coins + settled.coins, coinsEarned: settled.coins, outcome, campaign: { cleared: settled.cleared }, best, races, showAccountPrompt });
     save();
   },
   dismissAccountPrompt: () => { set({ accountPromptDismissed: true, showAccountPrompt: false }); save(); },
@@ -111,5 +136,6 @@ function save() {
   writeSave({
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
     accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints, driver: s.driver, track: s.track,
+    campaign: s.campaign,
   });
 }

@@ -142,12 +142,11 @@ export function RaceLogic() {
           const projected = done === null && avg > 1 ? race.clock + (total - r.progress.distance) / avg : null;
           return {
             name: r.name, vehicle: r.vehicle.id, color: r.paint.color, isPlayer: r.isPlayer, time: done ?? projected, projected: done === null,
-            best: r.progress.lapTimes.length ? Math.min(...r.progress.lapTimes) : null,
+            best: r.progress.lapTimes.length ? Math.min(...r.progress.lapTimes) : null, out: null,
           };
         });
         const place = order.indexOf(player);
-        const coins = [150, 100, 60, 30][place] ?? 20;
-        store.finishRace(results, coins, results[place].best);
+        store.finishRace(results, place + 1, results[place].best);
         store.setHud({ phase: 'finished' });
       }
     }

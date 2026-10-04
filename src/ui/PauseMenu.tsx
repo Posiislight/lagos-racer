@@ -13,7 +13,7 @@ export function PauseMenu() {
         <p className="muted">Take am easy. The danfo go wait.</p>
         <div className="col">
           <button className="btn primary" onClick={() => setPaused(false)}>Resume</button>
-          <button className="btn" onClick={startRace}>Restart race</button>
+          <button className="btn" onClick={() => startRace(useGame.getState().spec ?? undefined)}>Restart race</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
           <button className="btn ghost" onClick={quitRace}>Quit to menu</button>
         </div>
