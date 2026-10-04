@@ -12,6 +12,8 @@ import { pavementTexture } from './art/textures';
 
 // Concrete kerb cross-section: [outwards, up] from the road edge.
 const KERB_PROFILE: [number, number][] = [[0, 0], [0.02, 0.16], [0.08, 0.18], [KERB, 0.18]];
+/** Half of a low concrete median barrier, from the road edge to the median's centre line. */
+const BARRIER_PROFILE: [number, number][] = [[0.1, 0], [0.13, 0.85], [0.22, 0.95], [0.8, 0.95]];
 
 /**
  * The road and its edges. Ojuelegba has no crash barriers: a plain concrete kerb, a narrow raised
@@ -28,11 +30,14 @@ export function Track({ cfg, track, density }: { cfg: TrackConfig; track: TrackD
     const median = cfg.median ? medianMask(track, hw, cfg.median.width) : null;
     const notMedian = median?.map(m => !m);
     const redWhite = median && cfg.median?.redWhite && cfg.axis ? roadRangeMask(track, cfg.axis, cfg.median.redWhite, 2 * hw + cfg.median.width) : null;
-    const bw = median?.map((m, i) => m && !redWhite?.[i]), rw = median?.map((m, i) => m && !!redWhite?.[i]);
+    const barrier = median && cfg.median?.barrier && cfg.axis ? roadRangeMask(track, cfg.axis, cfg.median.barrier, 2 * hw + cfg.median.width) : null;
+    const bw = median?.map((m, i) => m && !redWhite?.[i] && !barrier?.[i]), rw = median?.map((m, i) => m && !!redWhite?.[i]);
+    const wall = barrier && median ? median.map((m, i) => m && barrier[i]) : null;
     const medianParts = median && cfg.median ? [
       new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, bw), mat(stripeTexture('#f5f5f0', '#1d1d1d'), { roughness: 0.6 })),
       new Mesh(sweep(track, hw, -1, KERB_PROFILE, 3, rw), mat(stripeTexture('#f5f5f0', '#c62828'), { roughness: 0.6 })),
       new Mesh(ribbon(track, -(hw + KERB), -(hw + cfg.median.width / 2), 0.18, 3, median), mat(tex.kerb)),
+      ...(wall ? [new Mesh(sweep(track, hw, -1, BARRIER_PROFILE, 3, wall), mat(tex.kerb, { roughness: 0.95 }))] : []),
     ] : [];
     return {
       road: new Mesh(ribbon(track, -hw, hw, 0.02, 14), mat(tex.road, { roughness: 0.85 })),

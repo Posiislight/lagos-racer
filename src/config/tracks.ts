@@ -24,8 +24,8 @@ export type TrackConfig = {
   control: [number, number][];
   /** For tracks along a real road: its centreline, east to west (see outAndBack). */
   axis?: [number, number][];
-  /** Two legs side by side with a median between them. redWhite: axis range where its kerb is red and white. */
-  median?: { width: number; redWhite?: [number, number] };
+  /** Two legs side by side with a median between them. redWhite: axis range where its kerb is red and white. barrier: axis range where it is a low concrete wall. */
+  median?: { width: number; redWhite?: [number, number]; barrier?: [number, number] };
   hills?: Hills;
   /** What the hills follow: lap distance (default) or world x (out-and-back roads). */
   hillsAxis?: 'lap' | 'x' | 'road';
@@ -96,7 +96,8 @@ export const TRACKS: TrackConfig[] = [
     // U-turns 13 m round the centre line: the BRT needs at least 12 m.
     control: outAndBack(IKORODU_AXIS, { gap: 2 * HALF_WIDTH + MEDIAN, turnRadius: 13, splay: 30, startAt: IKORODU_START }),
     axis: IKORODU_AXIS,
-    median: { width: MEDIAN },
+    // The last 390 real metres to the roundabout are a dual carriageway with a concrete barrier down the middle.
+    median: { width: MEDIAN, barrier: [IKORODU_LENGTH - 117, IKORODU_LENGTH] },
     hills: [[0.3, 2, 0.4], [0.18, 5, 1.3], [0.06, 13, 2.1]],
     hillsAxis: 'road',
     halfWidth: HALF_WIDTH,

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { TRACKS, trackById, trackFor } from './tracks';
 import { project, sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
-import { medianMask } from '../game/outAndBack';
+import { medianMask, roadRangeMask } from '../game/outAndBack';
+import { IKORODU_AXIS } from './ikoroduAxis';
 
 describe('every track', () => {
   it('builds with a length and at least one lap', () => {
@@ -54,5 +55,16 @@ describe('ikorodu track', () => {
     });
     expect(n).toBeGreaterThan(100);
     expect(worst).toBeLessThan(0.1);
+  });
+
+  it('has a concrete barrier on the last 117 m (the dual carriageway) and painted kerb elsewhere', () => {
+    const b = cfg.median!.barrier!, L = IKORODU_AXIS.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - IKORODU_AXIS[i - 1][0], p[1] - IKORODU_AXIS[i - 1][1]) : 0), 0);
+    expect(b[1]).toBeCloseTo(L, 1);
+    expect(b[1] - b[0]).toBeGreaterThan(100);
+    expect(b[1] - b[0]).toBeLessThan(130);
+    const mask = roadRangeMask(tr, cfg.axis!, b, 2 * cfg.halfWidth + cfg.median!.width), med = medianMask(tr, cfg.halfWidth, cfg.median!.width);
+    const both = mask.filter((m, i) => m && med[i]).length;
+    expect(both).toBeGreaterThan(50);
+    expect(both).toBeLessThan(med.filter(Boolean).length / 2);
   });
 });
