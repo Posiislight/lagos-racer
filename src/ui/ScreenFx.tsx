@@ -29,13 +29,14 @@ const BLOBS = [0, 1, 2, 3].map(blob);
 /**
  * Full-screen power-up effects over the race, drawn without React re-renders and switched off when
  * nothing is happening: speed lines rushing in from the edges on a fuel boost, a purple flash when
- * juju hits you, oily splats while you slide on crude oil, and picked-up items flying into the
+ * juju hits you, oily splats while you slide on crude oil, a hot, blurry vignette while you cough from pepper soup, and picked-up items flying into the
  * item button.
  */
 export function ScreenFx() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const juju = useRef<HTMLDivElement>(null);
   const oil = useRef<HTMLDivElement>(null);
+  const cough = useRef<HTMLDivElement>(null);
   const flyers = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,6 +81,13 @@ export function ScreenFx() {
       }
       if (juju.current) juju.current.style.opacity = String(Math.max(0, 1 - fx.juju / 0.6));
       if (oil.current) oil.current.style.opacity = String(fx.slip);
+      const co = cough.current;
+      if (co) {
+        // Hidden outright when idle: a backdrop blur costs even at zero opacity.
+        co.style.display = fx.cough > 0.01 ? 'block' : 'none';
+        co.style.opacity = String(fx.cough);
+        co.classList.toggle('blur', fx.quality !== 'low');
+      }
 
       // Picked-up items fly from where you grabbed them into the item button.
       const target = document.querySelector('.hud-item')?.getBoundingClientRect();
@@ -109,6 +117,7 @@ export function ScreenFx() {
       <div ref={oil} className="fx-oil" style={{ opacity: 0 }}>
         {BLOBS.map((src, i) => <img key={i} src={src} alt="" className={`blob b${i}`} />)}
       </div>
+      <div ref={cough} className="fx-cough" style={{ display: 'none' }} />
       <div ref={flyers} />
     </div>
   );

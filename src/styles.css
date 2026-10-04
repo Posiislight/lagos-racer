@@ -163,6 +163,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .fx-oil .blob { position: absolute; width: 52vmin; height: 52vmin; }
 .fx-oil .b0 { left: -26vmin; top: 22%; } .fx-oil .b1 { left: 24%; bottom: -30vmin; transform: rotate(40deg); }
 .fx-oil .b2 { right: -26vmin; top: 6%; transform: rotate(110deg); } .fx-oil .b3 { right: -22vmin; bottom: 4%; transform: rotate(200deg); }
+.fx-cough { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(255, 120, 40, 0) 38%, rgba(214, 62, 24, .55)); }
+.fx-cough.blur { backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
 .fx-fly { position: absolute; width: 64px; height: 64px; pointer-events: none; }
 .hud { position: absolute; inset: 0; pointer-events: none; z-index: 12; font-family: Bungee, Impact, sans-serif; color: #fff; }
 .hud > * { position: absolute; }
@@ -204,6 +206,25 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .hud-item.full { background: var(--yellow); animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: translateY(-50%) scale(1.08); } }
 @media (pointer: coarse) { .hud-item { width: 88px; height: 88px; } .hud-item .icon-img { width: 74px; height: 74px; } }
+/* The special button sits just left of the power-up button and matches its size. The ring is a conic gradient
+   filled to --charge (0..1); the face on top is the button's own colour. */
+.hud-special {
+  --size: 76px;
+  pointer-events: auto; top: 50%; right: calc(14px + var(--safe-r) + var(--size) + 12px); transform: translateY(-50%);
+  width: var(--size); height: var(--size); border-radius: 50%; border: 3px solid var(--ink); padding: 5px; cursor: pointer; color: var(--ink);
+  background: conic-gradient(var(--yellow) calc(var(--charge, 0) * 360deg), rgba(20, 18, 16, .28) 0);
+}
+.hud-special .face {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: rgba(255, 250, 240, .92);
+  font-family: Bungee, Impact, sans-serif; font-size: 13px; text-transform: uppercase; letter-spacing: -.02em;
+}
+.hud-special kbd {
+  position: absolute; right: -4px; bottom: -4px; min-width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px;
+  background: var(--ink); color: #fff; font-family: Archivo, sans-serif; font-weight: 900; font-size: 12px;
+}
+.hud-special.ready { animation: pulse 1s ease-in-out infinite; box-shadow: 0 0 0 4px rgba(245, 180, 0, .55), 0 0 18px 6px rgba(245, 180, 0, .7); }
+.hud-special.ready .face { background: var(--yellow); }
+@media (pointer: coarse) { .hud-special { --size: 88px; } .hud-special .face { font-size: 15px; } }
 .hud-speed {
   bottom: calc(12px + var(--safe-b)); left: 50%; transform: translateX(-50%); font-family: Archivo, sans-serif; font-weight: 800;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .6); font-size: 14px;
@@ -228,7 +249,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
 @keyframes msg { 0% { transform: translateX(-50%) scale(1.5); opacity: 0; } 12% { transform: translateX(-50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
 @keyframes blink { 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .hud-msg, .hud-count, .hud-item.full, .hud-wrong { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .hud-msg, .hud-count, .hud-item.full, .hud-special.ready, .hud-wrong { animation: none; } }
 
 /* ---------- touch controls ---------- */
 .touch { position: absolute; inset: 0; pointer-events: none; z-index: 11; }
@@ -264,4 +285,5 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .pad.brake { width: 72px; height: 72px; }
   .hud-pos b { font-size: 34px; }
   .hud-item { width: 78px; height: 78px; }
+  .hud-special { --size: 78px; }
 }
