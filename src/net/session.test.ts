@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FLAG, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage } from './protocol';
+import { FLAG, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage, type RoomView } from './protocol';
 import type { Hazard, RaceRuntime, Racer } from '../game/runtime';
 import { makeRacer } from '../game/runtime';
 import { vehicleById } from '../config/vehicles';
@@ -323,6 +323,58 @@ describe('NetSession', () => {
       s.onEvent({ t: 'finished', netId: 0, time: 90 });
       s.resumed();
       expect(sent).toHaveLength(3);
+    });
+
+    it('re-sends unanswered finishes every 2 s until finished, dnf or results', () => {
+      const { s, race, racers, sent, now } = started(1000);
+      for (const r of [racers[0], racers[1]]) {
+        r.progress.lapTimes = [30, 30, 30];
+        r.progress.finishTime = 90;
+        s.finish(r);
+      }
+      const claims = () => sent.filter(m => m.t === 'finish').map(m => (m as { netId: number }).netId);
+      expect(claims()).toEqual([0, 1]);
+      now.mockReturnValue(2900);
+      s.update(race);
+      expect(claims()).toEqual([0, 1]);
+      now.mockReturnValue(3000);
+      s.update(race);
+      expect(claims()).toEqual([0, 1, 0, 1]);
+      s.onEvent({ t: 'finished', netId: 1, time: 90 });
+      now.mockReturnValue(5000);
+      s.update(race);
+      expect(claims()).toEqual([0, 1, 0, 1, 0]);
+      // A refused claim comes back as a dnf: nothing left to claim for that car.
+      s.onEvent({ t: 'dnf', netIds: [0] });
+      now.mockReturnValue(7000);
+      s.update(race);
+      expect(claims()).toHaveLength(5);
+
+      const other = started(1000);
+      other.racers[0].progress.lapTimes = [30, 30, 30];
+      other.racers[0].progress.finishTime = 90;
+      other.s.finish(other.racers[0]);
+      expect(other.s.onResults()).toBe(true);
+      other.now.mockReturnValue(9000);
+      other.s.update(other.race);
+      expect(other.sent.filter(m => m.t === 'finish')).toHaveLength(1);
+    });
+
+    it('takes the results only once', () => {
+      const { s } = started(1000);
+      expect(s.onResults()).toBe(true);
+      expect(s.onResults()).toBe(false);
+    });
+
+    it('is stranded when the room is back in the lobby after my race and no results came', () => {
+      const { s } = started(1000);
+      const view = (phase: RoomView['phase'], raceSeq: number): RoomView =>
+        ({ code: 'ABCD', phase, hostSlot: 1, fillAI: false, raceSeq, players: [] });
+      expect(s.stranded(view('racing', 1))).toBe(false);
+      expect(s.stranded(view('lobby', 2))).toBe(false);
+      expect(s.stranded(view('lobby', 1))).toBe(true);
+      s.onResults();
+      expect(s.stranded(view('lobby', 1))).toBe(false);
     });
 
     it('drops snapshots from another raceSeq or from my own slot', () => {

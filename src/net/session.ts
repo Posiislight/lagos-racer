@@ -4,9 +4,12 @@ import type { OnlineSetup } from '../game/setup';
 import type { ClockSync } from './clock';
 import type { NetLink } from './connection';
 import { sfx } from '../game/audio';
-import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage, type ServerMessage } from './protocol';
+import { FLAG, START_LEAD_MS, TICK_HZ, decodeSnapshot, encodeSnapshot, type CarState, type ClientMessage, type RoomView, type ServerMessage } from './protocol';
 
 type FinishClaim = Extract<ClientMessage, { t: 'finish' }>;
+
+// How often an unanswered finish claim goes out again (s): a stalled socket can swallow it without dropping.
+const CLAIM_EVERY = 2;
 
 export class NetSession implements NetHooks {
   readonly raceSeq: number;
@@ -20,6 +23,8 @@ export class NetSession implements NetHooks {
   private dnf = new Set<number>();
   /** Finish claims for my cars the room hasn't answered yet; a claim made while the socket was down is lost. */
   private unanswered = new Map<number, FinishClaim>();
+  private lastClaim = -Infinity;
+  private gotResults = false;
 
   constructor(
     private readonly link: NetLink,
@@ -62,6 +67,7 @@ export class NetSession implements NetHooks {
     if (this.startAt === null) return;
     for (const r of race.racers) if (r.kind !== 'remote' && r.controls.horn) this.hornSince.add(r.id);
     const t = this.now();
+    if (this.unanswered.size && t - this.lastClaim >= CLAIM_EVERY) this.claim();
     // Measured from the last send, not accumulated, so a long gap (backgrounded tab) is one snapshot, not a burst.
     if (t - this.lastSend < 1 / TICK_HZ) return;
     this.lastSend = t;
@@ -107,7 +113,11 @@ export class NetSession implements NetHooks {
    */
   onEvent(m: ServerMessage) {
     if (m.t === 'dnf') {
-      for (const id of m.netIds) this.dnf.add(id);
+      for (const id of m.netIds) {
+        this.dnf.add(id);
+        // A refused finish comes back as a dnf: no point claiming it again.
+        this.unanswered.delete(id);
+      }
       // My own car drives on here, but the room has stopped counting it.
       if (this.race?.racers.some(r => r.isPlayer && m.netIds.includes(r.id))) this.flash('Network wahala');
       this.applyDnf();
@@ -161,6 +171,25 @@ export class NetSession implements NetHooks {
     const claim: FinishClaim = { t: 'finish', netId: r.id, laps: [...r.progress.lapTimes], time };
     this.unanswered.set(r.id, claim);
     this.link.sendJson(claim);
+    this.lastClaim = this.now();
+  }
+
+  private claim() {
+    for (const claim of this.unanswered.values()) this.link.sendJson(claim);
+    this.lastClaim = this.now();
+  }
+
+  /** The room's results for this race came in. Returns false for a repeat (say, re-sent after a resume). */
+  onResults(): boolean {
+    if (this.gotResults) return false;
+    this.gotResults = true;
+    this.unanswered.clear();
+    return true;
+  }
+
+  /** The room went back to the lobby after this race, but its results never reached us. */
+  stranded(room: RoomView): boolean {
+    return room.phase === 'lobby' && room.raceSeq === this.raceSeq && !this.gotResults;
   }
 
   /**
@@ -169,6 +198,6 @@ export class NetSession implements NetHooks {
    */
   resumed() {
     if (this.sentLoaded && this.startAt === null) this.link.sendJson({ t: 'loaded' });
-    for (const claim of this.unanswered.values()) this.link.sendJson(claim);
+    if (this.unanswered.size) this.claim();
   }
 }

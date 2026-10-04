@@ -35,6 +35,9 @@ const TOKEN_KEY = 'lagos-racer:net-token';
 const PING_WARMUP = 5;
 const PING_WARMUP_MS = 100;
 const PING_EVERY_MS = 5000;
+// How long a room back in the lobby after our race may keep its results from us before we stop waiting.
+const STRANDED_MS = 3000;
+const STRANDED_FLASH_MS = 1500;
 
 export const ERROR_TEXT: Record<NetError, string> = {
   'not-found': 'Room not found',
@@ -74,6 +77,9 @@ let generation = 0;
 let clock = new ClockSync();
 let pingTimer: ReturnType<typeof setTimeout> | null = null;
 let session: NetSession | null = null;
+/** Set by a welcome: the room view that follows says whether the race we were in is still the room's. */
+let resyncPending = false;
+let strandTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const getClock = (): ClockSync => clock;
 export const getLink = (): NetLink | null => conn;
@@ -100,6 +106,9 @@ function startPings() {
 function drop() {
   generation++;
   stopPings();
+  if (strandTimer) clearTimeout(strandTimer);
+  strandTimer = null;
+  resyncPending = false;
   session = null;
   const old = conn;
   conn = null;
@@ -165,14 +174,20 @@ export const useNet = create<NetState>((set, get) => {
         writeToken(m.token);
         set({ code: m.code, mySlot: m.slot, error: null });
         startPings();
-        // Back from a drop mid-race: catch the room up on what was lost while the socket was down.
-        session?.resumed();
+        resyncPending = true;
         const game = useGame.getState();
         if (game.screen === 'online') game.setScreen('lobby');
         break;
       }
       case 'room':
         set({ room: m.room });
+        if (resyncPending) {
+          resyncPending = false;
+          // Back from a drop mid-race: catch the room up on what was lost while the socket was down, unless it has
+          // moved on to another race (loaded and finish don't say which race they are for).
+          if (session?.raceSeq === m.room.raceSeq) session.resumed();
+        }
+        if (session?.stranded(m.room)) watchStranded();
         break;
       case 'error':
         // Before we are seated, or when a resume is refused, there is no room to stay in.
@@ -205,7 +220,7 @@ export const useNet = create<NetState>((set, get) => {
         // The room is back in the lobby; the next grid starts a fresh session.
         const mySlot = get().mySlot;
         const mine = m.results.find(r => !r.ai && r.slot === mySlot);
-        if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine) break;
+        if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine || !session.onResults()) break;
         const game = useGame.getState();
         game.finishRace(toResults(m.results, mySlot), coinsFor(mine), mine.best);
         game.setHud({ phase: 'finished' });
@@ -214,6 +229,24 @@ export const useNet = create<NetState>((set, get) => {
       default:
         break;
     }
+  }
+
+  /** The room finished our race without us hearing the results: give it a moment, then go back to the lobby. */
+  function watchStranded() {
+    if (strandTimer) return;
+    const id = generation, mine = session;
+    strandTimer = setTimeout(() => {
+      strandTimer = null;
+      const room = get().room;
+      if (id !== generation || session !== mine || !room || !mine?.stranded(room)) return;
+      const game = useGame.getState();
+      if (game.screen !== 'race' || !game.online) return;
+      game.flash('Network wahala');
+      setTimeout(() => {
+        const g = useGame.getState();
+        if (id === generation && session === mine && g.screen === 'race' && g.online && !g.results) g.setScreen('lobby');
+      }, STRANDED_FLASH_MS);
+    }, STRANDED_MS);
   }
 
   const sendLobby = (change: { vehicle?: VehicleId; ready?: boolean; fillAI?: boolean }) => {
