@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TRACKS, trackById, trackFor } from './tracks';
+import { TRACKS, trackById, trackFor, trackOrDefault } from './tracks';
 import { project, sampleAt } from '../game/track';
 import { createProgress } from '../game/race';
 import { medianMask, roadRangeMask } from '../game/outAndBack';
@@ -11,6 +11,13 @@ describe('every track', () => {
       expect(trackFor(t).length).toBeGreaterThan(0);
       expect(t.laps).toBeGreaterThanOrEqual(1);
     }
+  });
+});
+
+describe('trackOrDefault', () => {
+  it('returns ojuelegba for an unknown id and the track for a known one', () => {
+    expect(trackOrDefault('nowhere').id).toBe('ojuelegba');
+    expect(trackOrDefault('ikorodu').id).toBe('ikorodu');
   });
 });
 

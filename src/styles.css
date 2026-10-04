@@ -301,3 +301,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .hud-item { width: 78px; height: 78px; }
   .hud-special { --size: 78px; }
 }
+.track-picker { display: flex; gap: 6px; margin: 8px 0 0; flex-wrap: wrap; }
+.track-chip { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.25); color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
+.track-chip.on { background: #f5b400; color: #1a1a1a; border-color: #f5b400; }

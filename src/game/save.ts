@@ -1,4 +1,5 @@
 import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { TRACKS } from '../config/tracks';
 import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
 
 /**
@@ -22,6 +23,8 @@ export type Saved = {
   itemHints: number;
   /** The chosen driver (who sits in the vehicle and which special power you get). */
   driver: DriverId;
+  /** The chosen track id. */
+  track: string;
 };
 
 export const SAVE_KEY = 'lagos-racer:v2';
@@ -37,7 +40,7 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER,
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba',
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -52,7 +55,7 @@ const OLD_IDS: Record<string, { vehicle: VehicleId; paint?: string }> = {
 };
 
 /** Fill in anything missing or malformed in a version 2 save. */
-function normalise(raw: Record<string, unknown>): Saved {
+export function normaliseSave(raw: Record<string, unknown>): Saved {
   const d = defaultSave();
   const unlocked = Array.isArray(raw.unlocked) ? [...new Set(raw.unlocked.filter((v): v is VehicleId => typeof v === 'string' && IDS.has(v)))] : [];
   return {
@@ -66,6 +69,7 @@ function normalise(raw: Record<string, unknown>): Saved {
     paint: isObj(raw.paint) ? raw.paint as Saved['paint'] : {},
     itemHints: num(raw.itemHints, 0),
     driver: sanitizeDriver(raw.driver),
+    track: typeof raw.track === 'string' && TRACKS.some(t => t.id === raw.track) ? raw.track : d.track,
   };
 }
 
@@ -79,14 +83,14 @@ export function migrateSave(v1: unknown): Saved {
   // The Ojuelegba track was rebuilt on the real road, so its old best lap no longer means anything.
   const best = isObj(v1.best) ? { ...v1.best } : {};
   delete best.ojuelegba;
-  return normalise({ ...v1, vehicle: old?.vehicle ?? v1.vehicle, unlocked, best, paint, itemHints: 0 });
+  return normaliseSave({ ...v1, vehicle: old?.vehicle ?? v1.vehicle, unlocked, best, paint, itemHints: 0 });
 }
 
 /** Read the save: version 2 if there is one, else a migrated version 1, else a fresh start. */
 export function loadSave(): Saved {
   try {
     const v2 = localStorage.getItem(SAVE_KEY);
-    if (v2) return normalise(JSON.parse(v2));
+    if (v2) return normaliseSave(JSON.parse(v2));
     const v1 = localStorage.getItem(OLD_KEY);
     return v1 ? migrateSave(JSON.parse(v1)) : defaultSave();
   } catch {

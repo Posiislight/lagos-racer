@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSave, migrateSave } from './save';
+import { defaultSave, migrateSave, normaliseSave } from './save';
 
 describe('migrateSave (v1 → v2)', () => {
   it('migrates the blue okada to an okada painted blue', () => {
@@ -45,5 +45,18 @@ describe('driver', () => {
   it('falls back to Moshood when the driver is missing or junk', () => {
     for (const raw of [{}, { driver: 7 }, { driver: null }, { driver: 'bob' }]) expect(migrateSave(raw).driver).toBe('moshood');
     expect(defaultSave().driver).toBe('moshood');
+  });
+});
+
+describe('saved track', () => {
+  it('keeps a known track id', () => {
+    expect(normaliseSave({ track: 'ikorodu' }).track).toBe('ikorodu');
+  });
+  it('falls back to ojuelegba for an unknown or missing id', () => {
+    expect(normaliseSave({ track: 'nowhere' }).track).toBe('ojuelegba');
+    expect(normaliseSave({}).track).toBe('ojuelegba');
+  });
+  it('keeps best laps for each track separately', () => {
+    expect(normaliseSave({ best: { ojuelegba: 61.2, ikorodu: 80.5 } }).best).toEqual({ ojuelegba: 61.2, ikorodu: 80.5 });
   });
 });

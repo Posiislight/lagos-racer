@@ -36,7 +36,6 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).get(
 
 export type State = Saved & {
   screen: Screen;
-  track: string;
   raceId: number;
   paused: boolean;
   hud: Hud;
@@ -44,6 +43,7 @@ export type State = Saved & {
   coinsEarned: number;
   showAccountPrompt: boolean;
   setScreen: (s: Screen) => void;
+  setTrack: (id: string) => void;
   setVehicle: (v: VehicleId) => void;
   setPaint: (v: VehicleId, paint: string) => void;
   setDriver: (d: DriverId) => void;
@@ -69,7 +69,6 @@ const emptyHud = (): Hud => ({
 export const useGame = create<State>((set, get) => ({
   ...initial,
   screen: 'menu',
-  track: 'ojuelegba',
   raceId: 0,
   paused: false,
   hud: emptyHud(),
@@ -77,6 +76,7 @@ export const useGame = create<State>((set, get) => ({
   coinsEarned: 0,
   showAccountPrompt: false,
   setScreen: screen => set({ screen }),
+  setTrack: track => { set({ track }); save(); },
   setVehicle: vehicle => { set({ vehicle }); save(); },
   setPaint: (v, paint) => { set(s => ({ paint: { ...s.paint, [v]: paint } })); save(); },
   setDriver: driver => { set({ driver }); save(); },
@@ -110,6 +110,6 @@ function save() {
   const s = useGame.getState();
   writeSave({
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
-    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints, driver: s.driver,
+    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints, driver: s.driver, track: s.track,
   });
 }

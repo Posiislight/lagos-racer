@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
-import { trackById } from '../config/tracks';
+import { TRACKS, trackOrDefault } from '../config/tracks';
 import { driverById } from '../config/drivers';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
@@ -20,9 +20,9 @@ export function goFullscreen() {
 }
 
 export function Menu() {
-  const { vehicle, coins, startRace, setScreen, best, track, paint, driver } = useGame();
+  const { vehicle, coins, startRace, setScreen, best, track, paint, driver, setTrack } = useGame();
   const [settings, setSettings] = useState(false);
-  const v = vehicleById(vehicle), t = trackById(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
+  const v = vehicleById(vehicle), t = trackOrDefault(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
@@ -42,7 +42,13 @@ export function Menu() {
           <h2>{v.name}</h2>
           <p className="driver-line"><b>{d.name}</b> at the wheel · {d.special.name}</p>
           <p className="muted">{v.blurb}</p>
-          <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[track] ?? null)}</p>
+          <div className="track-picker" role="radiogroup" aria-label="Track">
+            {TRACKS.map(k => (
+              <button key={k.id} role="radio" aria-checked={k.id === t.id} className={`track-chip${k.id === t.id ? ' on' : ''}`} onClick={() => setTrack(k.id)}>{k.name}</button>
+            ))}
+          </div>
+          <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[t.id] ?? null)}</p>
+          <p className="muted">{t.blurb}</p>
           <p className="credit muted">Road layout © OpenStreetMap contributors</p>
         </div>
         <button className="btn primary big" onClick={() => { goFullscreen(); if (useGame.getState().settings.steering === 'tilt') void enableTilt(); startRace(); }}>OYA, RACE!</button>

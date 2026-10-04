@@ -119,6 +119,8 @@ export const TRACKS: TrackConfig[] = [
 ];
 
 export const trackById = (id: string) => TRACKS.find(t => t.id === id)!;
+/** The track with this id, or Ojuelegba for an id that no longer exists (an old save). */
+export const trackOrDefault = (id: string) => TRACKS.find(t => t.id === id) ?? TRACKS[0];
 
 /** The sampled track for a config: its loop, its hills, and what the hills follow. */
 export function trackFor(cfg: TrackConfig): Track {

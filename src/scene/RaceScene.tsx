@@ -5,7 +5,7 @@ import {
   BackSide, CanvasTexture, PerspectiveCamera, Color, DirectionalLight, Fog, Mesh, MeshBasicMaterial, PMREMGenerator, SRGBColorSpace, Scene, SphereGeometry,
 } from 'three';
 import { randomDriver, type DriverId } from '../config/drivers';
-import { trackById, trackFor } from '../config/tracks';
+import { trackOrDefault, trackFor } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { pickRivals, type Pick } from '../game/lineup';
 import { sampleAt } from '../game/track';
@@ -33,7 +33,7 @@ const QUALITY: Record<Quality, { density: number; shadows: number; far: number }
 };
 
 export function makeRace(trackId: string, player: Pick, playerDriver: DriverId): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
-  const config = trackById(trackId);
+  const config = trackOrDefault(trackId);
   const track = trackFor(config);
   // Five rivals (every vehicle at least once, all in different paints), then you at the back.
   const lineup = [...pickRivals(player, 5), player];
