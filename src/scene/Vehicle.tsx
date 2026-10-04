@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, RoundCuboidCollider, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, Points, PointsMaterial, Quaternion, SphereGeometry, Vector3,
+  AdditiveBlending, BufferAttribute, BufferGeometry, CapsuleGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Points, PointsMaterial, Quaternion, SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
 import { getRace, type Racer } from '../game/runtime';
@@ -227,6 +227,9 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
       for (let i = 0; i < SPARKS; i++) pos.setXYZ(i, -(sp.from + Math.random() * (sp.to - sp.from)), (Math.random() - 0.5) * sp.w * 2, (Math.random() - 0.5) * sp.w * 2);
       pos.needsUpdate = true;
     }
+    // Moshood's boys run behind and shove while Push Squad lasts.
+    fx.boys.visible = racer.push > 0;
+    if (fx.boys.visible) fx.boys.children.forEach((boy, i) => { boy.position.y = Math.abs(Math.sin(tt * 14 + i * 2)) * 0.14; });
     fx.aura.visible = racer.curse > 0;
     if (fx.aura.visible) {
       const p = 1 + Math.sin(tt * 9) * 0.08;
@@ -293,6 +296,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: {
           <primitive object={fx.aura} />
           <primitive object={fx.sparks} />
           <primitive object={fx.bubble} />
+          <primitive object={fx.boys} />
         </group>
       </group>
     </RigidBody>
@@ -346,6 +350,22 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
   );
   bubble.position.set(0, lay.originY, 0);
   bubble.visible = false;
-  return { flame, aura, bubble, sparks, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
+  // Three of the boys, shoving from behind: a capsule body and a round head each, leaning into it.
+  const boys = new Group();
+  boys.position.set(-(len + 0.8), 0, 0);
+  boys.visible = false;
+  const body = new CapsuleGeometry(0.2, 0.55, 4, 8), head = new SphereGeometry(0.2, 12, 8);
+  ['#e8452c', '#2f9e5b', '#f2b705'].forEach((shirt, i) => {
+    const boy = new Group();
+    const torso = new Mesh(body, new MeshStandardMaterial({ color: shirt, roughness: 0.7 }));
+    torso.position.y = 0.75;
+    const skull = new Mesh(head, new MeshStandardMaterial({ color: i === 1 ? '#6b4326' : '#8a5a36', roughness: 0.6 }));
+    skull.position.y = 1.4;
+    boy.add(torso, skull);
+    boy.rotation.z = -0.35;
+    boy.position.z = (i - 1) * Math.max(0.7, w * 0.8);
+    boys.add(boy);
+  });
+  return { flame, aura, bubble, sparks, boys, sparkSpread: { from: 1.2 + len * 0.3, to: 2.6 + len * 0.4, w: 0.3 + h * 0.15 } };
 }
 const SPARKS = 12;
