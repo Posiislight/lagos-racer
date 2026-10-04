@@ -96,6 +96,11 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 }
 @media (max-height: 480px) {
   .menu-side .card .muted { display: none; }
+  .menu-side .card .eyebrow { display: none; }
+  .menu-side .card .credit { display: block; margin-top: 2px; }
+  .track-picker { margin-top: 4px; }
+  .track-chip { min-height: 34px; padding: 0 12px; font-size: 14px; }
+  .menu-side .card h2 { font-size: 26px; }
   .board h1 { font-size: 28px; }
   .btn.big { font-size: 20px; padding: 10px 18px; }
 }
