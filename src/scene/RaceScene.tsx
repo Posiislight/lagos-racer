@@ -12,6 +12,7 @@ import { makeRacer, setRace, getRace, type RaceRuntime } from '../game/runtime';
 import { makePickups } from '../game/items';
 import { makeCritters } from '../game/critters';
 import { AI_NAMES } from '../game/ai';
+import { NO_UPGRADES, applyUpgrades, levelsFor, type UpgradeLevels } from '../game/upgrades';
 import { useGame, type Quality } from '../game/store';
 import { resetPlayerInput } from '../game/input';
 import { Track } from './Track';
@@ -34,7 +35,7 @@ function rivals(player: VehicleId): VehicleId[] {
   return VEHICLES.map(v => v.id).filter(v => v !== player).sort(() => Math.random() - 0.5);
 }
 
-export function makeRace(trackId: string, playerVehicle: VehicleId): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
+export function makeRace(trackId: string, playerVehicle: VehicleId, upgrades: UpgradeLevels = NO_UPGRADES): { race: RaceRuntime; spawns: { x: number; y: number; z: number; yaw: number }[] } {
   const config = trackById(trackId);
   const track = buildTrack(config.control, 2, config.hills);
   const lineup = [...rivals(playerVehicle), playerVehicle];
@@ -49,7 +50,9 @@ export function makeRace(trackId: string, playerVehicle: VehicleId): { race: Rac
     const x = at.pos.x + at.right.x * lane, z = at.pos.z + at.right.z * lane;
     spawns.push({ x, y: at.pos.y, z, yaw: Math.atan2(-at.tangent.z, at.tangent.x) });
     const isPlayer = k === lineup.length - 1;
-    const r = makeRacer(k, isPlayer ? 'You' : names[k], vehicleById(vid), isPlayer, createProgress(track, x, z));
+    const base = vehicleById(vid);
+    // Only the player's vehicle gets upgrades; the AI always races stock.
+    const r = makeRacer(k, isPlayer ? 'You' : names[k], isPlayer ? applyUpgrades(base, upgrades) : base, isPlayer, createProgress(track, x, z));
     if (!isPlayer) r.ai = { lane, laneTarget: lane, skill: 0.9 + k * 0.035 + Math.random() * 0.03, itemDelay: 2, stuck: 0, reverseTime: 0 };
     return r;
   });
@@ -70,7 +73,11 @@ export function RaceScene() {
   const q = QUALITY[quality];
 
   // A fresh race whenever a new one is started.
-  const setup = useMemo(() => makeRace(trackId, VEHICLES.some(v => v.id === vehicle) ? vehicle : 'okada'), [raceId, trackId, vehicle]);
+  const setup = useMemo(() => {
+    const id = VEHICLES.some(v => v.id === vehicle) ? vehicle : 'okada';
+    // Upgrades are read when the race starts; nothing can be bought mid-race.
+    return makeRace(trackId, id, levelsFor(useGame.getState().upgrades, id));
+  }, [raceId, trackId, vehicle]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
   useLayoutEffect(() => {

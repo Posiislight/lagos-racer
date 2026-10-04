@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { payoutForPlace } from '../config/economy';
 import { getRace, type Racer } from '../game/runtime';
 import { updateProgress, standings, currentLap } from '../game/race';
 import { readPlayer } from '../game/input';
@@ -131,8 +132,7 @@ export function RaceLogic() {
           };
         });
         const place = order.indexOf(player);
-        const coins = [150, 100, 60, 30][place] ?? 20;
-        store.finishRace(results, coins, results[place].best);
+        store.finishRace(results, payoutForPlace(place), results[place].best);
         store.setHud({ phase: 'finished' });
       }
     }
