@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { aiState, getRace, type Racer } from '../game/runtime';
 import { updateProgress, standings, currentLap } from '../game/race';
 import { clearQueuedPresses, readPlayer } from '../game/input';
-import { driveAI } from '../game/ai';
+import { catchUpGap, driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
 import { updateSpecials } from '../game/specials';
 import { driverById } from '../config/drivers';
@@ -63,7 +63,10 @@ export function RaceLogic() {
     if (race.phase === 'countdown') {
       race.countdown -= dt;
       const label = race.countdown > 0 ? COUNT[Math.min(2, Math.floor(3 - race.countdown))] ?? '3' : 'OYA GO!';
-      if (label !== lastCount.current) { lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' }); }
+      if (label !== lastCount.current) {
+        lastCount.current = label; beep(label === 'OYA GO!'); store.setHud({ countdown: label, phase: 'countdown' });
+        if (label === 'OYA GO!' && race.spec?.taunts) store.flash(race.spec.taunts.before);
+      }
       if (race.countdown <= 0) { race.phase = 'racing'; store.setHud({ phase: 'racing' }); setTimeout(() => useGame.getState().setHud({ countdown: '' }), 900); }
     } else {
       race.clock += dt;
@@ -78,7 +81,7 @@ export function RaceLogic() {
       }
       else {
         if (!r.ai) r.ai = aiState(r.progress.lateral, 0.95, 3, 0);
-        driveAI(r, race, dt, r.isPlayer ? 0 : r.progress.distance - player.progress.distance);
+        driveAI(r, race, dt, catchUpGap(race, r, player));
       }
     }
 

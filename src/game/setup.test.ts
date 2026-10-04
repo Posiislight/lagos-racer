@@ -72,3 +72,34 @@ describe('makeRace: shape of a spec', () => {
     }
   });
 });
+
+describe('makeRace: duel', () => {
+  const duel = { track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.06 } } as const;
+
+  for (const vehicle of ['okada', 'brt'] as const) {
+    it(`puts Mama Put beside the player in a ${vehicle} of another paint`, () => {
+      const mine = { vehicle, paint: VEHICLES.find(v => v.id === vehicle)!.paints[0].id };
+      const { race, spawns } = makeRace(duel, mine, 'moshood');
+      expect(race.racers).toHaveLength(2);
+      expect(spawns).toHaveLength(2);
+      const [her, me] = race.racers;
+      expect(me).toMatchObject({ id: 1, isPlayer: true, driver: 'moshood' });
+      expect(her).toMatchObject({ id: 0, isPlayer: false, name: 'Mama Put', driver: 'mamaput' });
+      expect(her.vehicle.id).toBe(vehicle);
+      expect(her.paint.id).not.toBe(mine.paint);
+      expect(her.ai!.skill).toBe(1.06);
+      expect(her.ai!.special).toBe(true);
+      expect(Math.abs(her.progress.distance - me.progress.distance)).toBeLessThan(0.5);
+      expect(me.progress.lateral).toBeGreaterThan(0);
+      expect(her.progress.lateral).toBeLessThan(0);
+    });
+  }
+
+  it('is a two-lap race with items on', () => {
+    const { race } = makeRace(duel, okada, 'moshood');
+    expect(race.config.laps).toBe(2);
+    expect(race.config.id).toBe('ikorodu');
+    expect(race.mode.id).toBe('duel');
+    expect(race.pickups.length).toBeGreaterThan(0);
+  });
+});

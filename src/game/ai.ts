@@ -66,6 +66,16 @@ export function aiSpecial(r: Racer, race: RaceRuntime, dt: number, rand: () => n
   });
 }
 
+/**
+ * How far ahead of the player this racer is, which `driveAI` turns into the rubber band (ease off
+ * when far ahead, push when far behind). Zero for the player and in a duel, where the rival's skill
+ * is the whole challenge and it is never helped or held back.
+ */
+export function catchUpGap(race: Pick<RaceRuntime, 'mode'>, r: Racer, player: Racer): number {
+  if (r.isPlayer || race.mode.id === 'duel') return 0;
+  return r.progress.distance - player.progress.distance;
+}
+
 export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: number) {
   const ai = r.ai, b = r.body;
   if (!ai || !b) return;

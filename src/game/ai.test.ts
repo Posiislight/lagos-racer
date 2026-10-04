@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { aiSpecial, sideStep, type Footprint } from './ai';
-import { aiState } from './runtime';
+import { aiSpecial, catchUpGap, sideStep, type Footprint } from './ai';
+import { aiState, type RaceRuntime } from './runtime';
 import { racerAt, raceWith } from './testkit';
 
 const HW = 6.5;
@@ -91,5 +91,21 @@ describe('aiSpecial', () => {
     r.charge = 1;
     aiSpecial(r, race, 0.1, () => 1);
     expect(r.ai!.specialDelay).toBeCloseTo(2 - 0.1, 5);
+  });
+});
+
+describe('catchUpGap', () => {
+  const rival = racerAt(1, 60), me = racerAt(2, 5, true);
+  const gap = (id: 'laps' | 'duel', r = rival, p = me) => catchUpGap({ mode: { id } } as unknown as Pick<RaceRuntime, 'mode'>, r, p);
+
+  it('is how far a rival is ahead of the player in an ordinary race', () => {
+    expect(gap('laps')).toBeCloseTo(rival.progress.distance - me.progress.distance, 5);
+    expect(gap('laps')).toBeGreaterThan(40);
+  });
+  it('is zero in a duel, so the rival is never rubber-banded', () => {
+    expect(gap('duel')).toBe(0);
+  });
+  it('is zero for the player', () => {
+    expect(gap('laps', me, me)).toBe(0);
   });
 });
