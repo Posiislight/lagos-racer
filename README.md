@@ -37,6 +37,16 @@ npm run dev      # the game, as above
 
 Phones on the same Wi-Fi reach the server through the laptop's address: the game connects to `ws://<the address you opened>:8787`, so open the "Network" address Vite prints on each phone and it finds the server by itself. Set `VITE_ROOM_SERVER` to point at a server somewhere else. In the game, **Race with friends** (main menu) opens the online screen: pick a nickname, then **Create room** or type a friend's 4-letter code and **Join room**. The lobby shows the room code, a **Share** button (a link ending in `?room=CODE`, which opens the join screen with the code filled in), everyone's ride and ready ticks, and for the host a **Start** button once at least two players are ready. The nickname is remembered on the device; the connection is only opened once you create or join a room. Add `?lag=120&jitter=40&loss=3` (ms, ms, percent) to fake a bad network when testing.
 
+## Deploying multiplayer
+
+The site stays on Vercel; the room server runs on Railway.
+
+1. In Railway, create a service from this repo and pick the EU West region (closest to Lagos players). `railway.json` makes it build with a no-op command and start `npm run server`, with `/health` as the health check. Railway sets `PORT` itself.
+2. Generate a public domain for the service and copy it.
+3. In Vercel, set the environment variable `VITE_ROOM_SERVER=wss://<domain>` (see `.env.example`) and redeploy the site, because Vite bakes it in at build time.
+
+Troubleshooting: if the site is served over https it must use `wss://`, not `ws://`, or the browser blocks the connection.
+
 ## Controls
 
 You're always on the gas: just steer. Hitting walls or other vehicles costs you speed, and if

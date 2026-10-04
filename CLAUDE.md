@@ -76,6 +76,8 @@ Milestones 1–3 are built, and milestone 4 is partly done.
 
 Do not start a later milestone until the earlier one feels fun.
 
+The room server deploys to Railway (`railway.json`); the Vercel site points at it through `VITE_ROOM_SERVER`.
+
 ## Working style
 
 - Plan before implementing each milestone and confirm the plan with me.
