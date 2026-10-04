@@ -41,6 +41,8 @@ export type TrackConfig = {
   /** Goat and chicken crossing points: track distance, animal, how many. */
   critters?: { s: number; kind: 'goat' | 'chicken'; count: number }[];
   zones: SceneryZone[];
+  /** 'real': draw the real signs listed in src/config/signs (lettering only). Default 'generic': no real names. */
+  signage?: 'real' | 'generic';
   /** Raised islands inside a U-turn, centred this far along the axis (a roundabout). */
   islands?: { road: number; radius: number; statue?: boolean }[];
   /** Axis ranges whose road shape is constructed, not taken from the map. track-report lists them. */
@@ -119,6 +121,7 @@ export const TRACKS: TrackConfig[] = [
       { kind: 'buildings', road: [0, IKORODU_LENGTH], street: 'south' },
     ],
     // The real ring is about 5.4 m in radius at this scale, too tight for the BRT; the road round it is 13 m.
+    signage: 'real',
     islands: [{ road: IKORODU_LENGTH, radius: 6.2, statue: true }],
     invented: [{ road: [0, 20], why: 'OSM shows only a 34 m service road inside the hospital gate; the U-turn there is a constructed 13 m turning circle in the forecourt' }],
     ground: '#a87d5c',
