@@ -38,9 +38,18 @@ describe('aiSpecial', () => {
   /** An AI driver of the given kind standing `s` metres round with a full meter. */
   const driver = (id: number, s: number, kind: 'moshood' | 'mamaput') => {
     const r = racerAt(id, s);
-    r.driver = kind; r.charge = 1; r.ai = aiState(0, 1);
+    r.driver = kind; r.charge = 1; r.ai = aiState(0, 1, 2, 0, true);
     return r;
   };
+
+  it('never fires unless the race allows AI specials (only the duel does)', () => {
+    for (const kind of ['moshood', 'mamaput'] as const) {
+      const r = driver(1, 5, kind), race = raceWith([r, racerAt(2, -20)]);
+      r.ai = aiState(0, 1);
+      expect(r.ai.special).toBe(false);
+      for (let i = 0; i < 40; i++) expect(aiSpecial(r, race, 0.5, none)).toBe(false);
+    }
+  });
 
   it('never fires with a part-charged meter', () => {
     const r = driver(1, 5, 'moshood'), race = raceWith([r]);

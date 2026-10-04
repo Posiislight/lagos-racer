@@ -32,10 +32,12 @@ export type AIState = {
   specialDelay: number;
   /** Seconds the special has been ready, so it can't wait forever for the perfect moment. */
   specialWait: number;
+  /** Whether this AI may use its driver special at all (only Mama Put in the duel does). */
+  special: boolean;
 };
 
-export const aiState = (lane: number, skill: number, itemDelay = 2, laneTarget = lane): AIState =>
-  ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0 });
+export const aiState = (lane: number, skill: number, itemDelay = 2, laneTarget = lane, special = false): AIState =>
+  ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0, special });
 
 export type Racer = {
   id: number;

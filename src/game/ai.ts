@@ -44,11 +44,12 @@ const footprint = (r: Racer): Footprint => ({
 /**
  * Whether an AI driver presses its special button this frame. It waits a moment after the meter fills,
  * then fires at a sensible time: Moshood on a straight (Push Squad needs room to run), Mama Put with a
- * rival close behind (the trail is for them). Either fires anyway after waiting 10 s.
+ * rival close behind (the trail is for them). Either fires anyway after waiting 10 s. Only an AI
+ * with `special` set uses it at all: in ordinary races the opponents leave their meters alone.
  */
 export function aiSpecial(r: Racer, race: RaceRuntime, dt: number, rand: () => number = Math.random): boolean {
   const ai = r.ai;
-  if (!ai) return false;
+  if (!ai?.special) return false;
   if (r.charge < 1) { ai.specialDelay = -1; ai.specialWait = 0; return false; }
   if (ai.specialDelay < 0) ai.specialDelay = 0.5 + rand() * 1.5;
   ai.specialDelay -= dt;
