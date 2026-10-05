@@ -230,11 +230,13 @@ export class Room {
     const conn = this.connOf(slot);
     if (conn === null || !this.grid.some(g => g.slot === slot)) return;
     if (this.phase === 'lobby') {
-      if (this.resultsMsg) this.send(conn, this.resultsMsg);
+      const results = this.resultsFor(slot);
+      if (results) this.send(conn, results);
       return;
     }
-    if (!this.gridMsg) return;
-    this.send(conn, this.gridMsg);
+    const grid = this.gridFor(slot);
+    if (!grid) return;
+    this.send(conn, grid);
     if (this.phase !== 'loading') this.send(conn, { t: 'start', raceSeq: this.raceSeq, at: this.startAt });
     if (this.dropped.size) this.send(conn, { t: 'dnf', netIds: [...this.dropped] });
   }
@@ -329,7 +331,28 @@ export class Room {
       trackId: this.trackId,
       laps: config.laps,
     };
-    this.broadcast(this.gridMsg);
+    for (const s of new Set(this.grid.map(g => g.slot))) {
+      const conn = this.connOf(s);
+      const msg = this.gridFor(s);
+      if (conn !== null && msg) this.send(conn, msg);
+    }
+  }
+
+  /**
+   * The bot flag is secret in a Quick room: a phone sees `ai: true` only on the cars it drives itself, so nobody can
+   * tell the bots from the other humans. Friends' rooms send the real flags.
+   */
+  private hide<T extends { ai: boolean; slot: number }>(entries: T[], slot: number): T[] {
+    if (!this.quick) return entries;
+    return entries.map(e => ({ ...e, ai: e.ai && e.slot === slot }));
+  }
+
+  gridFor(slot: number): Extract<ServerMessage, { t: 'grid' }> | null {
+    return this.gridMsg && { ...this.gridMsg, grid: this.hide(this.gridMsg.grid, slot) };
+  }
+
+  resultsFor(slot: number): Extract<ServerMessage, { t: 'results' }> | null {
+    return this.resultsMsg && { ...this.resultsMsg, results: this.hide(this.resultsMsg.results, slot) };
   }
 
   /** A grid human finished loading the track. Anyone else, or a repeat, is ignored. */
@@ -434,7 +457,11 @@ export class Room {
   private endRace(now: number, withResults: boolean) {
     if (withResults && this.referee) {
       this.resultsMsg = { t: 'results', raceSeq: this.raceSeq, results: this.referee.results(this.raceTime(now)) };
-      for (const conn of this.othersOnGrid(0)) this.send(conn, this.resultsMsg);
+      for (const s of new Set(this.grid.map(g => g.slot))) {
+        const conn = this.connOf(s);
+        const msg = this.resultsFor(s);
+        if (conn !== null && msg) this.send(conn, msg);
+      }
     }
     this.phase = 'lobby';
     this.referee = null;

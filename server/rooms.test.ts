@@ -1376,6 +1376,74 @@ describe('quick room', () => {
     expect(room.view().hostSlot).toBe(0);
   });
 
+  describe('hidden bot flag', () => {
+    const start = () => {
+      human(1, 'Ade');
+      human(2, 'Bola');
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+    };
+    const flags = (conn: number) => sentTo(conn, 'grid')[0].grid.map(e => [e.netId, e.ai]);
+
+    it('owner sees ai true for bots only, others see all false', () => {
+      start();
+      const real = (room as any).grid as { netId: number; ai: boolean; slot: number }[];
+      const bots = real.filter(e => e.ai);
+      expect(bots.length).toBe(4);
+      expect(flags(1).filter(([, ai]) => ai).map(([id]) => id)).toEqual(bots.map(e => e.netId));
+      expect(flags(2).every(([, ai]) => ai === false)).toBe(true);
+    });
+
+    it('human cars are false for everyone', () => {
+      start();
+      const humans = (room as any).grid.filter((e: { ai: boolean }) => !e.ai).map((e: { netId: number }) => e.netId);
+      for (const conn of [1, 2]) for (const [id, ai] of flags(conn)) if (humans.includes(id)) expect(ai).toBe(false);
+    });
+
+    it('results are filtered the same way', () => {
+      start();
+      (room as any).endRace(now + 5000, true);
+      const r1 = sentTo(1, 'results')[0].results;
+      const r2 = sentTo(2, 'results')[0].results;
+      expect(r1.filter(r => r.ai)).toHaveLength(4);
+      expect(r1.filter(r => r.ai).every(r => r.slot === 1)).toBe(true);
+      expect(r2.every(r => !r.ai)).toBe(true);
+      expect(r1).toHaveLength(6);
+    });
+
+    it('resume re-sends a filtered grid', () => {
+      start();
+      room.detach(2, now);
+      room.attach(2, 9);
+      room.resync(2);
+      expect(sentTo(9, 'grid')[0].grid.every(e => !e.ai)).toBe(true);
+      room.detach(1, now);
+      room.attach(1, 8);
+      room.resync(1);
+      expect(sentTo(8, 'grid')[0].grid.filter(e => e.ai)).toHaveLength(4);
+    });
+
+    it('referee still treats bots as ai', () => {
+      start();
+      const results = (room as any).referee.results(1) as { ai: boolean }[];
+      expect(results.filter(r => r.ai)).toHaveLength(4);
+      expect(((room as any).grid as { ai: boolean }[]).filter(e => e.ai)).toHaveLength(4);
+    });
+
+    it('friends room grid still carries real ai flags', () => {
+      quickRoom(7, false);
+      human(1, 'Ade');
+      human(2, 'Bola');
+      room.lobby(1, { ready: true });
+      room.lobby(2, { ready: true });
+      room.lobby(1, { fillAI: true });
+      expect(room.startRace(1, now, Math.random)).toBeNull();
+      const real = (room as any).grid as { ai: boolean }[];
+      expect(real.some(e => e.ai)).toBe(true);
+      expect(sentTo(2, 'grid')[0].grid.map(e => e.ai)).toEqual(real.map(e => e.ai));
+    });
+  });
+
   it('view shows bots only after their appearance time and hides one when a human takes the seat', () => {
     human(1, 'Ade');
     const start = now;
@@ -1515,6 +1583,14 @@ describe('quick matchmaking', () => {
     expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
     send(b.conn, { t: 'vote', trackId: 'x'.repeat(41) });
     expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
+  });
+
+  it('a friends join by code into a quick room is refused as not-found', () => {
+    const a = quick('A');
+    const c = connect();
+    send(c.conn, { t: 'join', code: a.welcome.code, name: 'Bola', vehicle: 'keke' });
+    expect(msgs(c.peer, 'error').at(-1)?.error).toBe('not-found');
+    expect(msgs(c.peer, 'welcome')).toHaveLength(0);
   });
 
   it('friends rooms never receive quick joiners', () => {

@@ -365,7 +365,8 @@ export class RoomServer {
     const code = normalizeCode(rawCode);
     if (!/^[A-Z]{4}$/.test(code)) return this.fail(conn, 'bad-code');
     const room = this.rooms.get(code);
-    if (!room) return this.fail(conn, 'not-found');
+    // Quick rooms are not joinable by code; their players come through quick().
+    if (!room || room.quick) return this.fail(conn, 'not-found');
     const name = cleanNick(rawName);
     if (!name) return this.fail(conn, 'bad-name');
     if (room.isFull) return this.fail(conn, 'full');
