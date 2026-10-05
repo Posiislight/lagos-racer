@@ -82,6 +82,8 @@ export class Room {
   private resultsMsg: Extract<ServerMessage, { t: 'results' }> | null = null;
   /** Cars out of the current race: their phone dropped or left, or the referee refused their finish. */
   private dropped = new Set<number>();
+  /** Quick rooms: slots that took over bots from a racer who left this race. */
+  private heirs = new Set<number>();
   private loaded = new Set<number>();
   private gridAt = 0;
   private startAt = 0;
@@ -210,9 +212,13 @@ export class Room {
     return !m || this.expired(m, now);
   }
 
-  /** Marks this slot's cars (its AI too) DNF in the race under way and tells the racers. */
+  /**
+   * Marks this slot's cars DNF in the race under way and tells the racers. In a friends' room its AI goes out with
+   * it; in a Quick room its bots pass to the next racer instead, if anyone is still connected.
+   */
   private dropOut(slot: number) {
     if (this.phase === 'lobby' || !this.referee) return;
+    if (this.quick) this.handOver(slot);
     const netIds = this.grid.filter(g => g.slot === slot && !this.dropped.has(g.netId)).map(g => g.netId);
     if (!netIds.length) return;
     for (const id of netIds) {
@@ -220,6 +226,36 @@ export class Room {
       this.dropped.add(id);
     }
     for (const conn of this.othersOnGrid(slot)) this.send(conn, { t: 'dnf', netIds });
+  }
+
+  /**
+   * A Quick room's bots driven by this slot become the lowest other connected racer's (`owns()` reads the grid, so
+   * that phone's snapshots and finishes for them count from now on), and it is told to drive the ones still going.
+   * Before the race it also gets its grid again, now showing those bots as its own. With nobody to take them they
+   * stay put and go out with the leaver.
+   */
+  private handOver(slot: number) {
+    const bots = this.grid.filter(g => g.ai && g.slot === slot);
+    const heir = this.here()
+      .map(m => m.slot)
+      .filter(s => s !== slot && this.grid.some(g => !g.ai && g.slot === s))
+      .sort((a, b) => a - b)[0];
+    if (!bots.length || heir === undefined) return;
+    for (const g of bots) g.slot = heir;
+    this.heirs.add(heir);
+    const conn = this.connOf(heir)!;
+    if (this.phase !== 'racing') {
+      const grid = this.gridFor(heir);
+      if (grid) this.send(conn, grid);
+    }
+    const netIds = this.adoptedBy(heir);
+    if (netIds.length) this.send(conn, { t: 'adopt', netIds });
+  }
+
+  /** The still-running bots this slot was handed (none if it never took any over). */
+  private adoptedBy(slot: number): number[] {
+    if (!this.heirs.has(slot)) return [];
+    return this.grid.filter(g => g.ai && g.slot === slot && this.referee?.running(g.netId) && !this.dropped.has(g.netId)).map(g => g.netId);
   }
 
   /**
@@ -239,6 +275,8 @@ export class Room {
     this.send(conn, grid);
     if (this.phase !== 'loading') this.send(conn, { t: 'start', raceSeq: this.raceSeq, at: this.startAt });
     if (this.dropped.size) this.send(conn, { t: 'dnf', netIds: [...this.dropped] });
+    const adopted = this.adoptedBy(slot);
+    if (adopted.length) this.send(conn, { t: 'adopt', netIds: adopted });
   }
 
   /** Applies a lobby change from a member; returns an error code if it is refused. */
@@ -320,6 +358,7 @@ export class Room {
     this.cutoffAt = null;
     this.resultsMsg = null;
     this.dropped.clear();
+    this.heirs.clear();
     this.loaded.clear();
     this.gridAt = now;
     this.phase = 'loading';
