@@ -88,6 +88,8 @@ Ojuelegba is laid out on the real road from OpenStreetMap (`scripts/osm-track.mj
 
 Let people play straight away with no sign-up. After their first race or two, prompt them to create an account to save coins and their high score.
 
+Sign-up and sign-in are Clerk (`src/ui/AuthControls.tsx`; the game runs with no account and with no `VITE_CLERK_PUBLISHABLE_KEY`). A signed-in player's progress syncs to a Postgres save through `GET`/`PUT /save` on the room server (`server/saves.ts`, client in `src/game/sync.ts`, shared rules in `src/game/syncSave.ts`). **The account's cloud save wins** over the phone's progress; a phone's progress only uploads when the account has no progress yet. Settings, the dismissed-prompt flag and the hint counter stay per phone. The server does not yet check that earnings are honest (leaderboard work). Spec `docs/superpowers/specs/2026-10-05-account-sync-design.md`, plan `docs/superpowers/plans/2026-10-05-account-sync.md`.
+
 ## Build order
 
 1. Okada driving well on one simple loop track (Ojuelegba-style) with lap counting, touch controls and keyboard, chase camera. Playable on a phone.

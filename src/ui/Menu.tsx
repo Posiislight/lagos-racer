@@ -7,6 +7,7 @@ import { formatNaira } from '../config/economy';
 import { PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
 import { Settings } from './Settings';
 import { AuthControls } from './AuthControls';
+import { SyncChip } from './SyncManager';
 import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
@@ -54,6 +55,7 @@ export function Menu() {
           </button>
           <button className="btn small" onClick={() => setSettings(true)}>Settings</button>
           <AuthControls />
+          <SyncChip />
         </div>
       </header>
       <div className="menu-preview">

@@ -5,6 +5,7 @@ import { App } from './App';
 import './styles.css';
 import { devAdStub, setAdProvider } from './game/ads';
 import { AUTH_ENABLED } from './ui/AuthControls';
+import { SyncManager } from './ui/SyncManager';
 
 // No real ad network yet: dev builds get a stub so the Garage ad flow can be tried.
 if (import.meta.env.DEV) setAdProvider(devAdStub);
@@ -13,7 +14,7 @@ if (import.meta.env.DEV) setAdProvider(devAdStub);
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {AUTH_ENABLED ? (
-      <ClerkProvider afterSignOutUrl="/"><App /></ClerkProvider>
+      <ClerkProvider afterSignOutUrl="/"><SyncManager /><App /></ClerkProvider>
     ) : (
       <App />
     )}

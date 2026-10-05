@@ -5,7 +5,8 @@ import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import { roomPayout, upgradePrice, type Stars } from '../config/economy';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
-import { loadSave, roomEarnedToday, todayKey, writeSave, type Saved, type Settings } from './save';
+import { SAVE_KEY, loadSave, roomEarnedToday, todayKey, writeSave, type Saved, type Settings } from './save';
+import { mergeRemote, pickSynced, type SyncedSave } from './syncSave';
 import { levelsFor, type UpgradeKind } from './upgrades';
 
 export type { Quality, Settings } from './save';
@@ -102,6 +103,8 @@ export type State = Saved & {
   /** `room` is set for a room race: it pays half, capped per day, and its best lap is on the room's track. */
   finishRace: (results: Result[], place: number, bestLap: number | null, room?: { trackId: string; dnf: boolean }) => void;
   dismissAccountPrompt: () => void;
+  /** The account's save replaces this phone's synced progress (a backup of the old save is kept). */
+  applyRemoteSave: (remote: SyncedSave) => void;
 };
 
 const emptyHud = (): Hud => ({
@@ -202,13 +205,31 @@ export const useGame = create<State>((set, get) => ({
     save();
   },
   dismissAccountPrompt: () => { set({ accountPromptDismissed: true, showAccountPrompt: false }); save(); },
+  applyRemoteSave: remote => {
+    const local = snapshot();
+    try { localStorage.setItem(`${SAVE_KEY}:backup`, JSON.stringify(local)); } catch { /* no room for a backup: the cloud copy still applies */ }
+    set(pickSynced(mergeRemote(local, remote)));
+    save();
+  },
 }));
 
-function save() {
+const savedListeners = new Set<() => void>();
+/** Calls listener after every local save (the cloud sync uses it to schedule a push). Returns an unsubscribe. */
+export function onSaved(listener: () => void): () => void {
+  savedListeners.add(listener);
+  return () => { savedListeners.delete(listener); };
+}
+
+export function snapshot(): Saved {
   const s = useGame.getState();
-  writeSave({
+  return {
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades,
     accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, premium: s.premium, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
     campaign: s.campaign, roomEarned: s.roomEarned,
-  });
+  };
+}
+
+function save() {
+  writeSave(snapshot());
+  savedListeners.forEach(l => l());
 }
