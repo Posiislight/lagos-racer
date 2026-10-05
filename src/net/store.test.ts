@@ -89,6 +89,20 @@ describe('quick race entry', () => {
     expect(raceIn(false).setup.quick).toBe(false);
   });
 
+  it('race again leaves the room and sends a fresh quick message', () => {
+    raceIn(true);
+    mock.sent.length = 0;
+    const first = mock.handlers;
+    useNet.getState().raceAgain('keke', 'blue');
+    expect(mock.sent).toEqual([{ t: 'leave' }]);
+    expect(useNet.getState().code).toBeNull();
+    expect(useGame.getState().screen).toBe('online');
+    expect(useGame.getState().online).toBe(false);
+    expect(mock.handlers).not.toBe(first);
+    mock.handlers!.onOpen(false);
+    expect(mock.sent).toEqual([{ t: 'leave' }, { t: 'quick', name: 'Ada', vehicle: 'keke', paint: 'blue' }]);
+  });
+
   it('adopt hands the named bot cars to the race session', () => {
     const session = raceIn(true);
     const adopt = vi.spyOn(session, 'adopt');

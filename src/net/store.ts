@@ -34,6 +34,8 @@ type NetState = {
   setFillAI: (fillAI: boolean) => void;
   start: () => void;
   leave: () => void;
+  /** After a Quick race: leave that room and queue for a fresh one under the saved nickname. */
+  raceAgain: (vehicle: VehicleId, paint: string) => void;
 };
 
 const NICK_KEY = 'lagos-racer:nick';
@@ -324,6 +326,14 @@ export const useNet = create<NetState>((set, get) => {
       reset(null);
       const game = useGame.getState();
       if (game.screen === 'lobby' || game.screen === 'online') game.setScreen('menu');
+    },
+    raceAgain: (vehicle, paint) => {
+      const name = get().nickname;
+      conn?.sendJson({ t: 'leave' });
+      reset(null);
+      // Back to the online screen so the new welcome carries us into the next lobby.
+      useGame.setState({ screen: 'online', online: false, paused: false, results: null });
+      get().quick(name, vehicle, paint);
     },
   };
 });

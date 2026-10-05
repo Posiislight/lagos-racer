@@ -1,6 +1,6 @@
 import { useGame, type Result } from '../game/store';
 import { formatTime } from '../game/race';
-import { vehicleById } from '../config/vehicles';
+import { paintOf, vehicleById } from '../config/vehicles';
 import { driverById } from '../config/drivers';
 import { nextRace } from '../game/campaign';
 import { eventName } from '../config/tracks';
@@ -17,6 +17,7 @@ function timeCell(r: Result, elimination: boolean) {
 }
 
 export function Results() {
+  const quickRoom = useNet(n => n.room?.quick !== undefined);
   const { results, spec, outcome, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
@@ -71,7 +72,15 @@ export function Results() {
             </div>
           </div>
         )}
-        {online ? (
+        {online && quickRoom ? (
+          <div className="row">
+            <button className="btn primary" onClick={() => {
+              const g = useGame.getState();
+              useNet.getState().raceAgain(g.vehicle, paintOf(vehicleById(g.vehicle), g.paint[g.vehicle]).id);
+            }}>Race again</button>
+            <button className="btn" onClick={() => { useNet.getState().leave(); quitRace(); }}>Menu</button>
+          </div>
+        ) : online ? (
           <div className="row">
             <button className="btn primary" onClick={() => setScreen('lobby')}>Back to lobby</button>
             <button className="btn" onClick={() => { useNet.getState().leave(); quitRace(); }}>Leave</button>
