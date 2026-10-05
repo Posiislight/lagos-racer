@@ -7,7 +7,8 @@ import { Garage } from './ui/Garage';
 import { Campaign } from './ui/Campaign';
 import { Online } from './ui/Online';
 import { Lobby } from './ui/Lobby';
-import { RotatePrompt } from './ui/RotatePrompt';
+import { useFakeLandscape } from './ui/RotatePrompt';
+import { InAppBrowserBanner } from './ui/InAppBrowserBanner';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
 const loadRace = () => import('./ui/Race');
@@ -25,6 +26,7 @@ function prefetchRace() {
 export function App() {
   const screen = useGame(s => s.screen);
   const sound = useGame(s => s.settings.sound);
+  const rotated = useFakeLandscape();
 
   useEffect(() => { startKeyboard(); }, []);
   useEffect(() => { prefetchRace(); }, []);
@@ -40,7 +42,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" data-rotated={rotated ? '' : undefined}>
       {screen === 'menu' && <Menu />}
       {screen === 'garage' && <Garage />}
       {screen === 'campaign' && <Campaign />}
@@ -51,7 +53,7 @@ export function App() {
           <Race />
         </Suspense>
       )}
-      <RotatePrompt />
+      {screen === 'menu' && <InAppBrowserBanner />}
     </div>
   );
 }
