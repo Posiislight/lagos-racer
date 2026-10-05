@@ -1,16 +1,76 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_UPGRADE_LEVEL, UPGRADE_PRICES, formatNaira, payoutForPlace, upgradePrice } from './economy';
+import {
+  DEFAULT_STARS,
+  MAX_UPGRADE_LEVEL,
+  UPGRADE_PRICES,
+  formatNaira,
+  payoutForStars,
+  roomPayout,
+  starsForPlace,
+  upgradePrice,
+} from './economy';
 import { vehicleById } from './vehicles';
 
-describe('payoutForPlace', () => {
-  it('pays the top three and nobody else', () => {
-    expect([0, 1, 2, 3, 4, 5].map(payoutForPlace)).toEqual([200_000, 150_000, 100_000, 0, 0, 0]);
+describe('starsForPlace', () => {
+  it('gives three, two and one stars to the podium and none after', () => {
+    expect([1, 2, 3, 4, 5, 6].map((p) => starsForPlace(DEFAULT_STARS, p))).toEqual([3, 2, 1, 0, 0, 0]);
   });
 
-  it('pays nothing for places outside the table', () => {
-    expect(payoutForPlace(-1)).toBe(0);
-    expect(payoutForPlace(6)).toBe(0);
-    expect(payoutForPlace(NaN)).toBe(0);
+  it('gives 0 beyond a short table and for nonsense places', () => {
+    expect(starsForPlace([3], 2)).toBe(0);
+    for (const p of [0, -1, NaN, 2.5, Infinity]) expect(starsForPlace(DEFAULT_STARS, p)).toBe(0);
+  });
+});
+
+describe('payoutForStars', () => {
+  it('pays by star count', () => {
+    expect([0, 1, 2, 3].map(payoutForStars)).toEqual([0, 30_000, 60_000, 100_000]);
+  });
+
+  it('pays nothing for invalid star counts', () => {
+    expect(payoutForStars(4)).toBe(0);
+    expect(payoutForStars(-1)).toBe(0);
+    expect(payoutForStars(NaN)).toBe(0);
+  });
+});
+
+describe('roomPayout', () => {
+  it('pays half the star payout by place', () => {
+    expect(roomPayout(1, false, 0)).toEqual({ naira: 50_000, capped: false });
+    expect(roomPayout(2, false, 0).naira).toBe(30_000);
+    expect(roomPayout(3, false, 0).naira).toBe(15_000);
+  });
+
+  it('pays nothing for fourth place or a DNF', () => {
+    expect(roomPayout(4, false, 0)).toEqual({ naira: 0, capped: false });
+    expect(roomPayout(1, true, 0)).toEqual({ naira: 0, capped: false });
+  });
+
+  it('trims a payout to the daily cap', () => {
+    expect(roomPayout(1, false, 280_000)).toEqual({ naira: 20_000, capped: true });
+    expect(roomPayout(1, false, 300_000)).toEqual({ naira: 0, capped: true });
+    expect(roomPayout(1, false, 310_000)).toEqual({ naira: 0, capped: true });
+    expect(roomPayout(4, false, 300_000)).toEqual({ naira: 0, capped: false });
+  });
+});
+
+describe('pacing', () => {
+  const avgPodium = (100_000 + 60_000 + 30_000) / 3;
+
+  it('puts the first upgrade within two podiums', () => {
+    expect(UPGRADE_PRICES[0] / avgPodium).toBeLessThanOrEqual(2);
+  });
+
+  it('puts a full build at about 25 to 50 podium races', () => {
+    const races = (UPGRADE_PRICES.reduce((a, b) => a + b, 0) * 3) / avgPodium;
+    expect(races).toBeGreaterThanOrEqual(25);
+    expect(races).toBeLessThanOrEqual(50);
+  });
+
+  it('puts the BRT at 20 to 40 podium races', () => {
+    const races = (vehicleById('brt').locked?.coins ?? 0) / avgPodium;
+    expect(races).toBeGreaterThanOrEqual(20);
+    expect(races).toBeLessThanOrEqual(40);
   });
 });
 
@@ -21,7 +81,7 @@ describe('upgradePrice', () => {
     expect(upgradePrice(-1)).toBeNull();
   });
 
-  it('puts a full build at about twelve wins', () => {
+  it('prices a full build', () => {
     const category = UPGRADE_PRICES.reduce((a, b) => a + b, 0);
     expect(category).toBe(820_000);
     expect(category * 3).toBe(2_460_000);
@@ -48,7 +108,7 @@ describe('formatNaira', () => {
 });
 
 describe('vehicle unlock prices', () => {
-  it('rescales the BRT to match the payouts', () => {
+  it('prices the BRT', () => {
     expect(vehicleById('brt').locked?.coins).toBe(2_000_000);
   });
 });
