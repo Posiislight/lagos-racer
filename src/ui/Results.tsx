@@ -19,12 +19,8 @@ function timeCell(r: Result, elimination: boolean) {
 }
 
 export function Results() {
-<<<<<<< HEAD
   const quickRoom = useNet(n => n.room?.quick !== undefined);
-  const { results, spec, outcome, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
-=======
   const { results, spec, outcome, earnedStars, roomCapped, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
->>>>>>> main
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   const dnf = results[place]?.dnf === true;
