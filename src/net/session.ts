@@ -179,12 +179,14 @@ export class NetSession implements NetHooks {
       r.remote = null;
       r.ai = botAI(r.progress.lateral);
       Object.assign(r.controls, { throttle: 0, brake: 0, steer: 0, handbrake: false, useItem: false, special: false, horn: false });
-      // Our finish claim needs a time per lap adding up to the finish time: the laps done on the other phone share
-      // the clock so far.
-      const done = r.progress.lapsDone;
-      if (done > 0 && r.progress.finishTime === null) {
-        r.progress.lapTimes = Array.from({ length: done }, () => t / done);
-        r.progress.lapStart = t;
+      // Our finish claim needs a time per lap adding up to the finish time, each no quicker than the referee allows.
+      // The clock so far is shared by distance: every lap done, and the part of this lap already driven, at the
+      // car's average pace (which the referee's distance cap keeps believable).
+      const done = r.progress.lapsDone, d = r.progress.distance;
+      if (done > 0 && r.progress.finishTime === null && d > 0 && t > 0) {
+        const L = race.track.length, per = t * L / d;
+        r.progress.lapTimes = Array.from({ length: done }, () => per);
+        r.progress.lapStart = t - (d / L - done) * per;
       }
       // Not built yet (still loading): the scene switches the body when it is.
       if (!b) continue;

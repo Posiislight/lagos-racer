@@ -8,6 +8,10 @@ import { ClockSync } from './clock';
 import type { NetLink } from './connection';
 import { NetSession } from './session';
 import { sfx } from '../game/audio';
+import { Referee } from '../../server/referee';
+import { track } from '../game/testkit';
+import { sampleAt } from '../game/track';
+import { createProgress, updateProgress } from '../game/race';
 
 vi.mock('../game/audio', () => ({ sfx: vi.fn() }));
 
@@ -100,7 +104,7 @@ describe('NetSession', () => {
       const flash = vi.fn();
       const s = new NetSession(link, clockAhead(), setup, flash);
       const racers = [racer(0, 'local', 1), racer(1, 'ai', 1), racer(2, 'remote', 2)];
-      const race = { racers, net: null } as unknown as RaceRuntime;
+      const race = { racers, net: null, track: { length: 400 } } as unknown as RaceRuntime;
       s.attach(race);
       // Server time is ms + 10000; a start at 10000 puts now() at ms / 1000.
       s.setStart(10000);
@@ -406,13 +410,17 @@ describe('NetSession', () => {
         expect(b.setTranslation).toHaveBeenCalledWith({ x: pose.x, y: pose.y, z: pose.z }, true);
         expect(b.setRotation).toHaveBeenCalledWith({ x: pose.qx, y: pose.qy, z: pose.qz, w: pose.qw }, true);
         expect(b.setLinvel).toHaveBeenCalledWith({ x: pose.vx, y: pose.vy, z: pose.vz }, true);
-        // Distance and laps carry on from the last snapshot, and the laps already done get times that add up to
-        // the clock, so this phone's finish claim has one time per lap and sums to the finish time.
+        // Distance and laps carry on from the last snapshot. The clock so far is shared by distance (400 m laps):
+        // each lap done at the average pace, and this lap started as long ago as its 102 m took at that pace.
         expect(car.progress.distance).toBeCloseTo(902);
         expect(car.progress.lapsDone).toBe(2);
+        const per = 41.05 * 400 / 902;
         expect(car.progress.lapTimes).toHaveLength(2);
-        expect(car.progress.lapTimes[0] + car.progress.lapTimes[1]).toBeCloseTo(41.05);
-        expect(car.progress.lapStart).toBeCloseTo(41.05);
+        expect(car.progress.lapTimes[0]).toBeCloseTo(per);
+        expect(car.progress.lapTimes[1]).toBeCloseTo(per);
+        expect(car.progress.lapStart).toBeCloseTo(41.05 - (102 / 400) * per);
+        // Laps done plus this lap so far add up to the clock.
+        expect(per * 2 + (41.05 - car.progress.lapStart)).toBeCloseTo(41.05);
       });
 
       it('ignores cars this phone already drives and unknown netIds, and a repeat adopt changes nothing', () => {
@@ -435,6 +443,51 @@ describe('NetSession', () => {
         expect(racers[2].kind).toBe('ai');
         expect(mocks(racers[2]).setTranslation).not.toHaveBeenCalled();
         expect(mocks(racers[2]).setBodyType).toHaveBeenCalledWith(0, true);
+      });
+
+      it('a bot adopted 80% through lap 2 finishes with a claim the referee accepts', () => {
+        // The real thing: a 3-lap race on the test loop, an okada at 90% of its top speed all the way round.
+        const LAPS = 3, L = track.length, v = vehicleById('okada').tuning.topSpeed * 0.9, start = -8;
+        const grid = [{ netId: 0, slot: 2, name: 'Kunle', vehicle: 'okada' as const, paint: 'red', ai: true }];
+        const referee = new Referee(track, LAPS, grid);
+        const at = (d: number) => sampleAt(track, ((d % L) + L) % L).pos;
+        const distAt = (time: number) => start + v * time;
+        // The old owner's snapshots reach the referee (once a second) until the handover.
+        const handover = (1.8 * L - start) / v;
+        const observe = (time: number) => {
+          const p = at(distAt(time));
+          referee.observe({ netId: 0, x: p.x, y: p.y, z: p.z, qx: 0, qy: 0, qz: 0, qw: 1, vx: v, vy: 0, vz: 0, distance: distAt(time), laps: Math.max(0, Math.floor(distAt(time) / L)), flags: 0 }, time);
+        };
+        for (let time = 0; time < handover; time += 1) observe(time);
+
+        const now = vi.spyOn(performance, 'now').mockReturnValue(handover * 1000);
+        const s = new NetSession(fakeLink().link, clockAhead(), setup);
+        s.setStart(10000);
+        const p0 = at(distAt(handover));
+        const car = makeRacer(0, 'Kunle', vehicleById('okada'), vehicleById('okada').paints[0], false, createProgress(track, p0.x, p0.z));
+        car.kind = 'remote'; car.owner = 2; car.remote = { buffer: new SnapshotBuffer(), dnf: false };
+        car.progress.distance = distAt(handover);
+        car.progress.lapsDone = 1;
+        s.attach({ racers: [car], net: null, track } as unknown as RaceRuntime);
+        s.adopt([0]);
+        expect(car.kind).toBe('ai');
+
+        // This phone drives the rest, counting laps as RaceLogic does, and the referee keeps hearing its snapshots.
+        let finished = false, time = handover;
+        while (!finished && time < handover + 200) {
+          time += 1 / 60;
+          const p = at(distAt(time));
+          finished = !!updateProgress(track, car.progress, p.x, p.z, time, LAPS)?.finished;
+          if (Math.floor(time) !== Math.floor(time - 1 / 60)) observe(time);
+        }
+        expect(finished).toBe(true);
+        observe(car.progress.finishTime!);
+        now.mockRestore();
+        // Every lap no quicker than the referee's fastest believable lap, and the claim is accepted.
+        const minLap = L / (vehicleById('okada').tuning.topSpeed * 1.6);
+        expect(car.progress.lapTimes).toHaveLength(LAPS);
+        expect(Math.min(...car.progress.lapTimes)).toBeGreaterThanOrEqual(minLap);
+        expect(referee.finish(0, [...car.progress.lapTimes], car.progress.finishTime!, car.progress.finishTime! + 0.1)).toBe(true);
       });
 
       it('adopt before attach applies on attach', () => {
