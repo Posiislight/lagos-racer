@@ -1,6 +1,4 @@
-import { Show, SignInButton, SignUpButton } from '@clerk/react';
 import { useGame, type Result } from '../game/store';
-import { AUTH_ENABLED } from './AuthControls';
 import { formatTime } from '../game/race';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { driverById } from '../config/drivers';
@@ -22,7 +20,7 @@ function timeCell(r: Result, elimination: boolean) {
 
 export function Results() {
   const quickRoom = useNet(n => n.room?.quick !== undefined);
-  const { results, spec, outcome, earnedStars, roomCapped, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
+  const { results, spec, outcome, earnedStars, roomCapped, coinsEarned, online, startRace, setScreen, setDriver, quitRace, track } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   const dnf = results[place]?.dnf === true;
@@ -80,18 +78,6 @@ export function Results() {
             <p><b>{unlocked.name} unlocked!</b> Now playable from the Garage.</p>
             <button className="btn primary" onClick={() => { setDriver(unlocked.id); setScreen('campaign'); }}>Use her</button>
           </div>
-        )}
-        {showAccountPrompt && !online && AUTH_ENABLED && (
-          <Show when="signed-out">
-            <div className="account">
-              <p><b>Keep your naira safe.</b> Create an account to save your naira and high score on any phone.</p>
-              <div className="row">
-                <SignUpButton mode="modal"><button className="btn">Create account</button></SignUpButton>
-                <SignInButton mode="modal"><button className="btn">Sign in</button></SignInButton>
-                <button className="btn ghost" onClick={dismissAccountPrompt}>Not now</button>
-              </div>
-            </div>
-          </Show>
         )}
         {online && quickRoom ? (
           <div className="row">

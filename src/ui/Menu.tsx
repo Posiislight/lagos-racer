@@ -8,7 +8,6 @@ import { PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
 import { Settings } from './Settings';
 import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
-import { AuthControls } from './AuthControls';
 import { SyncChip } from './SyncManager';
 import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
@@ -58,7 +57,6 @@ export function Menu() {
           </button>
           <button className="btn small" onClick={() => setHowTo(true)} aria-label="How to play">?</button>
           <button className="btn small" onClick={() => setSettings(true)}>Settings</button>
-          <AuthControls />
           <SyncChip />
         </div>
       </header>
