@@ -108,7 +108,7 @@ export function Garage() {
             <button key={d.id} role="tab" aria-selected={d.id === driver} aria-disabled={!open} className={open ? undefined : 'locked'} onClick={() => { if (open) setDriver(d.id); }}>
               <b>{d.name}</b><span className="role"> · {d.role}</span>{!open && <span className="lock" aria-label="locked"> 🔒</span>}
               <span className="special">{d.special.name} · charges in {d.special.chargeTime} s</span>
-              <small>{open ? d.blurb : `Beat ${d.name} in the campaign to unlock`}</small>
+              <small>{open ? d.blurb : `Beat ${d.name} in Single player to unlock`}</small>
             </button>
           );
         })}

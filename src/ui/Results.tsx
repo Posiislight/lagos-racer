@@ -5,7 +5,8 @@ import { driverById } from '../config/drivers';
 import { nextRace } from '../game/campaign';
 import { eventName } from '../config/tracks';
 import { useNet } from '../net/store';
-import { formatNaira } from '../config/economy';
+import { formatNaira, PAYOUT_BY_STARS } from '../config/economy';
+import { Stars, payoutLine, noStarsText } from './Stars';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
@@ -18,7 +19,7 @@ function timeCell(r: Result, elimination: boolean) {
 }
 
 export function Results() {
-  const { results, spec, outcome, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
+  const { results, spec, outcome, earnedStars, roomCapped, coinsEarned, online, startRace, setScreen, setDriver, quitRace, showAccountPrompt, dismissAccountPrompt, track } = useGame();
   if (!results) return null;
   const place = results.findIndex(r => r.isPlayer);
   const dnf = results[place]?.dnf === true;
@@ -39,6 +40,8 @@ export function Results() {
         <p className="eyebrow">{spec ? `${event} · ${spec.title}` : event}</p>
         <div className="result-head">
           <h2 id="results-title">{heading}</h2>
+          {!online && <Stars earned={earnedStars} />}
+          {outcome?.newBest && <span className="new-best">New best!</span>}
           {outcome && <span className={`verdict ${outcome.passed ? 'passed' : 'failed'}`}>{outcome.passed ? 'Passed' : 'Try again'}</span>}
         </div>
         {!dnf && <p className="cheer">{cheer}</p>}
@@ -56,7 +59,19 @@ export function Results() {
             ))}
           </tbody>
         </table>
-        <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time'}{outcome?.firstClear && spec ? ` (includes ${formatNaira(spec.firstClearCoins)} first-clear bonus)` : ''}</p>
+        {online ? (
+          <>
+            <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time'}</p>
+            <p className="payout-note">{roomCapped ? 'Daily room limit reached' : 'Room races pay half'}</p>
+          </>
+        ) : coinsEarned > 0 ? (
+          <>
+            <p className="earned">+ {formatNaira(coinsEarned)}</p>
+            <p className="payout-note">{payoutLine(place + 1, earnedStars, PAYOUT_BY_STARS[earnedStars] ?? 0)}</p>
+          </>
+        ) : (
+          <p className="earned none">{noStarsText(spec?.pass.place)}</p>
+        )}
         {unlocked && (
           <div className="unlocked">
             <p><b>{unlocked.name} unlocked!</b> Now playable from the Garage.</p>
@@ -65,7 +80,7 @@ export function Results() {
         )}
         {showAccountPrompt && !online && (
           <div className="account">
-            <p><b>Keep your coins safe.</b> Create an account to save your coins and high score on any phone.</p>
+            <p><b>Keep your naira safe.</b> Create an account to save your naira and high score on any phone.</p>
             <div className="row">
               <button className="btn" disabled title="Accounts are coming soon">Create account (soon)</button>
               <button className="btn ghost" onClick={dismissAccountPrompt}>Not now</button>
@@ -79,19 +94,9 @@ export function Results() {
           </div>
         ) : (
         <div className="row">
-          {spec ? (
-            <>
-              {next && <button className="btn primary" onClick={() => startRace(next)}>Next race</button>}
-              <button className={`btn${next ? '' : ' primary'}`} onClick={() => startRace(spec)}>Retry</button>
-              <button className="btn" onClick={() => setScreen('campaign')}>Campaign</button>
-            </>
-          ) : (
-            <>
-              <button className="btn primary" onClick={() => startRace()}>Race again</button>
-              <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
-              <button className="btn" onClick={() => setScreen('menu')}>Menu</button>
-            </>
-          )}
+          {next && <button className="btn primary" onClick={() => startRace(next)}>Next race</button>}
+          <button className={`btn${next ? '' : ' primary'}`} onClick={() => spec && startRace(spec)}>Retry</button>
+          <button className="btn" onClick={() => setScreen('campaign')}>Campaign</button>
         </div>
         )}
       </div>

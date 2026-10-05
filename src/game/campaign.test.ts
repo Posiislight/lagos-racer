@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CHAPTER_1, QUICK_COINS } from '../config/campaign';
+import { CHAPTER_1 } from '../config/campaign';
 import { TRACKS } from '../config/tracks';
-import { campaignStatus, coinsForPlace, driverAvailable, evaluatePass, nextRace, sanitizeCleared, settle } from './campaign';
+import { campaignStatus, driverAvailable, evaluatePass, nextRace, sanitizeCleared, sanitizeStars, settle, type CampaignSave } from './campaign';
 
 describe('CHAPTER_1', () => {
   it('has the four races in order, two per map', () => {
@@ -12,10 +12,9 @@ describe('CHAPTER_1', () => {
     expect(CHAPTER_1.map(r => r.mode.kind)).toEqual(['laps', 'laps', 'elimination', 'duel']);
   });
 
-  it('pins the pass rules and bonuses', () => {
+  it('pins the pass rules and star tables', () => {
     expect(CHAPTER_1.map(r => r.pass.place)).toEqual([3, 3, 3, 1]);
-    expect(CHAPTER_1.map(r => r.firstClearCoins)).toEqual([100, 100, 100, 300]);
-    expect(CHAPTER_1.map(r => r.coins)).toEqual([QUICK_COINS, QUICK_COINS, QUICK_COINS, [200, 40]]);
+    expect(CHAPTER_1.map(r => r.stars)).toEqual([undefined, undefined, undefined, [3]]);
   });
 
   it('keeps Mama Put out of races 1-3 and rewards her for race 4', () => {
@@ -41,20 +40,6 @@ describe('CHAPTER_1', () => {
   });
 });
 
-describe('coinsForPlace', () => {
-  it('reads the table by 1-based place and repeats the last entry', () => {
-    expect([1, 2, 3, 4, 5, 6].map(p => coinsForPlace(QUICK_COINS, p))).toEqual([150, 100, 60, 30, 20, 20]);
-  });
-  it('gives the last entry for a place that makes no sense', () => {
-    for (const p of [0, -1, NaN, 2.5]) expect(coinsForPlace(QUICK_COINS, p)).toBe(20);
-  });
-  it('works on the duel table', () => {
-    expect(coinsForPlace([200, 40], 1)).toBe(200);
-    expect(coinsForPlace([200, 40], 2)).toBe(40);
-    expect(coinsForPlace([200, 40], 6)).toBe(40);
-  });
-});
-
 describe('evaluatePass', () => {
   const six = [10, 11, 12, 13, 14, 15];
   it('passes inside the place limit', () => {
@@ -72,20 +57,52 @@ describe('evaluatePass', () => {
 
 describe('settle', () => {
   const [r1, , , r4] = CHAPTER_1;
-  it('pays place coins plus the first-clear bonus once', () => {
-    expect(settle(r1, 2, [])).toEqual({ coins: 200, passed: true, firstClear: true, cleared: ['campaign-1-1'], unlocked: null });
-    expect(settle(r1, 2, ['campaign-1-1'])).toEqual({ coins: 100, passed: true, firstClear: false, cleared: ['campaign-1-1'], unlocked: null });
+  const fresh: CampaignSave = { cleared: [], stars: {} };
+  const best = (n: 1 | 2 | 3): CampaignSave => ({ cleared: ['campaign-1-1'], stars: { 'campaign-1-1': n } });
+
+  it('a first win earns 3 stars, pays for them and records the clear', () => {
+    expect(settle(r1, 1, fresh)).toEqual({
+      stars: 3, payout: 100_000, newBest: true, passed: true, firstClear: true, unlocked: null,
+      saved: { cleared: ['campaign-1-1'], stars: { 'campaign-1-1': 3 } },
+    });
   });
-  it('pays a failed attempt its place coins and clears nothing', () => {
-    expect(settle(r1, 4, [])).toEqual({ coins: 30, passed: false, firstClear: false, cleared: [], unlocked: null });
+  it('pays by stars for second and third', () => {
+    expect(settle(r1, 2, fresh)).toMatchObject({ stars: 2, payout: 60_000, passed: true });
+    expect(settle(r1, 3, fresh)).toMatchObject({ stars: 1, payout: 30_000, passed: true });
   });
-  it('unlocks Mama Put the first time the duel is won', () => {
-    expect(settle(r4, 1, ['campaign-1-1'])).toEqual({ coins: 500, passed: true, firstClear: true, cleared: ['campaign-1-1', 'campaign-1-4'], unlocked: 'mamaput' });
-    expect(settle(r4, 2, [])).toEqual({ coins: 40, passed: false, firstClear: false, cleared: [], unlocked: null });
-    expect(settle(r4, 1, ['campaign-1-4'])).toEqual({ coins: 200, passed: true, firstClear: false, cleared: ['campaign-1-4'], unlocked: null });
+  it('a failed attempt earns nothing and changes nothing', () => {
+    const s = settle(r1, 4, fresh);
+    expect(s).toMatchObject({ stars: 0, payout: 0, passed: false, newBest: false, firstClear: false, unlocked: null });
+    expect(s.saved).toEqual(fresh);
   });
-  it('a quick race (no spec) only pays place coins', () => {
-    expect(settle(null, 3, [])).toEqual({ coins: 60, passed: false, firstClear: false, cleared: [], unlocked: null });
+  it('a replay pays this run but keeps the best', () => {
+    const s = settle(r1, 3, best(3));
+    expect(s).toMatchObject({ stars: 1, payout: 30_000, newBest: false, firstClear: false });
+    expect(s.saved.stars['campaign-1-1']).toBe(3);
+  });
+  it('a replay that improves the best says so', () => {
+    const s = settle(r1, 2, best(1));
+    expect(s).toMatchObject({ newBest: true, firstClear: false });
+    expect(s.saved.stars['campaign-1-1']).toBe(2);
+  });
+  it('the duel needs the win and unlocks Mama Put once', () => {
+    expect(settle(r4, 1, fresh)).toMatchObject({ stars: 3, payout: 100_000, passed: true, firstClear: true, unlocked: 'mamaput' });
+    expect(settle(r4, 2, fresh)).toMatchObject({ stars: 0, payout: 0, passed: false, unlocked: null });
+    const again = settle(r4, 1, { cleared: ['campaign-1-4'], stars: { 'campaign-1-4': 3 } });
+    expect(again.unlocked).toBeNull();
+    expect(again.firstClear).toBe(false);
+  });
+  it('nonsense places earn nothing', () => {
+    for (const p of [0, NaN, 2.5, -1]) expect(settle(r1, p, fresh)).toMatchObject({ stars: 0, payout: 0, passed: false });
+  });
+});
+
+describe('sanitizeStars', () => {
+  it('keeps known ids with integer values 1-3', () => {
+    expect(sanitizeStars({ 'campaign-1-1': 3, 'campaign-1-2': 4, 'campaign-1-3': 'x', nope: 2, 'campaign-1-4': 0 })).toEqual({ 'campaign-1-1': 3 });
+  });
+  it('turns non-objects into an empty record', () => {
+    for (const junk of [undefined, 'x', 5, null, [1, 2]]) expect(sanitizeStars(junk)).toEqual({});
   });
 });
 

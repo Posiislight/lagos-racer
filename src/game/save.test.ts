@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSave, migrateSave, normaliseSave } from './save';
+import { defaultSave, migrateSave, normaliseSave, roomEarnedToday, todayKey } from './save';
 
 describe('migrateSave (v1 → v2)', () => {
   it('migrates the blue okada to an okada painted blue', () => {
@@ -56,18 +56,61 @@ describe('driver', () => {
 
 describe('campaign progress', () => {
   it('starts with nothing cleared, also for saves from before the campaign', () => {
-    expect(defaultSave().campaign).toEqual({ cleared: [] });
-    expect(normaliseSave({}).campaign).toEqual({ cleared: [] });
+    expect(defaultSave().campaign).toEqual({ cleared: [], stars: {} });
+    expect(normaliseSave({}).campaign).toEqual({ cleared: [], stars: {} });
   });
 
   it('survives junk', () => {
     for (const junk of [null, 5, 'x', { cleared: 'all' }, { cleared: [7, null] }]) {
-      expect(normaliseSave({ campaign: junk }).campaign).toEqual({ cleared: [] });
+      expect(normaliseSave({ campaign: junk }).campaign).toEqual({ cleared: [], stars: {} });
     }
   });
 
   it('keeps known race ids once each', () => {
-    expect(normaliseSave({ campaign: { cleared: ['nope', 'campaign-1-1', 'campaign-1-1'] } }).campaign).toEqual({ cleared: ['campaign-1-1'] });
+    expect(normaliseSave({ campaign: { cleared: ['nope', 'campaign-1-1', 'campaign-1-1'] } }).campaign)
+      .toEqual({ cleared: ['campaign-1-1'], stars: { 'campaign-1-1': 1 } });
+  });
+
+  it('gives one star to each race cleared before stars existed', () => {
+    expect(normaliseSave({ campaign: { cleared: ['campaign-1-1', 'campaign-1-2'] } }).campaign)
+      .toEqual({ cleared: ['campaign-1-1', 'campaign-1-2'], stars: { 'campaign-1-1': 1, 'campaign-1-2': 1 } });
+  });
+
+  it('keeps saved stars and fills in the rest', () => {
+    expect(normaliseSave({ campaign: { cleared: ['campaign-1-1', 'campaign-1-2'], stars: { 'campaign-1-1': 3 } } }).campaign)
+      .toEqual({ cleared: ['campaign-1-1', 'campaign-1-2'], stars: { 'campaign-1-1': 3, 'campaign-1-2': 1 } });
+  });
+
+  it('counts a race with stars as cleared', () => {
+    const c = normaliseSave({ campaign: { cleared: [], stars: { 'campaign-1-2': 2 } } }).campaign;
+    expect(c.cleared).toEqual(['campaign-1-2']);
+    expect(c.stars).toEqual({ 'campaign-1-2': 2 });
+  });
+
+  it('drops junk stars, and a v1 save starts with none', () => {
+    expect(normaliseSave({ campaign: { stars: { 'campaign-1-1': 9, bogus: 2 } } }).campaign).toEqual({ cleared: [], stars: {} });
+    expect(migrateSave({ coins: 5 }).campaign).toEqual({ cleared: [], stars: {} });
+  });
+});
+
+describe('todayKey and room earnings', () => {
+  it('gives the local date as YYYY-MM-DD', () => {
+    expect(todayKey(new Date(2026, 9, 5, 23, 59))).toBe('2026-10-05');
+    expect(todayKey(new Date(2026, 9, 6, 0, 1))).toBe('2026-10-06');
+  });
+
+  it('counts room earnings only for the day they were earned', () => {
+    const saved = { roomEarned: { day: '2026-10-05', naira: 120_000 } };
+    expect(roomEarnedToday(saved, new Date(2026, 9, 5, 12))).toBe(120_000);
+    expect(roomEarnedToday(saved, new Date(2026, 9, 6, 12))).toBe(0);
+  });
+
+  it('starts empty and survives junk', () => {
+    expect(defaultSave().roomEarned).toEqual({ day: '', naira: 0 });
+    expect(normaliseSave({ roomEarned: { day: 5, naira: 'x' } }).roomEarned).toEqual({ day: '', naira: 0 });
+    expect(normaliseSave({ roomEarned: { day: '2026-10-05', naira: -4 } }).roomEarned).toEqual({ day: '2026-10-05', naira: 0 });
+    expect(normaliseSave({ roomEarned: { day: '2026-10-05', naira: Infinity } }).roomEarned.naira).toBe(0);
+    expect(normaliseSave({ roomEarned: 'x' }).roomEarned).toEqual({ day: '', naira: 0 });
   });
 });
 

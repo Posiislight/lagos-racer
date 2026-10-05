@@ -1,11 +1,11 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
-import { TRACKS, eventName, trackOrDefault } from '../config/tracks';
+import { TRACKS } from '../config/tracks';
 import { driverById } from '../config/drivers';
 import { formatNaira } from '../config/economy';
-import { formatTime } from '../game/race';
 import { Settings } from './Settings';
+import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
 
@@ -21,23 +21,23 @@ export function goFullscreen() {
   }
 }
 
-/** Start a race from a button press: fullscreen and tilt need the tap, then the quick race or the campaign race. */
-export function launchRace(spec?: RaceSpec) {
+/** Start a race from a button press: fullscreen and tilt need the tap, then the campaign race. */
+export function launchRace(spec: RaceSpec) {
   goFullscreen();
   if (useGame.getState().settings.steering === 'tilt') void enableTilt();
   useGame.getState().startRace(spec);
 }
 
 export function Menu() {
-  const { vehicle, coins, setScreen, best, track, paint, driver, setTrack } = useGame();
+  const { vehicle, coins, setScreen, paint, driver } = useGame();
   const [settings, setSettings] = useState(false);
-  const v = vehicleById(vehicle), t = trackOrDefault(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
+  const v = vehicleById(vehicle), p = paintOf(v, paint[v.id]), d = driverById(driver), credit = menuCredit(TRACKS);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
       <header className="menu-head">
         <div className="board">
-          <small>{eventName(t)}</small>
+          <small>{MENU_TAGLINE}</small>
           <h1>LAGOS RACER</h1>
         </div>
         <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
@@ -51,22 +51,16 @@ export function Menu() {
           <h2>{v.name}</h2>
           <p className="driver-line"><b>{d.name}</b> at the wheel · {d.special.name}</p>
           <p className="muted">{v.blurb}</p>
-          <div className="track-picker" role="radiogroup" aria-label="Track">
-            {TRACKS.map(k => (
-              <button key={k.id} role="radio" aria-checked={k.id === t.id} className={`track-chip${k.id === t.id ? ' on' : ''}`} onClick={() => setTrack(k.id)}>{k.name}</button>
-            ))}
-          </div>
-          <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[t.id] ?? null)}</p>
-          <p className="muted">{t.blurb}</p>
-          {t.credit && <p className="credit muted">Road layout {t.credit}</p>}
         </div>
-        <button className="btn primary big" onClick={() => setScreen('campaign')}>CAMPAIGN</button>
+        <div className="menu-entries">
+          <button className="btn primary big" onClick={() => setScreen('campaign')}>SINGLE PLAYER</button>
+          <button className="btn big" onClick={() => setScreen('online')}>MULTIPLAYER</button>
+        </div>
         <div className="row menu-row">
-          <button className="btn" onClick={() => launchRace()}>OYA, RACE!</button>
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
-          <button className="btn" onClick={() => setScreen('online')}>Race with friends</button>
         </div>
+        {credit && <p className="credit muted">Ojuelegba road layout {credit}</p>}
         <p className="keys muted">You're always on the gas · ← → or A D to steer · Space to use items · Q for your special · C to drift · H to honk · Esc to pause</p>
       </div>
       {settings && <Settings onClose={() => setSettings(false)} />}

@@ -5,7 +5,7 @@ import { useGame } from '../game/store';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
 import { NetSession } from './session';
-import { coinsFor, toResults } from './results';
+import { toResults } from './results';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -234,7 +234,7 @@ export const useNet = create<NetState>((set, get) => {
         // Too late: the stranded fallback has already taken us back to the lobby.
         if (game.screen !== 'race') break;
         if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine || !session.onResults()) break;
-        game.finishRace(toResults(m.results, mySlot), mine.place, mine.best, { coins: coinsFor(mine), trackId: get().pendingGrid?.trackId ?? game.track });
+        game.finishRace(toResults(m.results, mySlot), mine.place, mine.best, { trackId: get().pendingGrid?.trackId ?? game.track, dnf: mine.dnf });
         game.setHud({ phase: 'finished' });
         break;
       }

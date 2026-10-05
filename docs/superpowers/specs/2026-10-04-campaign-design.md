@@ -1,5 +1,7 @@
 # Campaign: Chapter 1, elimination and the Mama Put duel
 
+> Payouts (including the first-clear bonus) are superseded by `2026-10-05-menu-stars-economy-design.md`.
+
 Tracked in GitHub issue [#4](https://github.com/Posiislight/lagos-racer/issues/4).
 
 ## Goal
