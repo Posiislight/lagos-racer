@@ -1,9 +1,9 @@
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
+import { Show, SignInButton, SignOutButton, SignUpButton } from '@clerk/react';
 
 /** Accounts are optional: without a Clerk key the game still runs and these controls stay hidden. */
 export const AUTH_ENABLED = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-/** Sign in / Sign up when signed out, the profile button when signed in. */
+/** Sign in / Sign up when signed out, a single Log out button when signed in. */
 export function AuthControls() {
   if (!AUTH_ENABLED) return null;
   return (
@@ -13,7 +13,7 @@ export function AuthControls() {
         <SignUpButton mode="modal"><button className="btn small">Sign up</button></SignUpButton>
       </Show>
       <Show when="signed-in">
-        <UserButton />
+        <SignOutButton><button className="btn small">Log out</button></SignOutButton>
       </Show>
     </>
   );
