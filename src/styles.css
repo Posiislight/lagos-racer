@@ -94,9 +94,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-entries { display: flex; flex-direction: column; gap: 8px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
 @media (pointer: coarse) { .keys { display: none; } }
-@media (max-width: 720px) and (orientation: portrait) {
-  .menu { grid-template-columns: 1fr; grid-template-rows: auto minmax(180px, 1fr) auto; }
-}
 @media (max-height: 480px) {
   .menu-side .card .muted { display: none; }
   .menu-side .card .eyebrow { display: none; }
@@ -170,7 +167,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .drivers small { flex-basis: 100%; font-size: 12px; line-height: 1.25; opacity: .8; }
 .driver-line { margin: 0 0 4px; font-size: 14px; }
 @media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
-@media (max-width: 720px) and (orientation: portrait) { .garage-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
 @media (max-height: 480px) {
   .garage-card .muted { display: none; }
   .garage-card h2 { font-size: 20px; margin: 6px 0 0; }
@@ -273,8 +269,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .hud-progress i { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 3px solid #141210; }
 .hud-progress i.me { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 4px; }
 /* Elimination: seconds to the next LASTMA clamp, next to "5/6 left". */
-/* Narrow portrait screens: the clamp timer would collide with the clock, so the bar drops below the position board. */
-@media (max-width: 720px) and (orientation: portrait) { .hud-progress.elim { top: calc(78px + var(--safe-t)); width: min(92vw, 420px); } }
 .hud-progress .elim-timer { flex: none; min-width: 40px; text-align: center; background: var(--board); color: var(--led); border-radius: 8px; padding: 2px 8px; font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .hud-progress .elim-timer.warn { background: #d9261c; color: #fff; animation: pulse .6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .hud-progress .elim-timer.warn { animation: none; } }
@@ -400,7 +394,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   color: var(--paper);
 }
 .stops-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; align-content: center; }
-@media (max-width: 720px) and (orientation: portrait) { .stops-list { grid-template-columns: 1fr; align-content: start; } }
 .stop {
   width: 100%; min-height: 76px; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
   background: var(--chip); color: var(--ink); border: 2px solid var(--ink); border-radius: 12px; padding: 10px 14px; box-shadow: 0 3px 0 var(--ink);
@@ -439,3 +432,10 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .payout-note { margin: -8px 0 12px; font-weight: 700; color: var(--muted); }
 .earned.none { color: var(--muted); }
 .reward-ladder { list-style: none; margin: 4px 0 8px; padding: 0; font-weight: 800; font-size: 14px; }
+
+/* Phones held upright: ask for landscape. Above the race, HUD and modals. */
+.rotate-prompt { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; background: var(--board); color: #fff; font-family: Bungee, Impact, sans-serif; font-size: 22px; }
+.rotate-prompt p { margin: 0; }
+.rotate-phone { width: 56px; height: 96px; border: 5px solid var(--yellow); border-radius: 12px; animation: rotate-phone 2.4s ease-in-out infinite; }
+@keyframes rotate-phone { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }
