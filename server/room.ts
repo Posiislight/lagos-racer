@@ -3,6 +3,7 @@ import {
   LOAD_TIMEOUT_MS,
   MAX_HUMANS,
   LOBBY_GRACE_MS,
+  QUICK_WAIT_MS,
   RECONNECT_GRACE_MS,
   START_LEAD_MS,
   type ClientMessage,
@@ -14,9 +15,10 @@ import {
   type ServerMessage,
   type Snapshot,
 } from '../src/net/protocol';
-import { trackById, trackFor } from '../src/config/tracks';
+import { TRACKS, trackById, trackFor } from '../src/config/tracks';
 import { paintOf, vehicleById, type VehicleId } from '../src/config/vehicles';
-import { buildGrid } from './grid';
+import { Roster, type BotView } from './bots';
+import { buildGrid, buildQuickGrid } from './grid';
 import { Referee } from './referee';
 
 export type Send = (conn: number, msg: ServerMessage) => void;
@@ -41,6 +43,30 @@ export type LobbyChange = { vehicle?: VehicleId; paint?: string; ready?: boolean
 /** The paint id if the vehicle has it, else the vehicle's usual colour. */
 const paintFor = (vehicle: VehicleId, paint: string | undefined) => paintOf(vehicleById(vehicle), paint).id;
 
+export type RoomOptions = {
+  /** A Quick race room: no host, the server runs the timer, the track vote and the start, and bots fill the grid. */
+  quick?: boolean;
+  random?: () => number;
+  /** Server time, for what the room shows between ticks (the countdown and the bots that have appeared). */
+  clock?: () => number;
+};
+
+/** Every track's vote count (0 included), from each human's latest vote. */
+function tally(votes: Map<number, string>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const t of TRACKS) out[t.id] = 0;
+  for (const id of votes.values()) out[id]++;
+  return out;
+}
+
+/** The most-voted track; a tie, or no votes at all, is settled at random among the tied tracks (or all of them). */
+function pickTrack(votes: Map<number, string>, random: () => number): string {
+  const counts = tally(votes);
+  const top = Math.max(...Object.values(counts));
+  const tied = TRACKS.map(t => t.id).filter(id => counts[id] === top);
+  return tied[Math.min(tied.length - 1, Math.floor(random() * tied.length))];
+}
+
 /** One room: who is in it, who hosts, and the lobby state shared with everyone. */
 export class Room {
   phase: RoomPhase = 'lobby';
@@ -63,13 +89,31 @@ export class Room {
   /** Server time the race ends regardless: FINISH_CUTOFF_MS after the first accepted finish. */
   private cutoffAt: number | null = null;
 
+  readonly quick: boolean;
+  private random: () => number;
+  private clock: () => number;
+  /** Quick rooms: when the race starts, set when the first human is seated. */
+  private startsAt: number | null = null;
+  private roster: Roster | null = null;
+  /** Quick rooms: each human slot's latest track vote. */
+  private votes = new Map<number, string>();
+  /** Quick rooms: how many bots the last check showed, so a change is broadcast once. */
+  private botsShown = 0;
+  /** Quick rooms: the bots on the grid, once the race has started (a Quick room races only once). */
+  private racingBots: BotView[] | null = null;
+
   constructor(
     readonly code: string,
-    readonly trackId: string,
+    /** Set from the vote when a Quick race starts; friends' rooms keep the server default. */
+    public trackId: string,
     private send: Send,
     now: number,
+    options: RoomOptions = {},
   ) {
     this.lastActivity = now;
+    this.quick = options.quick ?? false;
+    this.random = options.random ?? Math.random;
+    this.clock = options.clock ?? Date.now;
   }
 
   get size() {
@@ -85,7 +129,14 @@ export class Room {
     let slot = 1;
     while (this.members.has(slot)) slot++;
     this.members.set(slot, { slot, name, vehicle, paint: paintFor(vehicle, paint), ready: false, token, conn, leftAt: null, grace: RECONNECT_GRACE_MS });
-    if (this.members.size === 1) this.hostSlot = slot;
+    if (this.quick) {
+      // Nobody hosts; the wait starts with the first human and later joins do not move it.
+      if (this.startsAt === null) {
+        const now = this.clock();
+        this.startsAt = now + QUICK_WAIT_MS;
+        this.roster = new Roster(this.random, now);
+      }
+    } else if (this.members.size === 1) this.hostSlot = slot;
     return slot;
   }
 
@@ -129,7 +180,8 @@ export class Room {
   remove(slot: number) {
     this.dropOut(slot);
     if (!this.members.delete(slot)) return;
-    if (slot === this.hostSlot) this.hostSlot = this.nextHost();
+    this.votes.delete(slot);
+    if (!this.quick && slot === this.hostSlot) this.hostSlot = this.nextHost();
   }
 
   /**
@@ -191,7 +243,9 @@ export class Room {
   lobby(slot: number, change: LobbyChange): ErrorCode | null {
     const m = this.members.get(slot);
     if (!m) return null;
-    if (change.fillAI !== undefined && slot !== this.hostSlot) return 'not-host';
+    if (change.fillAI !== undefined && (this.quick || slot !== this.hostSlot)) return 'not-host';
+    // In a Quick room every connected human counts as ready; only the ride can change.
+    if (this.quick) change = { vehicle: change.vehicle, paint: change.paint };
     if (change.vehicle !== undefined || change.paint !== undefined) {
       m.vehicle = change.vehicle ?? m.vehicle;
       m.paint = paintFor(m.vehicle, change.paint ?? m.paint);
@@ -203,14 +257,63 @@ export class Room {
 
   /** Host starts the race: lines up the connected humans and tells them to load. */
   startRace(slot: number, now: number, random: () => number): ErrorCode | null {
+    if (this.quick) return 'not-host';
     if (this.phase !== 'lobby') return null;
     if (slot !== this.hostSlot) return 'not-host';
-    const here = [...this.members.values()].filter(m => m.conn !== null);
+    const here = this.here();
     if (here.length < 2 || here.some(m => !m.ready)) return 'not-ready';
+    this.launch(buildGrid(here, this.fillAI, this.hostSlot, random), now, random);
+    return null;
+  }
 
+  /** A Quick room's human votes for a track. False if refused: not a Quick lobby, not a member, or no such track. */
+  vote(slot: number, trackId: string): boolean {
+    if (!this.quick || this.phase !== 'lobby' || this.racingBots) return false;
+    if (!this.members.has(slot) || !TRACKS.some(t => t.id === trackId)) return false;
+    this.votes.set(slot, trackId);
+    return true;
+  }
+
+  /**
+   * A Quick room's lobby clock: tells everyone when bots appear or go, and starts the race when the wait is over or
+   * the room is full of humans. Nothing happens while no human is connected.
+   */
+  tickQuick(now: number) {
+    if (!this.quick || this.phase !== 'lobby' || this.racingBots || this.startsAt === null) return;
+    const here = this.here();
+    if (!here.length) return;
+    if (now >= this.startsAt || this.members.size >= MAX_HUMANS) return this.startQuick(here, now);
+    const shown = this.visibleBots(now).length;
+    if (shown !== this.botsShown) {
+      this.botsShown = shown;
+      this.broadcastRoom();
+    }
+  }
+
+  /** Races the voted track, with bots in every empty seat, all driven by the lowest connected human. */
+  private startQuick(here: Member[], now: number) {
+    this.trackId = pickTrack(this.votes, this.random);
+    this.racingBots = this.roster!.visible(Infinity, here);
+    const owner = Math.min(...here.map(m => m.slot));
+    this.launch(buildQuickGrid(here, this.racingBots, owner), now, this.random);
+  }
+
+  /** The members whose phone is connected. */
+  private here(): Member[] {
+    return [...this.members.values()].filter(m => m.conn !== null);
+  }
+
+  /** The bots a Quick room shows: the ones that have arrived while there are seats for them, or the grid's. */
+  private visibleBots(now: number): BotView[] {
+    if (this.racingBots) return this.racingBots;
+    return this.roster?.visible(now, [...this.members.values()]) ?? [];
+  }
+
+  /** Lines up this grid and tells the racers to load. */
+  private launch(grid: GridEntry[], now: number, random: () => number) {
     const config = trackById(this.trackId);
     this.raceSeq++;
-    this.grid = buildGrid(here, this.fillAI, this.hostSlot, random);
+    this.grid = grid;
     this.referee = new Referee(trackFor(config), config.laps, this.grid);
     this.cutoffAt = null;
     this.resultsMsg = null;
@@ -227,7 +330,6 @@ export class Room {
       laps: config.laps,
     };
     this.broadcast(this.gridMsg);
-    return null;
   }
 
   /** A grid human finished loading the track. Anyone else, or a repeat, is ignored. */
@@ -239,7 +341,7 @@ export class Room {
 
   /** Timers: the start, the finish cutoff, and a race everyone has walked away from. */
   tick(now: number) {
-    if (this.phase === 'lobby') return;
+    if (this.phase === 'lobby') return this.tickQuick(now);
     // Nobody left to race or to tell: no results, just the lobby (and the room is reaped if it is empty). A racer
     // still inside the reconnect grace may yet come back, so a blip never ends the race.
     if (this.grid.every(g => this.gone(g.slot, now))) return this.endRace(now, false);
@@ -361,7 +463,14 @@ export class Room {
     const players: PlayerInfo[] = [...this.members.values()]
       .sort((a, b) => a.slot - b.slot)
       .map(m => ({ slot: m.slot, name: m.name, vehicle: m.vehicle, paint: m.paint, ready: m.ready, connected: m.conn !== null }));
-    return { code: this.code, phase: this.phase, hostSlot: this.hostSlot, fillAI: this.fillAI, raceSeq: this.raceSeq, players };
+    const view: RoomView = { code: this.code, phase: this.phase, hostSlot: this.hostSlot, fillAI: this.fillAI, raceSeq: this.raceSeq, players };
+    if (!this.quick) return view;
+    // Connected humans count as ready, and the bots look just like them, listed after the humans.
+    for (const p of players) p.ready = p.connected;
+    const now = this.clock();
+    for (const b of this.visibleBots(now)) players.push({ ...b, ready: true, connected: true });
+    const startsInMs = this.racingBots ? 0 : this.startsAt === null ? QUICK_WAIT_MS : Math.max(0, this.startsAt - now);
+    return { ...view, hostSlot: 0, quick: { startsInMs, votes: tally(this.votes) } };
   }
 
   broadcast(msg: ServerMessage) {

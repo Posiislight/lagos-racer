@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
-import { trackById } from '../src/config/tracks';
+import { Room } from './room';
+import { BOT_NAMES } from './bots';
+import { TRACKS, trackById } from '../src/config/tracks';
 import { buildTrack, sampleAt } from '../src/game/track';
 import {
   FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
   LOBBY_GRACE_MS,
   LOBBY_SILENCE_MS,
+  BOT_SLOT_BASE,
+  QUICK_WAIT_MS,
   SILENCE_MS,
   RECONNECT_GRACE_MS,
   ROOM_IDLE_MS,
@@ -1216,5 +1220,198 @@ describe('finish and results', () => {
       server.tick();
       expect(server.rooms.has(room.code)).toBe(false);
     }
+  });
+});
+
+describe('quick room', () => {
+  type Sent = { conn: number; msg: ServerMessage };
+  let sent: Sent[];
+  let room: Room;
+
+  const seeded = (s: number) => () => (s = (s * 16807) % 2147483647) / 2147483647;
+  function quickRoom(seed = 7, quick = true) {
+    sent = [];
+    room = new Room('QUIK', TRACKS[0].id, (conn, msg) => sent.push({ conn, msg }), now, { quick, random: seeded(seed), clock: () => now });
+    return room;
+  }
+  beforeEach(() => quickRoom());
+
+  /** Seats a human on connection `conn` in the lowest free slot. */
+  const human = (conn: number, name = `P${conn}`) => room.add(conn, name, 'okada', 'red', `token-${conn}`);
+  const sentTo = <T extends ServerMessage['t']>(conn: number, t: T) =>
+    sent.filter(s => s.conn === conn && s.msg.t === t).map(s => s.msg as Extract<ServerMessage, { t: T }>);
+
+  it('timer starts at the first human and a later join does not reset it', () => {
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    now += 5000;
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    human(1);
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    now += 10_000;
+    human(2);
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS - 10_000);
+    now += QUICK_WAIT_MS - 10_000 - 1;
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    now += 1;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+  });
+
+  it('race starts at 30s with one human and five bots in the grid', () => {
+    human(1, 'Ade');
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(room.raceSeq).toBe(1);
+    const [g] = sentTo(1, 'grid');
+    expect(g.grid.map(e => e.netId)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(g.grid.map(e => e.ai)).toEqual([true, true, true, true, true, false]);
+    expect(g.grid.every(e => e.slot === 1)).toBe(true);
+    expect(g.grid[5]).toMatchObject({ slot: 1, name: 'Ade', vehicle: 'okada', paint: 'red' });
+    const names = g.grid.map(e => e.name);
+    expect(new Set(names).size).toBe(6);
+    expect(g.grid.slice(0, 5).every(e => BOT_NAMES.includes(e.name))).toBe(true);
+    // The view keeps its quick block once the race is on, with nothing left to wait for.
+    expect(room.view().quick!.startsInMs).toBe(0);
+    // It starts only once.
+    now += 1000;
+    room.tick(now);
+    expect(sentTo(1, 'grid')).toHaveLength(1);
+  });
+
+  it('sixth human starts it at once with no bots', () => {
+    for (let c = 1; c <= 6; c++) human(c);
+    expect(room.size).toBe(6);
+    expect(room.isFull).toBe(true);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    const [g] = sentTo(3, 'grid');
+    expect(g.grid.map(e => [e.slot, e.ai])).toEqual([1, 2, 3, 4, 5, 6].map(s => [s, false]));
+  });
+
+  it('most votes wins', () => {
+    for (let c = 1; c <= 3; c++) human(c);
+    expect(room.vote(1, 'third-mainland')).toBe(true);
+    expect(room.vote(2, 'third-mainland')).toBe(true);
+    // A later vote replaces the earlier one.
+    expect(room.vote(2, 'ikorodu')).toBe(true);
+    expect(room.vote(3, 'ikorodu')).toBe(true);
+    expect(room.view().quick!.votes).toEqual({ ojuelegba: 0, 'third-mainland': 1, ikorodu: 2 });
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.trackId).toBe('ikorodu');
+    expect(sentTo(1, 'grid')[0]).toMatchObject({ trackId: 'ikorodu', laps: trackById('ikorodu').laps });
+  });
+
+  it('tie and no votes pick from the right set', () => {
+    const tied = new Set<string>();
+    const open = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      quickRoom(seed);
+      human(1);
+      human(2);
+      human(3);
+      room.vote(1, 'third-mainland');
+      room.vote(2, 'ikorodu');
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      tied.add(room.trackId);
+
+      quickRoom(seed * 7919);
+      human(1);
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      open.add(room.trackId);
+    }
+    expect([...tied].sort()).toEqual(['ikorodu', 'third-mainland']);
+    expect([...open].sort()).toEqual(TRACKS.map(t => t.id).sort());
+  });
+
+  it('unknown track vote refused', () => {
+    human(1);
+    expect(room.vote(1, 'atlantis')).toBe(false);
+    expect(room.vote(9, 'ikorodu')).toBe(false);
+    expect(Object.values(room.view().quick!.votes).every(n => n === 0)).toBe(true);
+  });
+
+  it('vote ignored outside a quick lobby', () => {
+    quickRoom(7, false);
+    human(1);
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+    expect(room.view().quick).toBeUndefined();
+
+    quickRoom();
+    human(1);
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+  });
+
+  it('quick room does not start with no connected human', () => {
+    human(1);
+    room.detach(1, now);
+    now += QUICK_WAIT_MS + 5000;
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    expect(sent).toHaveLength(0);
+    room.attach(1, 5);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(sentTo(5, 'grid')).toHaveLength(1);
+  });
+
+  it('start and fillAI refused with not-host', () => {
+    human(1);
+    human(2);
+    expect(room.view().hostSlot).toBe(0);
+    expect(room.lobby(1, { fillAI: true })).toBe('not-host');
+    expect(room.startRace(1, now, Math.random)).toBe('not-host');
+    expect(room.phase).toBe('lobby');
+    // Ready is ignored: every connected human counts as ready.
+    expect(room.lobby(2, { ready: false, vehicle: 'danfo' })).toBeNull();
+    expect(room.view().players.slice(0, 2).map(p => [p.slot, p.vehicle, p.ready])).toEqual([[1, 'okada', true], [2, 'danfo', true]]);
+    room.remove(1);
+    expect(room.view().hostSlot).toBe(0);
+  });
+
+  it('view shows bots only after their appearance time and hides one when a human takes the seat', () => {
+    human(1, 'Ade');
+    const start = now;
+    now = start + 2999;
+    room.tick(now);
+    expect(room.view().players.map(p => p.slot)).toEqual([1]);
+    expect(sentTo(1, 'room')).toHaveLength(0);
+
+    // Each second, a room broadcast goes out only when the number of bots shown has changed.
+    let shown = 0;
+    for (let t = 3000; t <= 26_000; t += 1000) {
+      now = start + t;
+      const before = sentTo(1, 'room').length;
+      room.tick(now);
+      const bots = room.view().players.length - 1;
+      expect(sentTo(1, 'room').length - before).toBe(bots === shown ? 0 : 1);
+      if (bots !== shown) expect(sentTo(1, 'room').at(-1)!.room.players).toHaveLength(bots + 1);
+      expect(bots).toBeGreaterThanOrEqual(shown);
+      shown = bots;
+    }
+    expect(room.phase).toBe('lobby');
+    const players = room.view().players;
+    expect(players).toHaveLength(6);
+    expect(players[0]).toMatchObject({ slot: 1, name: 'Ade' });
+    for (const bot of players.slice(1)) {
+      expect(bot.slot).toBeGreaterThanOrEqual(BOT_SLOT_BASE);
+      expect(bot).toMatchObject({ ready: true, connected: true });
+      expect(bot.name).not.toBe('Ade');
+    }
+    // Bots are not members.
+    expect(room.size).toBe(1);
+
+    human(2, 'Bola');
+    const after = room.view().players;
+    expect(after).toHaveLength(6);
+    expect(after.filter(p => p.slot < BOT_SLOT_BASE).map(p => p.slot)).toEqual([1, 2]);
+    expect(after.filter(p => p.slot >= BOT_SLOT_BASE)).toHaveLength(4);
   });
 });

@@ -1,6 +1,7 @@
 import { GRID_SIZE, type GridEntry } from '../src/net/protocol';
 import { VEHICLES, type VehicleId } from '../src/config/vehicles';
 import { AI_NAMES } from '../src/game/names';
+import type { BotView } from './bots';
 
 /**
  * The starting grid; netId is the grid index. With fillAI, AI cars owned by the host take the front places and the
@@ -33,4 +34,20 @@ export function buildGrid(
   }
   const human = humans.map(m => ({ slot: m.slot, name: m.name, vehicle: m.vehicle, paint: m.paint, ai: false }));
   return [...ai, ...human].map((e, netId) => ({ netId, ...e }));
+}
+
+/**
+ * A Quick race grid: the disguised bots take the front places, all driven by `ownerSlot`'s phone with the real
+ * `ai: true`, and the humans start behind them in slot order. netId is the grid index.
+ */
+export function buildQuickGrid(
+  humans: { slot: number; name: string; vehicle: VehicleId; paint: string }[],
+  bots: BotView[],
+  ownerSlot: number,
+): GridEntry[] {
+  const front = bots.map(b => ({ slot: ownerSlot, name: b.name, vehicle: b.vehicle, paint: b.paint, ai: true }));
+  const back = [...humans]
+    .sort((a, b) => a.slot - b.slot)
+    .map(m => ({ slot: m.slot, name: m.name, vehicle: m.vehicle, paint: m.paint, ai: false }));
+  return [...front, ...back].map((e, netId) => ({ netId, ...e }));
 }
