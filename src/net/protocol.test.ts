@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FLAG, cleanNick, decodeSnapshot, encodeSnapshot, normalizeCode, type Snapshot } from './protocol';
+import { BOT_SLOT_BASE, FLAG, MAX_HUMANS, MAX_QUICK_ROOMS, QUICK_WAIT_MS, cleanNick, decodeSnapshot, encodeSnapshot, normalizeCode, type Snapshot } from './protocol';
 
 const yaw30 = { qx: 0, qy: Math.sin(Math.PI / 12), qz: 0, qw: Math.cos(Math.PI / 12) };
 
@@ -68,5 +68,14 @@ describe('room codes and nicknames', () => {
     expect(cleanNick('a\u0007b')).toBe('ab');
     expect(cleanNick('   ')).toBeNull();
     expect(cleanNick('x'.repeat(30))).toHaveLength(16);
+  });
+});
+
+describe('quick race', () => {
+  it('quick constants match the spec', () => {
+    expect(QUICK_WAIT_MS).toBe(30000);
+    expect(MAX_QUICK_ROOMS).toBe(50);
+    expect(BOT_SLOT_BASE).toBe(7);
+    expect(BOT_SLOT_BASE).toBeGreaterThan(MAX_HUMANS);
   });
 });

@@ -10,6 +10,10 @@ export const START_LEAD_MS = 3500;
 export const FINISH_CUTOFF_MS = 30000;
 export const MAX_HUMANS = 6;
 export const GRID_SIZE = 6;
+// Quick race: how long a quick room waits for more players, how many may exist, and where bot slots start (above MAX_HUMANS).
+export const QUICK_WAIT_MS = 30000;
+export const MAX_QUICK_ROOMS = 50;
+export const BOT_SLOT_BASE = 7;
 export const MAX_MESSAGE_BYTES = 4096;
 export const RATE_LIMIT_PER_S = 30;
 // Either end gives up on a socket it has heard nothing from for this long (pings go out every 5 s).
@@ -27,11 +31,13 @@ export const NICK_MAX = 16;
 export const FLAG = { boost: 1, slip: 2, curse: 4, wobble: 8, horn: 16, finished: 32, shield: 64 } as const;
 
 export type RoomPhase = 'lobby' | 'loading' | 'countdown' | 'racing';
-export type ErrorCode = 'not-found' | 'full' | 'started' | 'bad-name' | 'bad-code' | 'expired' | 'not-host' | 'not-ready';
+export type ErrorCode = 'not-found' | 'full' | 'started' | 'bad-name' | 'bad-code' | 'expired' | 'not-host' | 'not-ready' | 'busy';
 
 /** paint is one of the vehicle's paint ids (see paintOf). */
 export type PlayerInfo = { slot: number; name: string; vehicle: VehicleId; paint: string; ready: boolean; connected: boolean };
-export type RoomView = { code: string; phase: RoomPhase; hostSlot: number; fillAI: boolean; raceSeq: number; players: PlayerInfo[] };
+/** Quick race lobby state: time until the race starts and the track votes (trackId -> vote count). */
+export type QuickView = { startsInMs: number; votes: Record<string, number> };
+export type RoomView = { code: string; phase: RoomPhase; hostSlot: number; fillAI: boolean; raceSeq: number; players: PlayerInfo[]; quick?: QuickView };
 
 /** slot is the owning human's slot; netId is the grid index, front to back. */
 export type GridEntry = { netId: number; slot: number; name: string; vehicle: VehicleId; paint: string; ai: boolean };
@@ -53,6 +59,8 @@ export type NetResult = {
 export type ClientMessage =
   | { t: 'create'; name: string; vehicle: VehicleId; paint: string }
   | { t: 'join'; code: string; name: string; vehicle: VehicleId; paint: string }
+  | { t: 'quick'; name: string; vehicle: VehicleId; paint: string }
+  | { t: 'vote'; trackId: string }
   | { t: 'resume'; token: string }
   | { t: 'ping'; c: number }
   | { t: 'lobby'; vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }
@@ -76,6 +84,7 @@ export type ServerMessage =
   | { t: 'hit'; hazard: number; netId: number; from: number }
   | { t: 'finished'; netId: number; time: number }
   | { t: 'dnf'; netIds: number[] }
+  | { t: 'adopt'; netIds: number[] }
   | { t: 'results'; raceSeq: number; results: NetResult[] };
 
 export type CarState = {

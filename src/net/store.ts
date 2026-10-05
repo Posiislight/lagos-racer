@@ -49,6 +49,7 @@ export const ERROR_TEXT: Record<NetError, string> = {
   expired: 'Room don close, start a new one',
   'not-host': 'Only the host can start the race',
   'not-ready': 'Everybody must be ready first',
+  busy: 'Server dey busy, try again',
 };
 
 function readNick(): string {
