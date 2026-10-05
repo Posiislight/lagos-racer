@@ -12,7 +12,7 @@ Naira stays the earned currency and is never sold for real money.
 
 | Topic | Decision |
 |---|---|
-| Premium currency | Name not chosen yet. Bought with real money. |
+| Premium currency | Called **Gems** (display name only; the code field stays `premium`). Bought with real money. |
 | What it buys | Vehicle skins (paints) and unlocking the BRT. Nothing else. |
 | Default paint | Yellow on Okada, Keke Marwa and Danfo. The BRT keeps its white-and-blue livery. |
 | Other paints | Every non-default paint costs premium currency. |
@@ -21,7 +21,7 @@ Naira stays the earned currency and is never sold for real money.
 
 ## Not decided yet
 
-- The currency's name and symbol.
+- The currency's symbol or icon (the name is Gems).
 - Skin prices, premium-currency bundle sizes and real-naira prices.
 - How many ad views unlock the BRT (one, or a short streak over a few days).
 - Whether ads can also give a small amount of premium currency.
