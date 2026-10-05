@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { useGame, type Hud as HudState } from '../game/store';
+import { useNet } from '../net/store';
 import { formatTime } from '../game/race';
 import { getRace } from '../game/runtime';
 import { queueItem, queueSpecial } from '../game/input';
@@ -10,7 +11,7 @@ const suffix = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st
 
 export function Hud({ onPause }: { onPause: () => void }) {
   const hud = useGame(s => s.hud);
-  const best = useGame(s => s.best[s.track]);
+  const best = useGame(s => s.best[s.spec?.track ?? (s.online ? useNet.getState().pendingGrid?.trackId : undefined) ?? s.track]);
   const isTouch = useIsTouch();
   if (hud.phase === 'loading') return null;
   return (

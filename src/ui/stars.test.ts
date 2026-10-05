@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { payoutLine } from './Stars';
+import { payoutLine, noStarsText } from './Stars';
 
 describe('payoutLine', () => {
   it('reads place, stars and naira', () => {
@@ -11,5 +11,15 @@ describe('payoutLine', () => {
   });
   it('falls back to a th ordinal beyond 6th', () => {
     expect(payoutLine(7, 0, 0)).toBe('7th place: no stars = ₦0');
+  });
+});
+
+describe('noStarsText', () => {
+  it('tells the duel player to beat her', () => {
+    expect(noStarsText(1)).toBe('No stars, no naira. Beat her to earn stars.');
+  });
+  it('names the top places for a normal race', () => {
+    expect(noStarsText(3)).toBe('No stars, no naira. Finish top 3.');
+    expect(noStarsText(undefined)).toBe('No stars, no naira. Finish top 3.');
   });
 });

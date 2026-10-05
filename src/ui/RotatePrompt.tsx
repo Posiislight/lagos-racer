@@ -15,18 +15,19 @@ export function RotatePrompt() {
   const screen = useGame(s => s.screen);
   const online = useGame(s => s.online);
   const paused = useGame(s => s.paused);
+  const resultsShowing = useGame(s => s.results !== null);
 
   useEffect(() => {
     const queries = [matchMedia(COARSE), matchMedia(PORTRAIT)];
     const update = () => setPrompting(read());
-    queries.forEach(q => q.addEventListener('change', update));
+    queries.forEach(q => (q.addEventListener ? q.addEventListener('change', update) : q.addListener(update)));
     update();
-    return () => queries.forEach(q => q.removeEventListener('change', update));
+    return () => queries.forEach(q => (q.removeEventListener ? q.removeEventListener('change', update) : q.removeListener(update)));
   }, []);
 
   useEffect(() => {
-    if (shouldPauseForRotate(prompting, screen, online, paused)) useGame.getState().setPaused(true);
-  }, [prompting, screen, online, paused]);
+    if (shouldPauseForRotate(prompting, screen, online, paused, resultsShowing)) useGame.getState().setPaused(true);
+  }, [prompting, screen, online, paused, resultsShowing]);
 
   if (!prompting) return null;
   return (

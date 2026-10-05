@@ -6,7 +6,7 @@ import { nextRace } from '../game/campaign';
 import { eventName } from '../config/tracks';
 import { useNet } from '../net/store';
 import { formatNaira, PAYOUT_BY_STARS } from '../config/economy';
-import { Stars, payoutLine } from './Stars';
+import { Stars, payoutLine, noStarsText } from './Stars';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
@@ -70,7 +70,7 @@ export function Results() {
             <p className="payout-note">{payoutLine(place + 1, earnedStars, PAYOUT_BY_STARS[earnedStars] ?? 0)}</p>
           </>
         ) : (
-          <p className="earned none">No stars, no naira. Finish top 3.</p>
+          <p className="earned none">{noStarsText(spec?.pass.place)}</p>
         )}
         {unlocked && (
           <div className="unlocked">
@@ -80,7 +80,7 @@ export function Results() {
         )}
         {showAccountPrompt && !online && (
           <div className="account">
-            <p><b>Keep your coins safe.</b> Create an account to save your coins and high score on any phone.</p>
+            <p><b>Keep your naira safe.</b> Create an account to save your naira and high score on any phone.</p>
             <div className="row">
               <button className="btn" disabled title="Accounts are coming soon">Create account (soon)</button>
               <button className="btn ghost" onClick={dismissAccountPrompt}>Not now</button>
