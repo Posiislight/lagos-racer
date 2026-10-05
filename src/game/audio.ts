@@ -39,7 +39,8 @@ export function unlockAudio() {
 function loadSounds() {
   if (!ctx) return;
   const c = ctx;
-  const fetchBytes = (u: string) => fetch(u).then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(u))));
+  // A host that answers a missing file with its index page (200, text/html) counts as "no file".
+  const fetchBytes = (u: string) => fetch(u).then(r => (r.ok && !r.headers.get('content-type')?.includes('text/html') ? r.arrayBuffer() : Promise.reject(new Error(u))));
   const decode = (b: ArrayBuffer) => c.decodeAudioData(b);
   const names = (Object.keys(SOUNDS) as SoundName[]).sort((a, b) => Number(b === 'ambience') - Number(a === 'ambience'));
   void (async () => {
