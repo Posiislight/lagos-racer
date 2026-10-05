@@ -2,8 +2,6 @@ import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from '
 import { touch } from '../game/input';
 import { useGame } from '../game/store';
 
-type Key = keyof typeof touch;
-
 export function useIsTouch() {
   const [isTouch, setTouch] = useState(() => typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0));
   useEffect(() => {
@@ -12,30 +10,6 @@ export function useIsTouch() {
     return () => window.removeEventListener('touchstart', on);
   }, []);
   return isTouch;
-}
-
-/** A hold-to-press button that works with several fingers at once. */
-function Pad({ k, className, label, children }: { k: Key; className: string; label: string; children: ReactNode }) {
-  const [down, setDown] = useState(false);
-  const press = (on: boolean) => (e: PointerEvent) => {
-    e.preventDefault();
-    if (on) (e.target as Element).setPointerCapture?.(e.pointerId);
-    touch[k] = on;
-    setDown(on);
-  };
-  return (
-    <button
-      className={`pad ${className}${down ? ' down' : ''}`}
-      aria-label={label}
-      onPointerDown={press(true)}
-      onPointerUp={press(false)}
-      onPointerCancel={press(false)}
-      onLostPointerCapture={() => { touch[k] = false; setDown(false); }}
-      onContextMenu={e => e.preventDefault()}
-    >
-      {children}
-    </button>
-  );
 }
 
 const STEER_R = 44; // half the steer button's size, keeps it fully on screen
@@ -98,11 +72,6 @@ export function TouchControls() {
     <div className="touch">
       {!tilt && <SteerZone k="left" side="left" label="Steer left">◀</SteerZone>}
       {!tilt && <SteerZone k="right" side="right" label="Steer right">▶</SteerZone>}
-      <div className={`touch-right${tilt ? '' : ' above-steer'}`}>
-        <div className="touch-row small">
-          <Pad k="horn" className="mini" label="Horn">PON PON</Pad>
-        </div>
-      </div>
     </div>
   );
 }
