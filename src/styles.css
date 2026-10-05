@@ -128,8 +128,21 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .garage-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .garage-head .coins { padding: 6px 10px; font-size: 14px; }
 .garage-head h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-family: Bungee, Impact, sans-serif; font-weight: 400; color: var(--led); font-size: 28px; }
-.garage-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr minmax(280px, 360px); gap: 12px; align-items: end; }
-.garage-preview { position: relative; height: 100%; min-height: 160px; }
+.garage-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr minmax(280px, 360px); gap: 12px; align-items: stretch; }
+.garage-left { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.garage-preview { position: relative; flex: 1; min-height: 120px; }
+/* Right column scrolls on its own so a short phone screen never clips the card or the drivers. */
+.garage-side { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; padding-bottom: 2px; scrollbar-width: none; }
+.garage-side::-webkit-scrollbar { display: none; }
+.garage-side .garage-card { flex: 0 0 auto; }
+.garage-side .drivers { flex-direction: column; overflow: visible; flex: 0 0 auto; padding: 0 2px 4px; }
+.garage-side .drivers button { flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .garage { overflow-y: auto; }
+  .garage-body { grid-template-columns: 1fr; flex: 0 0 auto; }
+  .garage-preview { flex: none; height: 220px; }
+  .garage-side { overflow: visible; }
+}
 .garage-card { color: var(--ink); }
 .stats { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 14px; margin: 10px 0 14px; }
 .paints { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
@@ -182,6 +195,13 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .driver-line { margin: 0 0 4px; font-size: 14px; }
 @media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
 @media (max-height: 480px) {
+  .garage { gap: 6px; padding-top: calc(6px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
+  .garage-head h1 { font-size: 22px; }
+  .garage-head .btn { min-height: 38px; padding: 4px 12px; }
+  .garage-body { grid-template-columns: 1fr minmax(260px, 46%); }
+  .stops button { padding: 6px 10px; font-size: 13px; }
+  .swatch { width: 34px; height: 34px; }
+  .paints { margin-bottom: 8px; }
   .garage-card .muted { display: none; }
   .garage-card h2 { font-size: 20px; margin: 6px 0 0; }
   .garage-card .stat-rows { gap: 6px; margin: 6px 0 10px; }

@@ -51,9 +51,22 @@ export function Garage() {
         <div className="coins premium" aria-label={`${premium} ${PREMIUM_LABEL}`}>{PREMIUM_LABEL} {premium}</div>
       </header>
       <div className="garage-body">
-        <div className="garage-preview">
-          <Suspense fallback={null}><Preview id={looking} color={shown.color} driver={driver} /></Suspense>
+        <div className="garage-left">
+          <div className="garage-preview">
+            <Suspense fallback={null}><Preview id={looking} color={shown.color} driver={driver} /></Suspense>
+          </div>
+          <div className="stops" role="tablist" aria-label="Vehicles">
+            {VEHICLES.map(x => {
+              const locked = !!x.locked && !unlocked.includes(x.id);
+              return (
+                <button key={x.id} role="tab" aria-selected={x.id === looking} onClick={() => lookAt(x.id)}>
+                  <span className="dot" style={{ background: paintOf(x, paint[x.id]).color }} />{x.name}{locked && <span className="lock" aria-label="locked"> 🔒</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
+        <div className="garage-side">
         <div className="card garage-card">
           <h2>{v.name}</h2>
           <p className="muted">{v.blurb}</p>
@@ -119,18 +132,7 @@ export function Garage() {
             </button>
           )}
         </div>
-      </div>
-      <div className="stops" role="tablist" aria-label="Vehicles">
-        {VEHICLES.map(x => {
-          const locked = !!x.locked && !unlocked.includes(x.id);
-          return (
-            <button key={x.id} role="tab" aria-selected={x.id === looking} onClick={() => lookAt(x.id)}>
-              <span className="dot" style={{ background: paintOf(x, paint[x.id]).color }} />{x.name}{locked && <span className="lock" aria-label="locked"> 🔒</span>}
-            </button>
-          );
-        })}
-      </div>
-      <div className="drivers" role="tablist" aria-label="Drivers">
+        <div className="drivers" role="tablist" aria-label="Drivers">
         {DRIVERS.map(d => {
           const open = driverAvailable(d.id, campaign.cleared);
           return (
@@ -141,6 +143,8 @@ export function Garage() {
             </button>
           );
         })}
+        </div>
+        </div>
       </div>
     </div>
   );
