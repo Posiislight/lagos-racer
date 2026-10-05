@@ -211,6 +211,7 @@ export class RoomServer {
     }
     room.lastActivity = this.now();
     if (m.t === 'vote') {
+      // Only a changed vote is broadcast.
       if (room.vote(c.slot, m.trackId)) room.broadcastRoom();
       return;
     }
@@ -342,11 +343,15 @@ export class RoomServer {
     let bestLeft = Infinity;
     let quickRooms = 0;
     for (const room of this.rooms.values()) {
-      if (!room.quick) continue;
+      // A Quick room races once, so one that has started (or ever raced) is never offered to a newcomer. One that
+      // has raced only lingers until its members leave, so it does not count toward the limit either.
+      if (!room.quick || room.raceSeq !== 0) continue;
       quickRooms++;
-      // A Quick room races once, so one that has started (or ever raced) is never offered to a newcomer.
-      if (room.phase !== 'lobby' || room.raceSeq !== 0 || room.isFull) continue;
+      // Nobody connected (abandoned, its members only inside their grace) or no wait left: a newcomer would start
+      // at once with nobody else able to join, so they get a new room instead.
+      if (room.phase !== 'lobby' || room.isFull || !room.hasConnected) continue;
       const left = room.view().quick?.startsInMs ?? Infinity;
+      if (left <= 0) continue;
       if (left < bestLeft) {
         best = room;
         bestLeft = left;

@@ -1290,6 +1290,24 @@ describe('quick room', () => {
     expect(g.grid.map(e => [e.slot, e.ai])).toEqual([1, 2, 3, 4, 5, 6].map(s => [s, false]));
   });
 
+  it('six members with one disconnected does not start early', () => {
+    for (let c = 1; c <= 6; c++) human(c);
+    room.detach(4, now);
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    // Back again: six connected humans start it.
+    room.attach(4, 4);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+  });
+
+  it('a repeated vote for the same track reports no change', () => {
+    human(1);
+    expect(room.vote(1, 'ikorodu')).toBe(true);
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+    expect(room.vote(1, 'ojuelegba')).toBe(true);
+  });
+
   it('most votes wins', () => {
     for (let c = 1; c <= 3; c++) human(c);
     expect(room.vote(1, 'third-mainland')).toBe(true);
@@ -1524,6 +1542,31 @@ describe('quick room', () => {
       expect(room.phase).toBe('racing');
     });
 
+    it('owner grace expiring while the others are all away hands the bots to one still in grace', () => {
+      race(3);
+      const bots = botIds();
+      room.detach(1, now);
+      now += 1000;
+      room.detach(2, now);
+      room.detach(3, now);
+      now += RECONNECT_GRACE_MS - 1000;
+      // Owner's grace is over; 2 and 3 are still within theirs.
+      room.expire(now);
+      room.tick(now);
+      expect(real().filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+      const referee = (room as any).referee;
+      for (const id of bots) expect(referee.running(id)).toBe(true);
+      expect([...(room as any).dropped]).toEqual([carOf(1)]);
+      // Nobody connected to tell yet.
+      expect(sent.some(s => s.msg.t === 'adopt')).toBe(false);
+      expect(room.phase).toBe('racing');
+      // The heir comes back and is told to drive them.
+      room.attach(2, 12);
+      room.resync(2);
+      expect(sentTo(12, 'adopt')).toEqual([{ t: 'adopt', netIds: bots }]);
+      expect(sentTo(12, 'grid')[0].grid.filter(e => e.ai).map(e => e.netId)).toEqual(bots);
+    });
+
     it('handover during loading and countdown', () => {
       for (const phase of ['loading', 'countdown'] as const) {
         quickRoom();
@@ -1733,6 +1776,56 @@ describe('quick matchmaking', () => {
     room.raceSeq = 1;
     const b = quick('B');
     expect(b.welcome.code).not.toBe(a.welcome.code);
+  });
+
+  it('an abandoned quick room is skipped and a new room opened', () => {
+    const a = quick('A');
+    server.close(a.conn);
+    const room = server.rooms.get(a.welcome.code)!;
+    // A is still a member, inside the lobby grace, but nobody is connected.
+    expect(room.size).toBe(1);
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    expect(server.rooms.size).toBe(2);
+  });
+
+  it('a quick room whose wait has run out is skipped', () => {
+    const a = quick('A');
+    const room = server.rooms.get(a.welcome.code)!;
+    // The wait is over but the room has not ticked yet.
+    now += QUICK_WAIT_MS;
+    expect(room.phase).toBe('lobby');
+    expect(room.view().quick!.startsInMs).toBe(0);
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+  });
+
+  it('quick rooms that have raced do not count toward the room limit', () => {
+    for (let i = 0; i < 50; i++) {
+      const first = quick('F' + i);
+      const room = server.rooms.get(first.welcome.code)!;
+      if (i === 0) {
+        // Raced once and back in the lobby: it only lingers until its members leave.
+        room.phase = 'lobby';
+        room.raceSeq = 1;
+      } else for (let s = 2; s <= 6; s++) room.add(-1, 'x', 'okada', '', 't');
+    }
+    expect(server.rooms.size).toBe(50);
+    const late = quick('Late');
+    expect(msgs(late.peer, 'error')).toHaveLength(0);
+    expect(late.welcome).toBeDefined();
+    expect(server.rooms.size).toBe(51);
+  });
+
+  it('re-voting the same track does not broadcast', () => {
+    const a = quick('A');
+    const b = quick('B');
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    const before = msgs(b.peer, 'room').length;
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    expect(msgs(b.peer, 'room')).toHaveLength(before);
+    send(a.conn, { t: 'vote', trackId: 'ojuelegba' });
+    expect(msgs(b.peer, 'room')).toHaveLength(before + 1);
   });
 
   it('bad nickname gives bad-name', () => {

@@ -126,6 +126,11 @@ export class Room {
     return this.members.size >= MAX_HUMANS;
   }
 
+  /** At least one member's phone is connected. */
+  get hasConnected() {
+    return this.here().length > 0;
+  }
+
   /** Seats a new human in the lowest free slot; the first one in becomes host. */
   add(conn: number, name: string, vehicle: VehicleId, paint: string, token: string): number {
     let slot = 1;
@@ -180,7 +185,7 @@ export class Room {
 
   /** Gone for good: in a race their cars are out of it at once. */
   remove(slot: number) {
-    this.dropOut(slot);
+    this.dropOut(slot, this.clock());
     if (!this.members.delete(slot)) return;
     this.votes.delete(slot);
     if (!this.quick && slot === this.hostSlot) this.hostSlot = this.nextHost();
@@ -197,7 +202,7 @@ export class Room {
       if (this.phase === 'lobby') {
         this.remove(m.slot);
         removed = true;
-      } else this.dropOut(m.slot);
+      } else this.dropOut(m.slot, now);
     }
     return removed;
   }
@@ -214,11 +219,11 @@ export class Room {
 
   /**
    * Marks this slot's cars DNF in the race under way and tells the racers. In a friends' room its AI goes out with
-   * it; in a Quick room its bots pass to the next racer instead, if anyone is still connected.
+   * it; in a Quick room its bots pass to the next racer instead, if anyone is still connected or may come back.
    */
-  private dropOut(slot: number) {
+  private dropOut(slot: number, now: number) {
     if (this.phase === 'lobby' || !this.referee) return;
-    if (this.quick) this.handOver(slot);
+    if (this.quick) this.handOver(slot, now);
     const netIds = this.grid.filter(g => g.slot === slot && !this.dropped.has(g.netId)).map(g => g.netId);
     if (!netIds.length) return;
     for (const id of netIds) {
@@ -231,19 +236,21 @@ export class Room {
   /**
    * A Quick room's bots driven by this slot become the lowest other connected racer's (`owns()` reads the grid, so
    * that phone's snapshots and finishes for them count from now on), and it is told to drive the ones still going.
-   * Before the race it also gets its grid again, now showing those bots as its own. With nobody to take them they
-   * stay put and go out with the leaver.
+   * Before the race it also gets its grid again, now showing those bots as its own. If every other racer is away
+   * but inside their grace, the lowest of them takes the bots and is told when it resumes (`resync`). With nobody
+   * to take them they stay put and go out with the leaver.
    */
-  private handOver(slot: number) {
+  private handOver(slot: number, now: number) {
     const bots = this.grid.filter(g => g.ai && g.slot === slot);
-    const heir = this.here()
-      .map(m => m.slot)
-      .filter(s => s !== slot && this.grid.some(g => !g.ai && g.slot === s))
-      .sort((a, b) => a - b)[0];
+    const racers = [...this.members.values()]
+      .filter(m => m.slot !== slot && !this.expired(m, now) && this.grid.some(g => !g.ai && g.slot === m.slot))
+      .sort((a, b) => a.slot - b.slot);
+    const heir = (racers.find(m => m.conn !== null) ?? racers[0])?.slot;
     if (!bots.length || heir === undefined) return;
     for (const g of bots) g.slot = heir;
     this.heirs.add(heir);
-    const conn = this.connOf(heir)!;
+    const conn = this.connOf(heir);
+    if (conn === null) return;
     if (this.phase !== 'racing') {
       const grid = this.gridFor(heir);
       if (grid) this.send(conn, grid);
@@ -310,6 +317,8 @@ export class Room {
   vote(slot: number, trackId: string): boolean {
     if (!this.quick || this.phase !== 'lobby' || this.racingBots) return false;
     if (!this.members.has(slot) || !TRACKS.some(t => t.id === trackId)) return false;
+    // The same vote again changes nothing, so there is nothing to broadcast.
+    if (this.votes.get(slot) === trackId) return false;
     this.votes.set(slot, trackId);
     return true;
   }
@@ -322,7 +331,8 @@ export class Room {
     if (!this.quick || this.phase !== 'lobby' || this.racingBots || this.startsAt === null) return;
     const here = this.here();
     if (!here.length) return;
-    if (now >= this.startsAt || this.members.size >= MAX_HUMANS) return this.startQuick(here, now);
+    // Early start only with a full grid of connected humans, the same set the grid is built from.
+    if (now >= this.startsAt || here.length >= MAX_HUMANS) return this.startQuick(here, now);
     const shown = this.visibleBots(now).length;
     if (shown !== this.botsShown) {
       this.botsShown = shown;
