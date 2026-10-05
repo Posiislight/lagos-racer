@@ -89,10 +89,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side .card h2 { margin-bottom: 2px; }
 .menu-side .row { flex-wrap: nowrap; gap: 8px; }
 .menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
-.track-pick { display: flex; gap: 6px; margin-top: 8px; }
-.track-pick .btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; font-size: 13px; }
-.track-line { margin: 8px 0 0; font-size: 14px; }
-.credit { margin: 4px 0 0; font-size: 11px; }
+.credit { margin: 0; font-size: 11px; }
+.menu-side > .credit { align-self: flex-start; background: rgba(255, 250, 240, .75); padding: 2px 8px; border-radius: 8px; color: var(--ink); }
+.menu-entries { display: flex; flex-direction: column; gap: 8px; }
 .keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
 @media (pointer: coarse) { .keys { display: none; } }
 @media (max-width: 720px) and (orientation: portrait) {
@@ -101,12 +100,13 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @media (max-height: 480px) {
   .menu-side .card .muted { display: none; }
   .menu-side .card .eyebrow { display: none; }
-  .menu-side .card .credit { display: block; margin-top: 2px; }
-  .track-picker { margin-top: 4px; }
-  .track-chip { min-height: 34px; padding: 0 12px; font-size: 14px; }
   .menu-side .card h2 { font-size: 26px; }
   .board h1 { font-size: 28px; }
-  .btn.big { font-size: 20px; padding: 10px 18px; }
+  .btn.big { font-size: 20px; padding: 8px 18px; }
+  .menu-side { gap: 6px; }
+  .menu-side .card { flex-shrink: 0; padding: 8px 12px; }
+  .menu-entries { gap: 6px; }
+  .keys { display: none; }
 }
 
 /* ---------- garage ---------- */
@@ -391,9 +391,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .hud-item { width: 78px; height: 78px; }
   .hud-special { --size: 78px; }
 }
-.track-picker { display: flex; gap: 6px; margin: 8px 0 0; flex-wrap: wrap; }
-.track-chip { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.25); color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
-.track-chip.on { background: #f5b400; color: #1a1a1a; border-color: #f5b400; }
 
 /* ---------- campaign ---------- */
 .campaign {
