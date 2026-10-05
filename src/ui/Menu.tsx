@@ -40,28 +40,28 @@ export function Menu() {
           <small>{MENU_TAGLINE}</small>
           <h1>LAGOS RACER</h1>
         </div>
-        <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
+        <div className="menu-corner">
+          <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
+          <button className="btn small" onClick={() => setScreen('garage')}>Garage</button>
+          <button className="btn small" onClick={() => setSettings(true)}>Settings</button>
+        </div>
       </header>
       <div className="menu-preview">
         <Suspense fallback={null}><Preview id={vehicle} color={p.color} driver={driver} /></Suspense>
+        <p className="menu-caption"><b>{d.name}</b> · {v.name}</p>
       </div>
       <div className="menu-side">
-        <div className="card">
-          <p className="eyebrow">Your ride</p>
-          <h2>{v.name}</h2>
-          <p className="driver-line"><b>{d.name}</b> at the wheel · {d.special.name}</p>
-          <p className="muted">{v.blurb}</p>
-        </div>
         <div className="menu-entries">
-          <button className="btn primary big" onClick={() => setScreen('campaign')}>SINGLE PLAYER</button>
-          <button className="btn big" onClick={() => setScreen('online')}>MULTIPLAYER</button>
-        </div>
-        <div className="row menu-row">
-          <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
-          <button className="btn" onClick={() => setSettings(true)}>Settings</button>
+          <button className="entry primary" onClick={() => setScreen('campaign')}>
+            <b>SINGLE PLAYER</b>
+            <span>Race the campaign across Lagos.</span>
+          </button>
+          <button className="entry" onClick={() => setScreen('online')}>
+            <b>MULTIPLAYER</b>
+            <span>Race your friends or anyone online.</span>
+          </button>
         </div>
         {credit && <p className="credit muted">Ojuelegba road layout {credit}</p>}
-        <p className="keys muted">You're always on the gas · ← → or A D to steer · Space to use items · Q for your special · C to drift · H to honk · Esc to pause</p>
       </div>
       {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
