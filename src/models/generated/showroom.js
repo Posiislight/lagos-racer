@@ -334,6 +334,23 @@ function driverFigure(id, seat={}){
   g.scale.set(...look.build);
   return g;
 }
+/* Moshood's boys for Push Squad: three area boys in reflective union vests and caps, scowling, hands out to shove.
+   Standing, facing +x, feet at y = 0 about 1.7 m tall. */
+const SQUAD_LOOKS = [
+  { vest:'#f2b705', vestText:'OGA',  shirt:'#c8321e', pants:'#2b2f3a', shoe:'#ece6d6', hat:'capBack', hatColor:'#1f8a4c', mustache:true,  skin:MAT.skin1 },
+  { vest:'#2f9e5b', vestText:'ZONE', shirt:'#f4f1e8', pants:'#4a3a2a', shoe:'#d9a400', hat:'cap',     hatColor:'#c62828', mustache:false, skin:MAT.skin2, shorts:true },
+  { vest:'#e8452c', vestText:'OYA',  shirt:'#2d7dd2', pants:'#37322c', shoe:'#2a2a2a', hatColor:null,                        mustache:true,  skin:MAT.skin1 },
+];
+function squadBoy(i){
+  const look=SQUAD_LOOKS[i%SQUAD_LOOKS.length], s=1.2;
+  const p=person({
+    ...look, hat:look.hat, arms:'bare', angry:2, pose:'stand',
+    hands:{L:[.42,.36,.14], R:[.42,.36,-.14]},
+  });
+  p.scale.setScalar(s); p.position.y=.57*s;
+  const g=new THREE.Group(); g.add(p);
+  return g;
+}
 function fixedChild(parent, child, x,y,z, ry=0, lean=0){
   const h=new THREE.Group(); h.position.set(x,y,z); h.rotation.y=ry; child.rotation.z=-lean; h.add(child); parent.add(h); return h;
 }
@@ -1309,4 +1326,4 @@ function buildBRT(lowerColor, number, driver){
 }
 
 
-export { buildOkada, buildKeke, buildDanfo, buildBRT, person, driverFigure, fixedChild, mat, paint, glow, MAT, mcache, ctex, textTex, plateTex, raceNumberTex, speedTex, checkerTex, ANKARA, ANKARA2, PLAID, GELE, rustTex, V, V2, mesh, rbox, rbGeo, sph, cylm, rod, limb, fender, decal, FACE, rrectShape, profileGeo, capsuleGeo, smoothNormals, sportWheel, carWheel, spokedWheel };
+export { buildOkada, buildKeke, buildDanfo, buildBRT, person, driverFigure, squadBoy, fixedChild, mat, paint, glow, MAT, mcache, ctex, textTex, plateTex, raceNumberTex, speedTex, checkerTex, ANKARA, ANKARA2, PLAID, GELE, rustTex, V, V2, mesh, rbox, rbGeo, sph, cylm, rod, limb, fender, decal, FACE, rrectShape, profileGeo, capsuleGeo, smoothNormals, sportWheel, carWheel, spokedWheel };

@@ -6,7 +6,7 @@ import type { Quality } from './save';
  * screen overlay (ScreenFx) and the chase camera. A plain object, so neither side re-renders React.
  */
 export const fx = {
-  /** 0..1: how strongly the fuel boost shows (speed lines, wider view, shake). Eased in and out. */
+  /** 0..1: how strongly the fuel boost or Push Squad shows (speed lines, wider view, shake). Eased in and out. */
   boost: 0,
   /** Seconds since the player was last hit by juju (Infinity: not recently). */
   juju: Infinity,

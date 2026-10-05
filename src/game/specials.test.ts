@@ -164,14 +164,14 @@ describe('speedFactors', () => {
   });
 
   it('gives Push Squad a steady boost and the cough a slowdown', () => {
-    expect(speedFactors({ ...none, push: 1 })).toEqual({ accel: 1.6, top: 1.18 });
+    expect(speedFactors({ ...none, push: 1 })).toEqual({ accel: 2.6, top: 1.35 });
     expect(speedFactors({ ...none, cough: 1 })).toEqual({ accel: 0.7, top: 0.7 });
   });
 
   it('stacks fuel and Push Squad', () => {
     const f = speedFactors({ ...none, boost: 1, push: 1 });
-    expect(f.accel).toBeCloseTo(3.52, 5);
-    expect(f.top).toBeCloseTo(1.534, 3);
+    expect(f.accel).toBeCloseTo(5.72, 5);
+    expect(f.top).toBeCloseTo(1.755, 3);
   });
 });
 

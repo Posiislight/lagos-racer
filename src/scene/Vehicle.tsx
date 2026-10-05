@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import { RigidBody, RoundCuboidCollider, useAfterPhysicsStep, useBeforePhysicsStep, useRapier, type RapierRigidBody } from '@react-three/rapier';
 import type { DynamicRayCastVehicleController } from '@dimforge/rapier3d-compat';
 import {
-  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CapsuleGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Points, PointsMaterial, Quaternion,
+  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, ConeGeometry, Group, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Points, PointsMaterial, Quaternion,
   SphereGeometry, Vector3,
 } from 'three';
-import { buildVehicleModel } from '../models';
+import { SQUAD_LEAN, buildSquad, buildVehicleModel } from '../models';
 import { getRace, type Racer, type RemoteCar } from '../game/runtime';
 import { bumpShove } from '../game/bump';
 import { sampleAt } from '../game/track';
@@ -67,7 +67,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     racer.bump.x += s.x; racer.bump.z += s.z;
     state.current.bumpCooldown = 0.25;
   };
-  const fx = useMemo(() => effectMeshes(lay), [lay]);
+  const fx = useMemo(() => effectMeshes(lay, racer.driver === 'moshood'), [lay, racer.driver]);
   const [dropped, setDropped] = useState(false);
   // Touching another phone's car: our speed when the contact began, so its push can be capped.
   const push = useRef({ pre: 0, touching: false, before: 0 });
@@ -293,7 +293,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     }
     // Moshood's boys run behind and shove while Push Squad lasts.
     fx.boys.visible = racer.push > 0;
-    if (fx.boys.visible) fx.boys.children.forEach((boy, i) => { boy.position.y = Math.abs(Math.sin(tt * 14 + i * 2)) * 0.14; });
+    if (fx.boys.visible) fx.boys.children.forEach((boy, i) => {
+      // Each boy hops with his stride and rocks into the shove, out of step with the others.
+      boy.position.y = Math.abs(Math.sin(tt * 15 + i * 2)) * 0.16;
+      boy.rotation.z = SQUAD_LEAN + Math.sin(tt * 15 + i * 2) * 0.07;
+    });
     fx.aura.visible = racer.curse > 0;
     if (fx.aura.visible) {
       const p = 1 + Math.sin(tt * 9) * 0.08;
@@ -415,7 +419,7 @@ export function respawn(racer: Racer, b: RapierRigidBody) {
 }
 
 /** Fuel flame out of the back, a purple juju aura and a blue odeshi bubble, all hidden until needed. */
-function effectMeshes(lay: ReturnType<typeof layout>) {
+function effectMeshes(lay: ReturnType<typeof layout>, squad: boolean) {
   const [len, h, w] = lay.half;
   const flame = new Mesh(
     new ConeGeometry(0.35 + h * 0.2, 1.6 + len * 0.25, 10, 1, true).rotateZ(Math.PI / 2).translate(-(0.8 + len * 0.12), 0, 0),
@@ -443,22 +447,10 @@ function effectMeshes(lay: ReturnType<typeof layout>) {
   );
   bubble.position.set(0, lay.originY, 0);
   bubble.visible = false;
-  // Three of the boys, shoving from behind: a capsule body and a round head each, leaning into it.
-  const boys = new Group();
-  boys.position.set(-(len + 0.8), 0, 0);
+  // Moshood's boys shove from behind: three angry agberos in union vests (only built when he is the driver).
+  const boys = squad ? buildSquad(Math.max(0.8, w * 0.8)) : new Group();
+  boys.position.set(-(len + 0.9), 0, 0);
   boys.visible = false;
-  const body = new CapsuleGeometry(0.2, 0.55, 4, 8), head = new SphereGeometry(0.2, 12, 8);
-  ['#e8452c', '#2f9e5b', '#f2b705'].forEach((shirt, i) => {
-    const boy = new Group();
-    const torso = new Mesh(body, new MeshStandardMaterial({ color: shirt, roughness: 0.7 }));
-    torso.position.y = 0.75;
-    const skull = new Mesh(head, new MeshStandardMaterial({ color: i === 1 ? '#6b4326' : '#8a5a36', roughness: 0.6 }));
-    skull.position.y = 1.4;
-    boy.add(torso, skull);
-    boy.rotation.z = -0.35;
-    boy.position.z = (i - 1) * Math.max(0.7, w * 0.8);
-    boys.add(boy);
-  });
   // LASTMA's wheel clamp (placeholder): a yellow block bolted on the front left wheel, with a black bar.
   const [wx, wz] = lay.wheels[0], side = Math.sign(wz) || -1;
   const clamp = new Group();

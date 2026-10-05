@@ -10,6 +10,8 @@ export function buildBRT(lowerColor: string, number: string, driver?: string): G
 export function person(o?: Record<string, unknown>): Group;
 /** Moshood or Mama Put, ready to seat; `seat` carries pose options the vehicle owns (hands, ankle, pose, wave...). Throws for an unknown id. */
 export function driverFigure(id: string, seat?: Record<string, unknown>): Group;
+/** One of Moshood's three Push Squad boys (index 0-2): an angry area boy in a union vest, facing +x, feet at y = 0, hands out to shove. */
+export function squadBoy(i: number): Group;
 export function fixedChild(parent: Object3D, child: Object3D, x: number, y: number, z: number, ry?: number, lean?: number): Group;
 export function mat(color: string, opts?: Record<string, unknown>): Material;
 export function paint(color: string): Material;
