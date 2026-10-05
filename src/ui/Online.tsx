@@ -53,32 +53,40 @@ export function Online() {
         <div className="card online-card">
           <h2>Play with friends</h2>
           <p className="muted">Make a room and send the code, or type the code your friend sent.</p>
-          {nickField}
-          <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
-          <p className="or" aria-hidden="true">or</p>
-          <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
-            <label className="field">
-              <span>Room code</span>
-              <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
-                placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
-            </label>
-            <button className="btn primary" type="submit" disabled={busy}>Join room</button>
-          </form>
+          <div className="online-cols">
+            <div className="online-col">
+              {nickField}
+              <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
+            </div>
+            <p className="or" aria-hidden="true">or</p>
+            <form className="join-row online-col" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
+              <label className="field">
+                <span>Room code</span>
+                <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
+                  placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
+              </label>
+              <button className="btn primary" type="submit" disabled={busy}>Join room</button>
+            </form>
+          </div>
           {note}
           <button className="btn" onClick={() => setFriends(false)}>← Back</button>
         </div>
       ) : (
         <div className="card online-card">
           <h2>Multiplayer</h2>
-          {nickField}
-          <button className="entry primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>
-            <b>QUICK PLAY</b>
-            <span>Jump in and race whoever is online now.</span>
-          </button>
-          <button className="entry" disabled={busy} onClick={() => setFriends(true)}>
-            <b>PLAY WITH FRIENDS</b>
-            <span>Make a room and share the code.</span>
-          </button>
+          <div className="online-cols">
+            <div className="online-col">{nickField}</div>
+            <div className="online-col">
+              <button className="entry primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>
+                <b>QUICK PLAY</b>
+                <span>Jump in and race whoever is online now.</span>
+              </button>
+              <button className="entry" disabled={busy} onClick={() => setFriends(true)}>
+                <b>PLAY WITH FRIENDS</b>
+                <span>Make a room and share the code.</span>
+              </button>
+            </div>
+          </div>
           {note}
           <button className="btn" onClick={leave}>← Back</button>
         </div>

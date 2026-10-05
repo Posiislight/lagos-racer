@@ -239,6 +239,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .online-card { width: min(440px, 100%); display: flex; flex-direction: column; gap: 10px; }
 .online-card h2 { margin-bottom: 0; }
 .online-card .muted { margin: 0; }
+.online-cols, .online-col { display: flex; flex-direction: column; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: 13px; color: var(--muted); }
 .field input {
   font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 10px;
@@ -269,6 +270,15 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 @media (max-height: 480px) {
   .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
   .online-card .muted { display: none; }
+  /* Landscape phone: two columns so nickname, choices and Back fit without scrolling. */
+  .online-card { width: min(720px, 100%); gap: 6px; padding: 10px 14px; }
+  .online-card h2 { font-size: 20px; }
+  .online-cols { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .online-col { flex: 1 1 0; min-width: 0; gap: 6px; }
+  .online-cols > .or { align-self: center; }
+  .online-card .btn { min-height: 42px; padding-top: 6px; padding-bottom: 6px; }
+  .field input { min-height: 40px; padding: 6px 12px; font-size: 16px; }
+  .net-note { min-height: 0; font-size: 13px; }
   .room-code { font-size: 36px; }
 }
 
