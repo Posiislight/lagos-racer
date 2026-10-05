@@ -1,5 +1,5 @@
 import { MathUtils } from 'three';
-import type { RaceRuntime, Racer } from './runtime';
+import { aiState, type AIState, type HumanState, type RaceRuntime, type Racer } from './runtime';
 import { sampleAt } from './track';
 import { isIn } from './modes';
 import { SPECIALS, driverById } from '../config/drivers';
@@ -116,7 +116,8 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
   // Aim at a point ahead on our lane; look further ahead the faster we go.
   const look = 7 + Math.abs(v) * 0.55;
   const aim = sampleAt(track, r.progress.s + look);
-  const ax = aim.pos.x + aim.right.x * ai.lane, az = aim.pos.z + aim.right.z * ai.lane;
+  const line = ai.lane + ai.offset;
+  const ax = aim.pos.x + aim.right.x * line, az = aim.pos.z + aim.right.z * line;
   const dx = ax - pos.x, dz = az - pos.z, len = Math.hypot(dx, dz) || 1;
   const sideAim = (dx * rx + dz * rz) / len, fwdAim = (dx * fx + dz * fz) / len;
   let steer = MathUtils.clamp(Math.atan2(sideAim, fwdAim) * 2.2, -1, 1);
@@ -179,4 +180,85 @@ export function driveAI(r: Racer, race: RaceRuntime, dt: number, leaderGap: numb
   }
 
   c.special = aiSpecial(r, race, dt);
+}
+
+/** A Quick race bot's skill range: close to a mid-level human. */
+export const BOT_SKILL = [0.85, 1.0] as const;
+
+/** A Quick race bot's AI, with a fresh skill in the bot range (a bot handed to this phone mid-race rolls one). */
+export function botAI(lane: number, rand: () => number = Math.random): AIState {
+  return aiState(lane, BOT_SKILL[0] + rand() * (BOT_SKILL[1] - BOT_SKILL[0]), 2);
+}
+
+// The human-ness layer's limits.
+const START_DELAY = 0.4; // s, longest pause at the green light
+const WOBBLE = 0.15; // of the track's half-width, widest lane wobble
+const MISTAKE_GAP = 25; // s, least time between two mistakes
+const MISTAKE_LONG = 0.6; // s, longest mistake
+const HOLD = [0.5, 3] as const; // s, how long a power-up is held before use
+// The longest frame (RaceLogic clamps dt to it): a hold or a mistake ends on a whole frame, so leave room for one.
+const FRAME = 0.05;
+
+function humanState(): HumanState {
+  return {
+    startDelay: Math.random() * START_DELAY,
+    amp: WOBBLE * (0.3 + Math.random() * 0.7), phase: Math.random() * Math.PI * 2, rate: 0.4 + Math.random() * 0.5,
+    mistake: 0, mistakeKind: 'lift', nextMistake: 6 + Math.random() * 20,
+    item: null, held: 0, hold: 0, wants: false,
+  };
+}
+
+/**
+ * Makes a Quick race bot drive like a person, on top of what `driveAI` decided this frame: a slightly late start at
+ * the green light, a gentle wobble across its lane, now and then a small mistake in a bend (a brief lift, or a wide
+ * line), and a power-up held a moment before it is used. Only for bots in Quick rooms (`race.humanize`); every other
+ * AI is left exactly as `driveAI` made it.
+ */
+export function humanize(r: Racer, dt: number, race: RaceRuntime) {
+  const ai = r.ai;
+  if (!race.humanize || !ai) return;
+  const h = (ai.human ??= humanState());
+  const c = r.controls;
+
+  // Wobble: a slow sway of the line it aims at, never more than WOBBLE of the half-width.
+  h.phase += dt * h.rate;
+  ai.offset = h.amp * race.config.halfWidth * Math.sin(h.phase);
+
+  // Power-ups: held for a while first; if the AI wanted to use it sooner, it goes the moment the hold is up.
+  if (r.item !== h.item) {
+    h.item = r.item;
+    h.held = 0;
+    h.wants = false;
+    h.hold = HOLD[0] + Math.random() * (HOLD[1] - FRAME - HOLD[0]);
+  }
+  if (r.item) {
+    if (h.held < h.hold) {
+      if (c.useItem) h.wants = true;
+      c.useItem = false;
+    } else if (h.wants) {
+      c.useItem = true;
+      h.wants = false;
+    }
+    h.held += dt;
+  }
+
+  if (race.phase !== 'racing') return;
+  // Late off the line: no throttle (and no brake, which would reverse) until the delay is up by the next frame.
+  if (race.clock + dt <= h.startDelay) { c.throttle = 0; c.brake = 0; return; }
+
+  // The odd small mistake in a bend.
+  if (h.mistake > 0) {
+    h.mistake = Math.max(0, h.mistake - dt);
+  } else if (race.clock >= h.nextMistake && Math.random() < dt * 0.4) {
+    const bend = Math.abs(race.track.points[sampleAt(race.track, r.progress.s + 10).index].curvature) > 0.015;
+    if (bend) {
+      h.mistake = 0.25 + Math.random() * (MISTAKE_LONG - FRAME - 0.25);
+      h.mistakeKind = Math.random() < 0.5 ? 'lift' : 'wide';
+      h.nextMistake = race.clock + MISTAKE_GAP + Math.random() * 20;
+    }
+  }
+  if (h.mistake > 0) {
+    if (h.mistakeKind === 'lift') c.throttle = 0;
+    else c.steer *= 0.4;
+  }
 }

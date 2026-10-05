@@ -5,7 +5,7 @@ import { BOT_SLOT_BASE, GRID_SIZE } from '../src/net/protocol';
 export const BOT_NAMES: readonly string[] = [
   'Tunde', 'Chidi_K', 'Femi99', 'Ngozi', 'Emeka', 'Bayo', 'Kelechi', 'Ife', 'Segun_X', 'Yinka',
   'Uche', 'Dayo', 'Chuka', 'Tobi', 'Wale', 'Kunle', 'Ada', 'Ibrahim', 'Musa', 'Sade',
-  'Naza', 'Jide', 'Obinna', 'Tola', 'Gbenga', 'Nneka', 'Lekan', 'Zainab', 'Damola', 'Efe',
+  'Nazo', 'Jide', 'Obinna', 'Tola', 'Gbenga', 'Nneka', 'Lekan', 'Zainab', 'Damola', 'Efe',
   'Osas', 'Amaka', 'Seyi', 'Bukky', 'Chinedu', 'Folake', 'Tayo', 'Ikenna', 'Kemi', 'Dele',
   'Abiola', 'Toyin', 'Nonso', 'Rotimi', 'Hauwa', 'Biodun', 'Lagos Boy', 'Wahala', 'No Wahala', 'Omo Ibadan',
   'Sharp Guy', 'Baddest 01', 'Fast Fada', 'Oga Tunde', 'Area Boy 23', 'Small Chops', 'Jollof King', 'Pepe', 'Gbam', 'Eko Baba',

@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { VEHICLES, ownsPaint, paintKey, paintPrice, vehicleById, type VehicleId } from '../config/vehicles';
 import { driverAvailable, settle } from './campaign';
 import { CHAPTER_1, type RaceSpec } from '../config/campaign';
+import { roomPayout, upgradePrice, type Stars } from '../config/economy';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
-import { loadSave, writeSave, type Saved, type Settings } from './save';
+import { loadSave, roomEarnedToday, todayKey, writeSave, type Saved, type Settings } from './save';
+import { levelsFor, type UpgradeKind } from './upgrades';
 
 export type { Quality, Settings } from './save';
 export type Screen = 'menu' | 'garage' | 'campaign' | 'online' | 'lobby' | 'race';
@@ -16,8 +18,8 @@ export type Screen = 'menu' | 'garage' | 'campaign' | 'online' | 'lobby' | 'race
  */
 export type Result = { name: string; vehicle: VehicleId; color: string; time: number | null; projected: boolean; best: number | null; isPlayer: boolean; out: number | null; dnf?: boolean };
 
-/** What a finished campaign race meant for the player (null for a quick race). */
-export type Outcome = { place: number; passed: boolean; firstClear: boolean; unlocked: DriverId | null };
+/** What a finished campaign race meant for the player (null for a room race). */
+export type Outcome = { place: number; stars: Stars; newBest: boolean; passed: boolean; firstClear: boolean; unlocked: DriverId | null };
 
 /** HUD values, refreshed a few times a second by the race loop (not every frame). */
 export type Hud = {
@@ -47,7 +49,7 @@ const initial = loadSave();
 const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 if (query?.get('unlock') === 'all') {
   initial.unlocked = ['brt'];
-  initial.campaign = { cleared: CHAPTER_1.map(s => s.id) };
+  initial.campaign = { cleared: CHAPTER_1.map(s => s.id), stars: Object.fromEntries(CHAPTER_1.map(s => [s.id, 3 as Stars])) };
   initial.ownedPaints = VEHICLES.flatMap(v => v.paints.map(p => paintKey(v.id, p.id)));
 }
 const premiumParam = Number(query?.get('premium'));
@@ -56,16 +58,21 @@ if (query?.has('premium') && Number.isFinite(premiumParam)) initial.premium = Ma
 export type State = Saved & {
   screen: Screen;
   raceId: number;
-  /** The campaign race being run (null for a quick race). */
+  /** The campaign race being run (null for a room race). */
   spec: RaceSpec | null;
-  /** How the last race went, for the results card (null for a quick race). */
+  /** How the last race went, for the results card (null for a room race). */
   outcome: Outcome | null;
   /** True while the race is a room race (Race with friends). */
   online: boolean;
   paused: boolean;
   hud: Hud;
   results: Result[] | null;
+  /** Naira paid by the last race. */
   coinsEarned: number;
+  /** Stars won by the last campaign race (0 for a room race). */
+  earnedStars: Stars;
+  /** True when the last room race hit the daily cap. */
+  roomCapped: boolean;
   showAccountPrompt: boolean;
   setScreen: (s: Screen) => void;
   setTrack: (id: string) => void;
@@ -81,17 +88,19 @@ export type State = Saved & {
   countItemHint: () => void;
   /** Unlocks a locked vehicle for its premium price. */
   unlock: (v: VehicleId) => void;
+  /** Buy the next level of one upgrade. True if it was bought. */
+  buyUpgrade: (v: VehicleId, kind: UpgradeKind) => boolean;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
-  /** Start a campaign race, or a quick race when no spec is given. */
-  startRace: (spec?: RaceSpec) => void;
+  /** Start a campaign race. */
+  startRace: (spec: RaceSpec) => void;
   startOnlineRace: () => void;
   quitRace: () => void;
   setPaused: (p: boolean) => void;
   setHud: (h: Partial<Hud>) => void;
   flash: (message: string) => void;
   /** `place` is the player's 1-based finishing place. */
-  /** `room` is set for a room race: its coins come from the server's results and its best lap is on the room's track. */
-  finishRace: (results: Result[], place: number, bestLap: number | null, room?: { coins: number; trackId: string }) => void;
+  /** `room` is set for a room race: it pays half, capped per day, and its best lap is on the room's track. */
+  finishRace: (results: Result[], place: number, bestLap: number | null, room?: { trackId: string; dnf: boolean }) => void;
   dismissAccountPrompt: () => void;
 };
 
@@ -112,6 +121,8 @@ export const useGame = create<State>((set, get) => ({
   hud: emptyHud(),
   results: null,
   coinsEarned: 0,
+  earnedStars: 0,
+  roomCapped: false,
   showAccountPrompt: false,
   setScreen: screen => set({ screen }),
   setTrack: track => { set({ track }); save(); },
@@ -149,17 +160,25 @@ export const useGame = create<State>((set, get) => ({
     set({ premium: s.premium - rule.premium, unlocked: [...s.unlocked, v], vehicle: v });
     save();
   },
+  buyUpgrade: (v, kind) => {
+    const s = get(), config = VEHICLES.find(x => x.id === v);
+    if (!config || (config.locked && !s.unlocked.includes(v))) return false;
+    const levels = levelsFor(s.upgrades, v), price = upgradePrice(levels[kind]);
+    if (price === null || s.coins < price) return false;
+    set({ coins: s.coins - price, upgrades: { ...s.upgrades, [v]: { ...levels, [kind]: levels[kind] + 1 } } });
+    save();
+    return true;
+  },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
-  startRace: spec => set(s => ({ screen: 'race', online: false, spec: spec ?? null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  startRace: spec => set(s => ({ screen: 'race', online: false, spec, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, earnedStars: 0, roomCapped: false, showAccountPrompt: false })),
   // Room races are always on the server's track (see ONLINE_TRACK); the solo track pick is left alone.
-  startOnlineRace: () => set(s => ({ screen: 'race', online: true, spec: null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
+  startOnlineRace: () => set(s => ({ screen: 'race', online: true, spec: null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, earnedStars: 0, roomCapped: false, showAccountPrompt: false })),
   quitRace: () => set({ screen: 'menu', online: false, paused: false, results: null }),
   setPaused: paused => set({ paused }),
   setHud: h => set(s => ({ hud: { ...s.hud, ...h } })),
   flash: message => set(s => ({ hud: { ...s.hud, message, messageKey: s.hud.messageKey + 1 } })),
   finishRace: (results, place, bestLap, room) => {
     const s = get();
-    const settled = room ? { ...settle(null, place, s.campaign.cleared), coins: room.coins } : settle(s.spec, place, s.campaign.cleared);
     // The best lap belongs to the track the race was run on, which a campaign race picks for itself.
     const trackId = room?.trackId ?? s.spec?.track ?? s.track;
     const best = { ...s.best };
@@ -167,8 +186,19 @@ export const useGame = create<State>((set, get) => ({
     const races = s.races + 1;
     // Let people play straight away; after their second race, suggest an account to keep coins.
     const showAccountPrompt = races >= 2 && !s.accountPromptDismissed;
-    const outcome = s.spec ? { place, passed: settled.passed, firstClear: settled.firstClear, unlocked: settled.unlocked } : null;
-    set({ results, coins: s.coins + settled.coins, coinsEarned: settled.coins, outcome, campaign: { cleared: settled.cleared }, best, races, showAccountPrompt });
+    const base = { results, best, races, showAccountPrompt };
+    if (room) {
+      const paid = roomPayout(place, room.dnf, roomEarnedToday(s));
+      const today = todayKey();
+      const roomEarned = { day: today, naira: (s.roomEarned.day === today ? s.roomEarned.naira : 0) + paid.naira };
+      set({ ...base, coins: s.coins + paid.naira, coinsEarned: paid.naira, earnedStars: 0, roomCapped: paid.capped, outcome: null, roomEarned });
+    } else if (s.spec) {
+      const settled = settle(s.spec, place, s.campaign);
+      const outcome = { place, stars: settled.stars, newBest: settled.newBest, passed: settled.passed, firstClear: settled.firstClear, unlocked: settled.unlocked };
+      set({ ...base, coins: s.coins + settled.payout, coinsEarned: settled.payout, earnedStars: settled.stars, roomCapped: false, outcome, campaign: settled.saved });
+    } else {
+      set(base);
+    }
     save();
   },
   dismissAccountPrompt: () => { set({ accountPromptDismissed: true, showAccountPrompt: false }); save(); },
@@ -177,8 +207,8 @@ export const useGame = create<State>((set, get) => ({
 function save() {
   const s = useGame.getState();
   writeSave({
-    settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
+    settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades,
     accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, premium: s.premium, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
-    campaign: s.campaign,
+    campaign: s.campaign, roomEarned: s.roomEarned,
   });
 }

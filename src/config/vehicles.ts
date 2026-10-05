@@ -45,6 +45,8 @@ export type VehicleConfig = {
     yawAssist: number;
     /** How far the body visually leans into corners, radians at full lateral load. */
     lean: number;
+    /** Multiplies the speed lost to crashes and wall scrapes (1 = normal, lower = tougher). */
+    impact: number;
   };
   camera: { distance: number; height: number; lookAhead: number };
   horn: { freqs: number[]; pattern: number[] };
@@ -63,7 +65,7 @@ export const VEHICLES: VehicleConfig[] = [
     wheels: { frontX: 0.68, rearX: -0.63, frontZ: 0.3, rearZ: 0.3, radius: 0.31 },
     tuning: {
       mass: 260, topSpeed: 33, accel: 9.5, steer: 0.5, steerAtSpeed: 0.38, grip: 9, driftGrip: 0.45, brake: 9,
-      suspension: { rest: 0.35, stiffness: 40, compression: 3, relaxation: 3.6 }, yawAssist: 0.8, lean: 0.55,
+      suspension: { rest: 0.35, stiffness: 40, compression: 3, relaxation: 3.6 }, yawAssist: 0.8, lean: 0.55, impact: 1,
     },
     camera: { distance: 6.2, height: 2.4, lookAhead: 4 },
     horn: { freqs: [880, 1175], pattern: [0.09, 0.06, 0.09] },
@@ -78,7 +80,7 @@ export const VEHICLES: VehicleConfig[] = [
     wheels: { frontX: 1.04, rearX: -0.72, frontZ: 0.42, rearZ: 0.655, radius: 0.25 },
     tuning: {
       mass: 420, topSpeed: 27, accel: 7.2, steer: 0.48, steerAtSpeed: 0.42, grip: 7.5, driftGrip: 0.5, brake: 8,
-      suspension: { rest: 0.32, stiffness: 34, compression: 2.6, relaxation: 3.2 }, yawAssist: 0.6, lean: -0.16,
+      suspension: { rest: 0.32, stiffness: 34, compression: 2.6, relaxation: 3.2 }, yawAssist: 0.6, lean: -0.16, impact: 1,
     },
     camera: { distance: 6.6, height: 2.8, lookAhead: 4 },
     horn: { freqs: [520, 660], pattern: [0.12, 0.05, 0.12, 0.05, 0.12] },
@@ -93,7 +95,7 @@ export const VEHICLES: VehicleConfig[] = [
     wheels: { frontX: 1.5, rearX: -1.5, frontZ: 0.92, rearZ: 0.92, radius: 0.42 },
     tuning: {
       mass: 950, topSpeed: 28.5, accel: 6.6, steer: 0.45, steerAtSpeed: 0.45, grip: 8, driftGrip: 0.5, brake: 7,
-      suspension: { rest: 0.36, stiffness: 30, compression: 2.4, relaxation: 3 }, yawAssist: 0.9, lean: -0.07,
+      suspension: { rest: 0.36, stiffness: 30, compression: 2.4, relaxation: 3 }, yawAssist: 0.9, lean: -0.07, impact: 1,
     },
     camera: { distance: 9, height: 3.6, lookAhead: 5 },
     horn: { freqs: [392, 494], pattern: [0.25, 0.08, 0.4] },
@@ -109,7 +111,7 @@ export const VEHICLES: VehicleConfig[] = [
     wheels: { frontX: 3.3, rearX: -3.3, frontZ: 1.1, rearZ: 1.1, radius: 0.6 },
     tuning: {
       mass: 2400, topSpeed: 26, accel: 5.4, steer: 0.42, steerAtSpeed: 0.5, grip: 8.5, driftGrip: 0.55, brake: 6,
-      suspension: { rest: 0.45, stiffness: 28, compression: 2.4, relaxation: 3 }, yawAssist: 1.3, lean: -0.04,
+      suspension: { rest: 0.45, stiffness: 28, compression: 2.4, relaxation: 3 }, yawAssist: 1.3, lean: -0.04, impact: 1,
     },
     camera: { distance: 13, height: 5, lookAhead: 6 },
     horn: { freqs: [220, 277, 330], pattern: [0.5, 0.1, 0.5] },

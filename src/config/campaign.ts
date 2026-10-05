@@ -21,42 +21,37 @@ export type RaceSpec = RaceSetup & {
   rule: string;
   /** Finish this place or better to pass. */
   pass: { place: number };
-  /** Coins by 1-based place; the last entry repeats for every place below it. */
-  coins: number[];
-  /** Extra coins the first time this race is passed. */
-  firstClearCoins: number;
+  /** Stars by 1-based place (first place is entry 0); places beyond the table earn none. Missing means `DEFAULT_STARS`. */
+  stars?: number[];
   /** Unlocked the first time this race is passed. */
   reward?: { driver: DriverId };
   /** Mama Put's lines: before the start, when she wins, when she loses. */
   taunts?: { before: string; win: string; lose: string };
 };
 
-/** What a quick race (and campaign races 1-3) pay by place. */
-export const QUICK_COINS = [150, 100, 60, 30, 20];
-
 export const CHAPTER_1: RaceSpec[] = [
   {
     id: 'campaign-1-1', title: 'Ojuelegba Hustle', track: 'ojuelegba', mode: { kind: 'laps', laps: 3 },
     excludeDrivers: ['mamaput'],
     story: 'Under the bridge, round the market. Finish top three to move on.', rule: 'Top 3 to move on',
-    pass: { place: 3 }, coins: QUICK_COINS, firstClearCoins: 100,
+    pass: { place: 3 },
   },
   {
     id: 'campaign-1-2', title: 'Third Mainland Dash', track: 'third-mainland', mode: { kind: 'laps', laps: 2 },
     excludeDrivers: ['mamaput'],
     story: 'Up the ramp, over the lagoon, home through the water village. Top three again.', rule: 'Top 3 to move on',
-    pass: { place: 3 }, coins: QUICK_COINS, firstClearCoins: 100,
+    pass: { place: 3 },
   },
   {
     id: 'campaign-1-3', title: 'LASTMA Is Coming', track: 'ojuelegba', mode: { kind: 'elimination', first: 20, step: 2, floor: 10 },
     excludeDrivers: ['mamaput'],
     story: 'Every 20 seconds LASTMA clamps whoever is last. Do not be last.', rule: 'Last place is clamped every 20 s',
-    pass: { place: 3 }, coins: QUICK_COINS, firstClearCoins: 100,
+    pass: { place: 3 },
   },
   {
     id: 'campaign-1-4', title: "Mama Put's Challenge", track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.06 },
     story: 'Mama Put has heard you are fast. One road, one pot, no mercy. Beat her and she rides with you.', rule: 'Beat her to win',
-    pass: { place: 1 }, coins: [200, 40], firstClearCoins: 300, reward: { driver: 'mamaput' },
+    pass: { place: 1 }, stars: [3], reward: { driver: 'mamaput' },
     taunts: { before: 'Oga, you go pay for that jollof.', win: 'Shine your eye, small boy.', lose: 'Next time carry your own pot.' },
   },
 ];

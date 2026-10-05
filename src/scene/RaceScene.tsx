@@ -8,6 +8,7 @@ import { STREET, TRACKS, trackOrDefault, type Setting } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
+import { levelsFor } from '../game/upgrades';
 import { useGame, type Quality } from '../game/store';
 import { resetPlayerInput } from '../game/input';
 import { getSession, useNet } from '../net/store';
@@ -47,7 +48,7 @@ export function RaceScene() {
     const roomTrack = session ? useNet.getState().pendingGrid?.trackId : undefined;
     const track = roomTrack && TRACKS.some(t => t.id === roomTrack) ? roomTrack : trackId;
     const race = session ? { track, mode: { kind: 'laps' as const, laps: trackOrDefault(track).laps } } : (spec ?? { track, mode: { kind: 'laps' as const, laps: trackOrDefault(track).laps } });
-    return { setup: makeRace(race, { vehicle: vehicleById(vehicle).id, paint }, driver, session ? null : spec, session?.setup), session };
+    return { setup: makeRace(race, { vehicle: vehicleById(vehicle).id, paint }, driver, session ? null : spec, session?.setup, levelsFor(useGame.getState().upgrades, vehicle)), session };
   }, [raceId, trackId, spec, vehicle, paint, driver, online]);
   // Publish the race for the frame loops. A layout effect (not render) so StrictMode's
   // mount/unmount/mount cycle ends with the race set.
@@ -64,7 +65,7 @@ export function RaceScene() {
       {/* A room race never stops for one phone's menu. */}
       <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
         <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={quality !== 'low'} />
-        {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} />)}
+        {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} quick={setup.race.humanize} />)}
       </Physics>
       <Effects />
       <Critters />

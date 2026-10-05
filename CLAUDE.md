@@ -98,11 +98,15 @@ Let people play straight away with no sign-up. After their first race or two, pr
 
 Milestones 1–3 are built, and milestone 4 is partly done.
 
-**Current milestone: multiplayer, friends' private rooms** (2–6 players by room code or link, with optional AI fill). Design: `docs/superpowers/specs/2026-10-03-multiplayer-design.md`. Public matchmaking is still out of scope.
+**Current milestone: multiplayer, friends' private rooms** (2–6 players by room code or link, with optional AI fill). Design: `docs/superpowers/specs/2026-10-03-multiplayer-design.md`. Public matchmaking beyond Quick race is still out of scope.
+
+**Quick race** (part of the multiplayer milestone): a public room anyone can join from the Online screen. It waits 30 s for more players, everyone votes on the track, and bots fill the grid. Bots are disguised as human players, arrive over the wait, and stay silent on voice; they earn no coins and no leaderboard entries. Spec `docs/superpowers/specs/2026-10-05-quick-race-design.md`, plan `docs/superpowers/plans/2026-10-05-quick-race.md`. Voice chat is a separate, later spec.
 
 **Single-player campaign** (started on 4 October at the user's request, separate from the multiplayer milestone): Chapter 1 is four races, two per map (Ojuelegba, Ikorodu Garage): a normal race, a normal race, an elimination race (LASTMA clamps whoever is last on a timer), and a hard 1-on-1 duel with Mama Put. Finishing the duel unlocks Mama Put as a playable driver; she stays locked in the Garage until `campaign-1-4` is cleared. Config in `src/config/campaign.ts`, rules in `src/game/campaign.ts`, race modes in `src/game/modes.ts`, race setup in `src/game/setup.ts`. In the campaign only the duel's AI (Mama Put) uses its driver special. Spec `docs/superpowers/specs/2026-10-04-campaign-design.md`, plan `docs/superpowers/plans/2026-10-04-campaign.md`, GitHub issue #4.
 
 **Audio** (5 October): no musical soundtrack; a looping Lagos street ambience plays in races. Every sound is synthesised in `src/game/audio.ts` and can be replaced by a recording in `public/audio/` (names and volumes in `src/config/sounds.ts`, file list in `public/audio/README.md`); a missing file falls back to synth. A juju aimed at the player hums louder as it closes in (`src/game/warnings.ts`). Spec `docs/superpowers/specs/2026-10-05-audio-design.md`.
+
+**Stars and naira** (spec `docs/superpowers/specs/2026-10-05-menu-stars-economy-design.md`): races pay by the stars earned in that run, every time: 1st ★★★ = ₦100,000, 2nd ★★ = ₦60,000, 3rd ★ = ₦30,000, nothing below 3rd (the duel overrides to win = ★★★ only). Best stars per race are saved (`campaign.stars`); a race counts as passed with at least one star. Only race 1 starts open; each next race opens when the one before is passed. Room races pay half with a ₦300,000 daily cap (`src/config/economy.ts`). The main menu has only two entries, Single player and Multiplayer (no quick race), with Garage and Settings as small icon buttons. Phones are forced to landscape: a rotate prompt (`src/ui/RotatePrompt.tsx`) covers every screen in portrait and pauses a race in progress.
 
 Do not start a later milestone until the earlier one feels fun.
 

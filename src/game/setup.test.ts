@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import { VEHICLES } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
+import { BOT_SKILL } from './ai';
 import { makeRace, type OnlineSetup } from './setup';
 
 const okada = { vehicle: 'okada' as const, paint: VEHICLES.find(v => v.id === 'okada')!.paints[0].id };
@@ -111,7 +112,7 @@ const grid: GridEntry[] = [
   { netId: 2, slot: 1, name: 'Area Fada', vehicle: 'brt', paint: 'red', ai: true },
   { netId: 3, slot: 2, name: 'Oga Landlord', vehicle: 'okada', paint: 'no-such-paint', ai: true },
 ];
-const online = (mySlot: number, seed = 1234): OnlineSetup => ({ grid, mySlot, seed });
+const online = (mySlot: number, seed = 1234, quick = false): OnlineSetup => ({ grid, mySlot, seed, quick });
 const room = (mySlot: number, seed?: number) => makeRace(laps, okada, 'moshood', null, online(mySlot, seed));
 
 describe('makeRace: offline kinds', () => {
@@ -143,6 +144,12 @@ describe('makeRace: online', () => {
     expect(spawns).toEqual(makeRace(laps, okada, 'moshood').spawns.slice(0, 4));
   });
 
+  it('only a Quick room makes its bots drive like people', () => {
+    expect(room(1).race.humanize).toBe(false);
+    expect(makeRace(laps, okada, 'moshood', null, online(1, 1234, true)).race.humanize).toBe(true);
+    expect(makeRace(laps, okada, 'moshood').race.humanize).toBe(false);
+  });
+
   it('hazard ids start at mySlot × 100000', () => {
     expect(room(1).race.nextId).toBe(100000);
     expect(room(3).race.nextId).toBe(300000);
@@ -158,5 +165,17 @@ describe('makeRace: online', () => {
     expect(skills(a)).toEqual(skills(b));
     expect(skills(a).slice(2).every(s => s !== null && s >= 0.9)).toBe(true);
     expect(skills(c)).not.toEqual(skills(a));
+  });
+
+  it('a Quick room gives its bots a skill in the bot range; other rooms keep the rival skill', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const quick = makeRace(laps, okada, 'moshood', null, online(2, seed, true)).race;
+      const bot = quick.racers[3].ai!;
+      expect(bot.skill).toBeGreaterThanOrEqual(BOT_SKILL[0]);
+      expect(bot.skill).toBeLessThanOrEqual(BOT_SKILL[1]);
+      // The rival formula for netId 3 is 0.9 + 3 × 0.035 + up to 0.03, always above the bot range.
+      const friends = room(2, seed).race;
+      expect(friends.racers[3].ai!.skill).toBeGreaterThan(1.0);
+    }
   });
 });

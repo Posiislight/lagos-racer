@@ -139,7 +139,7 @@ describe('items online', () => {
 
   it('juju aimed at a remote car keeps homing and is only removed by a hit event', () => {
     const sent: ClientMessage[] = [];
-    const session = new NetSession({ sendJson: m => { sent.push(m); }, sendBinary: () => {} }, new ClockSync(), { grid: [], mySlot: 1, seed: 1, raceSeq: 1 });
+    const session = new NetSession({ sendJson: m => { sent.push(m); }, sendBinary: () => {} }, new ClockSync(), { grid: [], mySlot: 1, seed: 1, raceSeq: 1, quick: false });
     const remote = racer(0, 'remote', 40, 4);
     const local = racer(1, 'local', 18);
     const race = makeTestRace([remote, local]);

@@ -1,11 +1,14 @@
 import { VEHICLES, ownsPaint, paintKey, vehicleById, type VehicleId } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
 import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
-import { driverAvailable, sanitizeCleared } from './campaign';
+import { driverAvailable, sanitizeCleared, sanitizeStars, type CampaignSave } from './campaign';
+import { sanitizeUpgrades, type UpgradeMap } from './upgrades';
 
 /**
  * What the game keeps in localStorage between visits. Version 2 has four vehicles with paints; a
- * version 1 save (six vehicles, two of them colour twins) is migrated once on load.
+ * version 1 save (six vehicles, two of them colour twins) is migrated once on load. Campaign stars
+ * and room earnings were added to version 2 without changing the key: a save without them loads
+ * with one star per race already cleared and no room earnings.
  */
 export type Quality = 'low' | 'medium' | 'high';
 export type Settings = { quality: Quality; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
@@ -17,6 +20,8 @@ export type Saved = {
   races: number;
   vehicle: VehicleId;
   unlocked: VehicleId[];
+  /** Stat upgrade levels bought per vehicle. */
+  upgrades: UpgradeMap;
   accountPromptDismissed: boolean;
   /** Chosen paint id per vehicle (missing: the vehicle's usual colour). Always a paint the player owns. */
   paint: Partial<Record<VehicleId, string>>;
@@ -32,8 +37,10 @@ export type Saved = {
   driver: DriverId;
   /** The chosen track id. */
   track: string;
-  /** Campaign progress: ids of the races passed so far. */
-  campaign: { cleared: string[] };
+  /** Campaign progress: ids of the races passed so far, and the stars (1 to 3) earned in each. */
+  campaign: CampaignSave;
+  /** Naira earned in friends' rooms on one local day (the daily cap resets when the day changes). */
+  roomEarned: { day: string; naira: number };
 };
 
 export const SAVE_KEY = 'lagos-racer:v2';
@@ -49,12 +56,23 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const num = (x: unknown, fallback: number) => (typeof x === 'number' && isFinite(x) ? x : fallback);
+
+/** The local date as YYYY-MM-DD. */
+export function todayKey(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** Naira earned in rooms today (0 if the saved amount is from an earlier day). */
+export function roomEarnedToday(saved: Pick<Saved, 'roomEarned'>, now: Date = new Date()): number {
+  return saved.roomEarned.day === todayKey(now) ? saved.roomEarned.naira : 0;
+}
 
 /** Old vehicle ids: the colour twins became one vehicle with a paint. */
 const OLD_IDS: Record<string, { vehicle: VehicleId; paint?: string }> = {
@@ -89,7 +107,13 @@ function sanitizeAdViews(raw: unknown): Saved['adViews'] {
 export function normaliseSave(raw: Record<string, unknown>): Saved {
   const d = defaultSave();
   const unlocked = Array.isArray(raw.unlocked) ? [...new Set(raw.unlocked.filter((v): v is VehicleId => typeof v === 'string' && IDS.has(v)))] : [];
-  const cleared = sanitizeCleared(isObj(raw.campaign) ? raw.campaign.cleared : undefined);
+  const rawCampaign = isObj(raw.campaign) ? raw.campaign : {};
+  const stars = sanitizeStars(rawCampaign.stars);
+  // A race with stars counts as cleared; a race cleared before stars existed gets one.
+  const cleared = sanitizeCleared([...(Array.isArray(rawCampaign.cleared) ? rawCampaign.cleared : []), ...Object.keys(stars)]);
+  for (const id of cleared) if (!(id in stars)) stars[id] = 1;
+  const rawRoom = isObj(raw.roomEarned) ? raw.roomEarned : {};
+  const roomEarned = { day: typeof rawRoom.day === 'string' ? rawRoom.day : '', naira: Math.max(0, num(rawRoom.naira, 0)) };
   const driver = sanitizeDriver(raw.driver);
   const { paint, ownedPaints } = sanitizePaints(raw.paint, raw.ownedPaints);
   return {
@@ -99,6 +123,7 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     races: num(raw.races, 0),
     vehicle: typeof raw.vehicle === 'string' && IDS.has(raw.vehicle) ? raw.vehicle as VehicleId : d.vehicle,
     unlocked,
+    upgrades: sanitizeUpgrades(raw.upgrades),
     accountPromptDismissed: raw.accountPromptDismissed === true,
     paint,
     ownedPaints,
@@ -108,7 +133,8 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     // A driver the campaign has not unlocked yet falls back to the default.
     driver: driverAvailable(driver, cleared) ? driver : DEFAULT_DRIVER,
     track: typeof raw.track === 'string' && TRACKS.some(t => t.id === raw.track) ? raw.track : d.track,
-    campaign: { cleared },
+    campaign: { cleared, stars },
+    roomEarned,
   };
 }
 

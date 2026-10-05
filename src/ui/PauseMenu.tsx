@@ -15,7 +15,7 @@ export function PauseMenu() {
         <p className="muted">{online ? 'The race no dey wait o. Your car still dey road.' : 'Take am easy. The danfo go wait.'}</p>
         <div className="col">
           <button className="btn primary" onClick={() => setPaused(false)}>Resume</button>
-          {!online && <button className="btn" onClick={() => startRace(useGame.getState().spec ?? undefined)}>Restart race</button>}
+          {!online && useGame.getState().spec && <button className="btn" onClick={() => startRace(useGame.getState().spec!)}>Restart race</button>}
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
           {online
             ? <button className="btn ghost" onClick={leaveRace}>Leave race</button>

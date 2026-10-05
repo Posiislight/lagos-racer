@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   CODE_ALPHABET,
   MAX_MESSAGE_BYTES,
+  MAX_QUICK_ROOMS,
   RATE_LIMIT_PER_S,
   ROOM_IDLE_MS,
   LOBBY_SILENCE_MS,
@@ -25,7 +26,7 @@ export interface Peer {
   close(dead?: boolean): void;
 }
 
-type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
+type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'quick' | 'vote' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
 
 /** One second's count of JSON messages. */
 type Budget = { start: number; count: number };
@@ -102,6 +103,12 @@ function parse(raw: string): Handled | null {
       const paint = paintIn(o.paint);
       return typeof o.name === 'string' && isVehicle(o.vehicle) && paint !== null ? { t: 'create', name: o.name, vehicle: o.vehicle, paint } : null;
     }
+    case 'quick': {
+      const paint = paintIn(o.paint);
+      return typeof o.name === 'string' && isVehicle(o.vehicle) && paint !== null ? { t: 'quick', name: o.name, vehicle: o.vehicle, paint } : null;
+    }
+    case 'vote':
+      return typeof o.trackId === 'string' && o.trackId.length <= 40 ? { t: 'vote', trackId: o.trackId } : null;
     case 'join': {
       const paint = paintIn(o.paint);
       return typeof o.code === 'string' && typeof o.name === 'string' && isVehicle(o.vehicle) && paint !== null
@@ -186,9 +193,10 @@ export class RoomServer {
     if (!m) return;
 
     if (m.t === 'ping') return this.send(conn, { t: 'pong', c: m.c, s: this.now() });
-    if (m.t === 'create' || m.t === 'join' || m.t === 'resume') {
+    if (m.t === 'create' || m.t === 'join' || m.t === 'quick' || m.t === 'resume') {
       if (c.room) return;
       if (m.t === 'create') this.create(conn, c, m.name, m.vehicle, m.paint);
+      else if (m.t === 'quick') this.quick(conn, c, m.name, m.vehicle, m.paint);
       else if (m.t === 'join') this.join(conn, c, m.code, m.name, m.vehicle, m.paint);
       else this.resume(conn, c, m.token);
       return;
@@ -202,6 +210,11 @@ export class RoomServer {
       return;
     }
     room.lastActivity = this.now();
+    if (m.t === 'vote') {
+      // Only a changed vote is broadcast.
+      if (room.vote(c.slot, m.trackId)) room.broadcastRoom();
+      return;
+    }
     if (m.t === 'leave') this.leave(c, room);
     else if (m.t === 'lobby') this.lobby(conn, c, room, m);
     else if (m.t === 'start') this.start(conn, c, room);
@@ -287,7 +300,7 @@ export class RoomServer {
     this.send(conn, { t: 'error', error });
   }
 
-  private newRoom(): Room | null {
+  private newRoom(quick = false): Room | null {
     const start = Math.floor(this.random() * CODE_SPACE) % CODE_SPACE;
     for (let i = 0; i < CODE_SPACE; i++) {
       let n = (start + i) % CODE_SPACE;
@@ -297,7 +310,7 @@ export class RoomServer {
         n = Math.floor(n / CODE_ALPHABET.length);
       }
       if (!this.rooms.has(code)) {
-        const room = new Room(code, this.trackId, (to, msg) => this.send(to, msg), this.now());
+        const room = new Room(code, this.trackId, (to, msg) => this.send(to, msg), this.now(), quick ? { quick: true, random: this.random, clock: this.now } : {});
         this.rooms.set(code, room);
         return room;
       }
@@ -322,11 +335,43 @@ export class RoomServer {
     this.seat(conn, c, room, name, vehicle, paint);
   }
 
+  /** Seats the player in the Quick room that starts soonest and still has a seat, or opens a new one. */
+  private quick(conn: number, c: Conn, rawName: string, vehicle: VehicleId, paint: string) {
+    const name = cleanNick(rawName);
+    if (!name) return this.fail(conn, 'bad-name');
+    let best: Room | null = null;
+    let bestLeft = Infinity;
+    let quickRooms = 0;
+    for (const room of this.rooms.values()) {
+      // A Quick room races once, so one that has started (or ever raced) is never offered to a newcomer. One that
+      // has raced only lingers until its members leave, so it does not count toward the limit either.
+      if (!room.quick || room.raceSeq !== 0) continue;
+      quickRooms++;
+      // Nobody connected (abandoned, its members only inside their grace) or no wait left: a newcomer would start
+      // at once with nobody else able to join, so they get a new room instead.
+      if (room.phase !== 'lobby' || room.isFull || !room.hasConnected) continue;
+      const left = room.view().quick?.startsInMs ?? Infinity;
+      if (left <= 0) continue;
+      if (left < bestLeft) {
+        best = room;
+        bestLeft = left;
+      }
+    }
+    if (!best) {
+      if (quickRooms >= MAX_QUICK_ROOMS) return this.fail(conn, 'busy');
+      best = this.newRoom(true);
+      if (!best) return this.fail(conn, 'busy');
+    }
+    best.lastActivity = this.now();
+    this.seat(conn, c, best, name, vehicle, paint);
+  }
+
   private join(conn: number, c: Conn, rawCode: string, rawName: string, vehicle: VehicleId, paint: string) {
     const code = normalizeCode(rawCode);
     if (!/^[A-Z]{4}$/.test(code)) return this.fail(conn, 'bad-code');
     const room = this.rooms.get(code);
-    if (!room) return this.fail(conn, 'not-found');
+    // Quick rooms are not joinable by code; their players come through quick().
+    if (!room || room.quick) return this.fail(conn, 'not-found');
     const name = cleanNick(rawName);
     if (!name) return this.fail(conn, 'bad-name');
     if (room.isFull) return this.fail(conn, 'full');

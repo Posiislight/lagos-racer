@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, project, sampleAt } from './track';
-import { createProgress, updateProgress, trackRemote, standings, currentLap, formatTime, lapMessage, coinsForPlace } from './race';
+import { createProgress, updateProgress, trackRemote, standings, currentLap, formatTime, lapMessage } from './race';
 import { TRACKS, trackFor } from '../config/tracks';
 import { medianMask } from './outAndBack';
 
@@ -117,12 +117,6 @@ describe('trackRemote', () => {
     expect(r.lapsDone).toBe(1);
     expect(r.lapTimes).toEqual([]);
     expect(r.finishTime).toBeNull();
-  });
-});
-
-describe('coinsForPlace', () => {
-  it('pays 150, 100, 60, 30 for the first four places, then 20', () => {
-    expect([1, 2, 3, 4, 5, 6].map(p => coinsForPlace(p))).toEqual([150, 100, 60, 30, 20, 20]);
   });
 });
 

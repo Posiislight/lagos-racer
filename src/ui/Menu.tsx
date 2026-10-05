@@ -1,10 +1,12 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
-import { TRACKS, eventName, trackOrDefault } from '../config/tracks';
+import { TRACKS } from '../config/tracks';
 import { driverById } from '../config/drivers';
-import { formatTime } from '../game/race';
+import { formatNaira } from '../config/economy';
+import { PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
 import { Settings } from './Settings';
+import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
 
@@ -20,55 +22,66 @@ export function goFullscreen() {
   }
 }
 
-/** Start a race from a button press: fullscreen and tilt need the tap, then the quick race or the campaign race. */
-export function launchRace(spec?: RaceSpec) {
+/** Start a race from a button press: fullscreen and tilt need the tap, then the campaign race. */
+export function launchRace(spec: RaceSpec) {
   goFullscreen();
   if (useGame.getState().settings.steering === 'tilt') void enableTilt();
   useGame.getState().startRace(spec);
 }
 
 export function Menu() {
-  const { vehicle, coins, setScreen, best, track, paint, driver, setTrack } = useGame();
+  const { vehicle, coins, premium, unlocked, setScreen, paint, driver } = useGame();
   const [settings, setSettings] = useState(false);
-  const v = vehicleById(vehicle), t = trackOrDefault(track), p = paintOf(v, paint[v.id]), d = driverById(driver);
+  const [shop, setShop] = useState(false);
+  const v = vehicleById(vehicle), p = paintOf(v, paint[v.id]), d = driverById(driver), credit = menuCredit(TRACKS);
+  // The Garage button gets a dot when the player can afford a paint or the BRT.
+  const brt = vehicleById('brt').locked;
+  const garageHint = premium >= PAINT_PRICE || (!!brt && !unlocked.includes('brt') && premium >= brt.premium);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
       <header className="menu-head">
         <div className="board">
-          <small>{eventName(t)}</small>
+          <small>{MENU_TAGLINE}</small>
           <h1>LAGOS RACER</h1>
         </div>
-        <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
+        <div className="menu-corner">
+          <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
+          <button className="coins premium gems" aria-label={`Get ${PREMIUM_LABEL}, you have ${premium}`} onClick={() => setShop(true)}>{PREMIUM_LABEL} {premium} +</button>
+          <button className="btn small garage-btn" onClick={() => setScreen('garage')}>
+            Garage{garageHint && <i className="hint-dot" role="img" aria-label="something you can afford" />}
+          </button>
+          <button className="btn small" onClick={() => setSettings(true)}>Settings</button>
+        </div>
       </header>
       <div className="menu-preview">
         <Suspense fallback={null}><Preview id={vehicle} color={p.color} driver={driver} /></Suspense>
+        <p className="menu-caption"><b>{d.name}</b> · {v.name}</p>
       </div>
       <div className="menu-side">
-        <div className="card">
-          <p className="eyebrow">Your ride</p>
-          <h2>{v.name}</h2>
-          <p className="driver-line"><b>{d.name}</b> at the wheel · {d.special.name}</p>
-          <p className="muted">{v.blurb}</p>
-          <div className="track-picker" role="radiogroup" aria-label="Track">
-            {TRACKS.map(k => (
-              <button key={k.id} role="radio" aria-checked={k.id === t.id} className={`track-chip${k.id === t.id ? ' on' : ''}`} onClick={() => setTrack(k.id)}>{k.name}</button>
-            ))}
-          </div>
-          <p className="track-line"><b>{t.name}</b> · {t.laps} laps · best lap {formatTime(best[t.id] ?? null)}</p>
-          <p className="muted">{t.blurb}</p>
-          {t.credit && <p className="credit muted">Road layout {t.credit}</p>}
+        <div className="menu-entries">
+          <button className="entry primary" onClick={() => setScreen('campaign')}>
+            <b>SINGLE PLAYER</b>
+            <span>Race the campaign across Lagos.</span>
+          </button>
+          <button className="entry" onClick={() => setScreen('online')}>
+            <b>MULTIPLAYER</b>
+            <span>Race your friends or anyone online.</span>
+          </button>
         </div>
-        <button className="btn primary big" onClick={() => setScreen('campaign')}>CAMPAIGN</button>
-        <div className="row menu-row">
-          <button className="btn" onClick={() => launchRace()}>OYA, RACE!</button>
-          <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
-          <button className="btn" onClick={() => setSettings(true)}>Settings</button>
-          <button className="btn" onClick={() => setScreen('online')}>Race with friends</button>
-        </div>
-        <p className="keys muted">You're always on the gas · ← → or A D to steer · Space to use items · Q for your special · C to drift · H to honk · Esc to pause</p>
+        {credit && <p className="credit muted">Ojuelegba road layout {credit}</p>}
       </div>
       {settings && <Settings onClose={() => setSettings(false)} />}
+      {shop && (
+        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+          <div className="card modal-card">
+            <h2 id="shop-title">Get {PREMIUM_LABEL}</h2>
+            <p className="muted">{PREMIUM_LABEL} buy new paints and unlock the BRT in the Garage. Gem packs are coming soon.</p>
+            <button className="btn" onClick={() => { setShop(false); setScreen('garage'); }}>Go to Garage</button>
+            <button className="btn primary" onClick={() => setShop(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

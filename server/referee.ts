@@ -1,6 +1,7 @@
 import { wrapDelta, type Track } from '../src/game/track';
 import { projectNear } from '../src/game/race';
 import { vehicleById } from '../src/config/vehicles';
+import { maxTopSpeed } from '../src/game/upgrades';
 import type { CarState, GridEntry, NetResult } from '../src/net/protocol';
 
 // Fastest a car can really go: its top speed with a fuel boost and a downhill.
@@ -44,7 +45,8 @@ export class Referee {
 
   constructor(private readonly track: Track, private readonly laps: number, grid: GridEntry[]) {
     for (const entry of grid) {
-      const topSpeed = vehicleById(entry.vehicle).tuning.topSpeed;
+      // The referee can't see which upgrades a player bought, so it allows for all of them.
+      const topSpeed = maxTopSpeed(vehicleById(entry.vehicle));
       this.cars.set(entry.netId, { entry, topSpeed, distance: 0, lastTime: 0, lastShortAt: 0, finishTime: null, laps: [], dnf: false });
     }
   }

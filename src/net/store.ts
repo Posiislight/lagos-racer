@@ -5,7 +5,7 @@ import { useGame } from '../game/store';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
 import { NetSession } from './session';
-import { coinsFor, toResults } from './results';
+import { toResults } from './results';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -16,18 +16,26 @@ type NetState = {
   code: string | null;
   mySlot: number | null;
   room: RoomView | null;
+  /** Date.now() when the latest room message arrived: the Quick lobby counts down from it. */
+  roomAt: number;
+  /** The track this player last voted for in a Quick room. */
+  myVote: string | null;
   error: NetError | null;
   /** True once a room we were in is out of reach for good: the "Connection don cut" screen. */
   cut: boolean;
   nickname: string;
   pendingGrid: PendingGrid | null;
   create: (name: string, vehicle: VehicleId, paint: string) => void;
+  quick: (name: string, vehicle: VehicleId, paint: string) => void;
+  vote: (trackId: string) => void;
   join: (code: string, name: string, vehicle: VehicleId, paint: string) => void;
   setVehicle: (v: VehicleId, paint: string) => void;
   setReady: (ready: boolean) => void;
   setFillAI: (fillAI: boolean) => void;
   start: () => void;
   leave: () => void;
+  /** After a Quick race: leave that room and queue for a fresh one under the saved nickname. */
+  raceAgain: (vehicle: VehicleId, paint: string) => void;
 };
 
 const NICK_KEY = 'lagos-racer:nick';
@@ -126,7 +134,7 @@ function drop() {
   old?.close();
 }
 
-const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, pendingGrid: null, cut: false };
+const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false };
 
 export const useNet = create<NetState>((set, get) => {
   /** Opens a fresh socket; `first` (create or join) goes out as soon as it is open. */
@@ -191,7 +199,7 @@ export const useNet = create<NetState>((set, get) => {
         break;
       }
       case 'room':
-        set({ room: m.room });
+        set({ room: m.room, roomAt: Date.now() });
         if (resyncPending) {
           resyncPending = false;
           // Back from a drop mid-race: catch the room up on what was lost while the socket was down, unless it has
@@ -213,12 +221,18 @@ export const useNet = create<NetState>((set, get) => {
         const mySlot = get().mySlot;
         if (!conn || mySlot === null || session?.raceSeq === m.raceSeq) break;
         set({ pendingGrid: { raceSeq: m.raceSeq, grid: m.grid, seed: m.seed, trackId: m.trackId, laps: m.laps } });
-        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq }, msg => useGame.getState().flash(msg));
+        // A Quick room says so in every room view; its AI cars are disguised bots.
+        const quick = get().room?.quick !== undefined;
+        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq, quick }, msg => useGame.getState().flash(msg));
         useGame.getState().startOnlineRace();
         break;
       }
       case 'start':
         if (session?.raceSeq === m.raceSeq) session.setStart(m.at);
+        break;
+      case 'adopt':
+        // Bots handed to this phone. Taken from this message only: a grid re-sent for the same race is ignored.
+        session?.adopt(m.netIds);
         break;
       case 'pickup':
       case 'use':
@@ -235,7 +249,7 @@ export const useNet = create<NetState>((set, get) => {
         // Too late: the stranded fallback has already taken us back to the lobby.
         if (game.screen !== 'race') break;
         if (session?.raceSeq !== m.raceSeq || mySlot === null || !mine || !session.onResults()) break;
-        game.finishRace(toResults(m.results, mySlot), mine.place, mine.best, { coins: coinsFor(mine), trackId: get().pendingGrid?.trackId ?? game.track });
+        game.finishRace(toResults(m.results, mySlot), mine.place, mine.best, { trackId: get().pendingGrid?.trackId ?? game.track, dnf: mine.dnf });
         game.setHud({ phase: 'finished' });
         break;
       }
@@ -291,6 +305,15 @@ export const useNet = create<NetState>((set, get) => {
       if (!/^[A-Z]{4}$/.test(clean)) return set({ error: 'bad-code' });
       open({ t: 'join', code: clean, name: nick, vehicle, paint });
     },
+    quick: (name, vehicle, paint) => {
+      const nick = rememberNick(name);
+      if (nick === null) return set({ error: 'bad-name' });
+      open({ t: 'quick', name: nick, vehicle, paint });
+    },
+    vote: trackId => {
+      set({ myVote: trackId, error: null });
+      conn?.sendJson({ t: 'vote', trackId });
+    },
     setVehicle: (vehicle, paint) => sendLobby({ vehicle, paint }),
     setReady: ready => sendLobby({ ready }),
     setFillAI: fillAI => sendLobby({ fillAI }),
@@ -303,6 +326,14 @@ export const useNet = create<NetState>((set, get) => {
       reset(null);
       const game = useGame.getState();
       if (game.screen === 'lobby' || game.screen === 'online') game.setScreen('menu');
+    },
+    raceAgain: (vehicle, paint) => {
+      const name = get().nickname;
+      conn?.sendJson({ t: 'leave' });
+      reset(null);
+      // Back to the online screen so the new welcome carries us into the next lobby.
+      useGame.setState({ screen: 'online', online: false, paused: false, results: null });
+      get().quick(name, vehicle, paint);
     },
   };
 });

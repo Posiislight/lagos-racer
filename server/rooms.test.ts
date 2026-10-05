@@ -1,12 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
-import { trackById } from '../src/config/tracks';
+import { Room } from './room';
+import { BOT_NAMES } from './bots';
+import { TRACKS, trackById } from '../src/config/tracks';
+import { vehicleById } from '../src/config/vehicles';
+import { maxTopSpeed } from '../src/game/upgrades';
 import { buildTrack, sampleAt } from '../src/game/track';
 import {
   FINISH_CUTOFF_MS,
   LOAD_TIMEOUT_MS,
   LOBBY_GRACE_MS,
   LOBBY_SILENCE_MS,
+  BOT_SLOT_BASE,
+  QUICK_WAIT_MS,
   SILENCE_MS,
   RECONNECT_GRACE_MS,
   ROOM_IDLE_MS,
@@ -960,7 +966,7 @@ describe('finish and results', () => {
     drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, 20);
     server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: 1e6, cars: [carAt(0, LAPS * L - 5)] }));
     // Clamped to the room's race time + 1 s: one second at full speed plus the step slack, not a whole race.
-    expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + 33 * 1.6 + 10);
+    expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + maxTopSpeed(vehicleById('okada')) * 1.6 + 10);
   });
 
   it('accepts a finish re-sent after a reconnect, claiming the time the car really crossed the line', () => {
@@ -1216,5 +1222,649 @@ describe('finish and results', () => {
       server.tick();
       expect(server.rooms.has(room.code)).toBe(false);
     }
+  });
+});
+
+describe('quick room', () => {
+  type Sent = { conn: number; msg: ServerMessage };
+  let sent: Sent[];
+  let room: Room;
+
+  const seeded = (s: number) => () => (s = (s * 16807) % 2147483647) / 2147483647;
+  function quickRoom(seed = 7, quick = true) {
+    sent = [];
+    room = new Room('QUIK', TRACKS[0].id, (conn, msg) => sent.push({ conn, msg }), now, { quick, random: seeded(seed), clock: () => now });
+    return room;
+  }
+  beforeEach(() => quickRoom());
+
+  /** Seats a human on connection `conn` in the lowest free slot. */
+  const human = (conn: number, name = `P${conn}`) => room.add(conn, name, 'okada', 'red', `token-${conn}`);
+  const sentTo = <T extends ServerMessage['t']>(conn: number, t: T) =>
+    sent.filter(s => s.conn === conn && s.msg.t === t).map(s => s.msg as Extract<ServerMessage, { t: T }>);
+
+  it('timer starts at the first human and a later join does not reset it', () => {
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    now += 5000;
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    human(1);
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS);
+    now += 10_000;
+    human(2);
+    expect(room.view().quick!.startsInMs).toBe(QUICK_WAIT_MS - 10_000);
+    now += QUICK_WAIT_MS - 10_000 - 1;
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    now += 1;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+  });
+
+  it('race starts at 30s with one human and five bots in the grid', () => {
+    human(1, 'Ade');
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(room.raceSeq).toBe(1);
+    const [g] = sentTo(1, 'grid');
+    expect(g.grid.map(e => e.netId)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(g.grid.map(e => e.ai)).toEqual([true, true, true, true, true, false]);
+    expect(g.grid.every(e => e.slot === 1)).toBe(true);
+    expect(g.grid[5]).toMatchObject({ slot: 1, name: 'Ade', vehicle: 'okada', paint: 'red' });
+    const names = g.grid.map(e => e.name);
+    expect(new Set(names).size).toBe(6);
+    expect(g.grid.slice(0, 5).every(e => BOT_NAMES.includes(e.name))).toBe(true);
+    // The view keeps its quick block once the race is on, with nothing left to wait for.
+    expect(room.view().quick!.startsInMs).toBe(0);
+    // It starts only once.
+    now += 1000;
+    room.tick(now);
+    expect(sentTo(1, 'grid')).toHaveLength(1);
+  });
+
+  it('sixth human starts it at once with no bots', () => {
+    for (let c = 1; c <= 6; c++) human(c);
+    expect(room.size).toBe(6);
+    expect(room.isFull).toBe(true);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    const [g] = sentTo(3, 'grid');
+    expect(g.grid.map(e => [e.slot, e.ai])).toEqual([1, 2, 3, 4, 5, 6].map(s => [s, false]));
+  });
+
+  it('six members with one disconnected does not start early', () => {
+    for (let c = 1; c <= 6; c++) human(c);
+    room.detach(4, now);
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    // Back again: six connected humans start it.
+    room.attach(4, 4);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+  });
+
+  it('a repeated vote for the same track reports no change', () => {
+    human(1);
+    expect(room.vote(1, 'ikorodu')).toBe(true);
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+    expect(room.vote(1, 'ojuelegba')).toBe(true);
+  });
+
+  it('most votes wins', () => {
+    for (let c = 1; c <= 3; c++) human(c);
+    expect(room.vote(1, 'third-mainland')).toBe(true);
+    expect(room.vote(2, 'third-mainland')).toBe(true);
+    // A later vote replaces the earlier one.
+    expect(room.vote(2, 'ikorodu')).toBe(true);
+    expect(room.vote(3, 'ikorodu')).toBe(true);
+    expect(room.view().quick!.votes).toEqual({ ojuelegba: 0, 'third-mainland': 1, ikorodu: 2 });
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.trackId).toBe('ikorodu');
+    expect(sentTo(1, 'grid')[0]).toMatchObject({ trackId: 'ikorodu', laps: trackById('ikorodu').laps });
+  });
+
+  it('tie and no votes pick from the right set', () => {
+    const tied = new Set<string>();
+    const open = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      quickRoom(seed);
+      human(1);
+      human(2);
+      human(3);
+      room.vote(1, 'third-mainland');
+      room.vote(2, 'ikorodu');
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      tied.add(room.trackId);
+
+      quickRoom(seed * 7919);
+      human(1);
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      open.add(room.trackId);
+    }
+    expect([...tied].sort()).toEqual(['ikorodu', 'third-mainland']);
+    expect([...open].sort()).toEqual(TRACKS.map(t => t.id).sort());
+  });
+
+  it('unknown track vote refused', () => {
+    human(1);
+    expect(room.vote(1, 'atlantis')).toBe(false);
+    expect(room.vote(9, 'ikorodu')).toBe(false);
+    expect(Object.values(room.view().quick!.votes).every(n => n === 0)).toBe(true);
+  });
+
+  it('vote ignored outside a quick lobby', () => {
+    quickRoom(7, false);
+    human(1);
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+    expect(room.view().quick).toBeUndefined();
+
+    quickRoom();
+    human(1);
+    now += QUICK_WAIT_MS;
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(room.vote(1, 'ikorodu')).toBe(false);
+  });
+
+  it('quick room does not start with no connected human', () => {
+    human(1);
+    room.detach(1, now);
+    now += QUICK_WAIT_MS + 5000;
+    room.tick(now);
+    expect(room.phase).toBe('lobby');
+    expect(sent).toHaveLength(0);
+    room.attach(1, 5);
+    room.tick(now);
+    expect(room.phase).toBe('loading');
+    expect(sentTo(5, 'grid')).toHaveLength(1);
+  });
+
+  it('start and fillAI refused with not-host', () => {
+    human(1);
+    human(2);
+    expect(room.view().hostSlot).toBe(0);
+    expect(room.lobby(1, { fillAI: true })).toBe('not-host');
+    expect(room.startRace(1, now, Math.random)).toBe('not-host');
+    expect(room.phase).toBe('lobby');
+    // Ready is ignored: every connected human counts as ready.
+    expect(room.lobby(2, { ready: false, vehicle: 'danfo' })).toBeNull();
+    expect(room.view().players.slice(0, 2).map(p => [p.slot, p.vehicle, p.ready])).toEqual([[1, 'okada', true], [2, 'danfo', true]]);
+    room.remove(1);
+    expect(room.view().hostSlot).toBe(0);
+  });
+
+  describe('hidden bot flag', () => {
+    const start = () => {
+      human(1, 'Ade');
+      human(2, 'Bola');
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+    };
+    const flags = (conn: number) => sentTo(conn, 'grid')[0].grid.map(e => [e.netId, e.ai]);
+
+    it('owner sees ai true for bots only, others see all false', () => {
+      start();
+      const real = (room as any).grid as { netId: number; ai: boolean; slot: number }[];
+      const bots = real.filter(e => e.ai);
+      expect(bots.length).toBe(4);
+      expect(flags(1).filter(([, ai]) => ai).map(([id]) => id)).toEqual(bots.map(e => e.netId));
+      expect(flags(2).every(([, ai]) => ai === false)).toBe(true);
+    });
+
+    it('human cars are false for everyone', () => {
+      start();
+      const humans = (room as any).grid.filter((e: { ai: boolean }) => !e.ai).map((e: { netId: number }) => e.netId);
+      for (const conn of [1, 2]) for (const [id, ai] of flags(conn)) if (humans.includes(id)) expect(ai).toBe(false);
+    });
+
+    it('results are filtered the same way', () => {
+      start();
+      (room as any).endRace(now + 5000, true);
+      const r1 = sentTo(1, 'results')[0].results;
+      const r2 = sentTo(2, 'results')[0].results;
+      expect(r1.filter(r => r.ai)).toHaveLength(4);
+      expect(r1.filter(r => r.ai).every(r => r.slot === 1)).toBe(true);
+      expect(r2.every(r => !r.ai)).toBe(true);
+      expect(r1).toHaveLength(6);
+    });
+
+    it('resume re-sends a filtered grid', () => {
+      start();
+      room.detach(2, now);
+      room.attach(2, 9);
+      room.resync(2);
+      expect(sentTo(9, 'grid')[0].grid.every(e => !e.ai)).toBe(true);
+      room.detach(1, now);
+      room.attach(1, 8);
+      room.resync(1);
+      expect(sentTo(8, 'grid')[0].grid.filter(e => e.ai)).toHaveLength(4);
+    });
+
+    it('referee still treats bots as ai', () => {
+      start();
+      const results = (room as any).referee.results(1) as { ai: boolean }[];
+      expect(results.filter(r => r.ai)).toHaveLength(4);
+      expect(((room as any).grid as { ai: boolean }[]).filter(e => e.ai)).toHaveLength(4);
+    });
+
+    it('friends room grid still carries real ai flags', () => {
+      quickRoom(7, false);
+      human(1, 'Ade');
+      human(2, 'Bola');
+      room.lobby(1, { ready: true });
+      room.lobby(2, { ready: true });
+      room.lobby(1, { fillAI: true });
+      expect(room.startRace(1, now, Math.random)).toBeNull();
+      const real = (room as any).grid as { ai: boolean }[];
+      expect(real.some(e => e.ai)).toBe(true);
+      expect(sentTo(2, 'grid')[0].grid.map(e => e.ai)).toEqual(real.map(e => e.ai));
+    });
+  });
+
+  describe('bot handover', () => {
+    type Entry = { netId: number; ai: boolean; slot: number };
+    const real = () => (room as any).grid as Entry[];
+    const botIds = () => real().filter(e => e.ai).map(e => e.netId);
+    const carOf = (slot: number) => real().find(e => !e.ai && e.slot === slot)!.netId;
+    const car = (netId: number): CarState => ({
+      netId, x: 1, y: 0.5, z: -3, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 12, distance: 40, laps: 0, flags: 0,
+    });
+    /** Humans on conns 1..n (slot = conn), started and taken to `phase`. */
+    function race(n: number, phase: 'loading' | 'countdown' | 'racing' = 'racing') {
+      for (let c = 1; c <= n; c++) human(c);
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      if (phase === 'loading') return;
+      for (let s = 1; s <= n; s++) room.markLoaded(s, now);
+      expect(room.phase).toBe('countdown');
+      if (phase === 'countdown') return;
+      now += START_LEAD_MS;
+      room.tick(now);
+      expect(room.phase).toBe('racing');
+    }
+
+    it('owner leaving mid-race hands bots to the next human and sends adopt', () => {
+      race(3);
+      const bots = botIds();
+      expect(bots).toHaveLength(3);
+      expect(real().filter(e => e.ai).every(e => e.slot === 1)).toBe(true);
+      room.remove(1);
+      expect(real().filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+      expect(sentTo(2, 'adopt')).toEqual([{ t: 'adopt', netIds: bots }]);
+      expect(sentTo(3, 'adopt')).toHaveLength(0);
+      // Mid-race the grid was already sent; only the adopt goes out.
+      expect(sentTo(2, 'grid')).toHaveLength(1);
+    });
+
+    it("leaver's own car is DNF but bots are not", () => {
+      race(3);
+      room.remove(1);
+      for (const conn of [2, 3]) expect(sentTo(conn, 'dnf')).toEqual([{ t: 'dnf', netIds: [carOf(1)] }]);
+      const referee = (room as any).referee;
+      expect(referee.running(carOf(1))).toBe(false);
+      for (const id of botIds()) expect(referee.running(id)).toBe(true);
+      expect([...(room as any).dropped]).toEqual([carOf(1)]);
+    });
+
+    it('snapshots for adopted cars are accepted from the new owner and refused from the old', () => {
+      race(3);
+      const [bot] = botIds();
+      const snap = (slot: number, cars: CarState[]): Snapshot => ({ slot, raceSeq: 1, time: 1, cars });
+      expect(room.snapshotTargets(snap(1, [car(bot)]))).not.toBeNull();
+      expect(room.snapshotTargets(snap(2, [car(bot)]))).toBeNull();
+      room.detach(1, now);
+      now += RECONNECT_GRACE_MS;
+      room.expire(now);
+      expect(room.snapshotTargets(snap(2, [car(bot)]))).toEqual([3]);
+      expect(room.snapshotTargets(snap(2, [car(carOf(2)), car(bot)]))).toEqual([3]);
+      expect(room.snapshotTargets(snap(1, [car(bot)]))).toBeNull();
+      // Finishes follow ownership the same way.
+      const laps = Array(trackById(room.trackId).laps).fill(60);
+      expect(room.finish(1, bot, laps, 200, now)).toBe(false);
+      expect((room as any).referee.running(bot)).toBe(true);
+    });
+
+    it('grace expiry also hands over', () => {
+      race(2);
+      room.detach(1, now);
+      now += RECONNECT_GRACE_MS - 1;
+      room.expire(now);
+      room.tick(now);
+      expect(sentTo(2, 'adopt')).toHaveLength(0);
+      expect(real().filter(e => e.ai).every(e => e.slot === 1)).toBe(true);
+      now += 1;
+      room.expire(now);
+      room.tick(now);
+      expect(sentTo(2, 'adopt')).toEqual([{ t: 'adopt', netIds: botIds() }]);
+      expect(real().filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+      expect(sentTo(2, 'dnf')).toEqual([{ t: 'dnf', netIds: [carOf(1)] }]);
+      expect(room.phase).toBe('racing');
+    });
+
+    it('owner grace expiring while the others are all away hands the bots to one still in grace', () => {
+      race(3);
+      const bots = botIds();
+      room.detach(1, now);
+      now += 1000;
+      room.detach(2, now);
+      room.detach(3, now);
+      now += RECONNECT_GRACE_MS - 1000;
+      // Owner's grace is over; 2 and 3 are still within theirs.
+      room.expire(now);
+      room.tick(now);
+      expect(real().filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+      const referee = (room as any).referee;
+      for (const id of bots) expect(referee.running(id)).toBe(true);
+      expect([...(room as any).dropped]).toEqual([carOf(1)]);
+      // Nobody connected to tell yet.
+      expect(sent.some(s => s.msg.t === 'adopt')).toBe(false);
+      expect(room.phase).toBe('racing');
+      // The heir comes back and is told to drive them.
+      room.attach(2, 12);
+      room.resync(2);
+      expect(sentTo(12, 'adopt')).toEqual([{ t: 'adopt', netIds: bots }]);
+      expect(sentTo(12, 'grid')[0].grid.filter(e => e.ai).map(e => e.netId)).toEqual(bots);
+    });
+
+    it('handover during loading and countdown', () => {
+      for (const phase of ['loading', 'countdown'] as const) {
+        quickRoom();
+        race(2, phase);
+        const bots = botIds();
+        room.remove(1);
+        expect(room.phase).toBe(phase);
+        const grids = sentTo(2, 'grid');
+        expect(grids).toHaveLength(2);
+        expect(grids[1].grid.filter(e => e.ai).map(e => e.netId)).toEqual(bots);
+        expect(grids[1].grid.filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+        expect(sentTo(2, 'adopt')).toEqual([{ t: 'adopt', netIds: bots }]);
+      }
+      // A handover in loading does not hold up the start.
+      quickRoom();
+      race(2, 'loading');
+      room.markLoaded(2, now);
+      room.remove(1);
+      room.tick(now);
+      expect(room.phase).toBe('countdown');
+    });
+
+    it('no human left ends the race', () => {
+      race(1);
+      room.remove(1);
+      room.tick(now);
+      expect(room.phase).toBe('lobby');
+      expect(sent.some(s => s.msg.t === 'results')).toBe(false);
+
+      // The bots changed hands first, then their new owner left too.
+      quickRoom();
+      race(2);
+      room.remove(1);
+      expect(sentTo(2, 'adopt')).toHaveLength(1);
+      room.tick(now);
+      expect(room.phase).toBe('racing');
+      room.detach(2, now);
+      now += RECONNECT_GRACE_MS;
+      room.expire(now);
+      room.tick(now);
+      expect(room.phase).toBe('lobby');
+      expect(sent.some(s => s.msg.t === 'results')).toBe(false);
+    });
+
+    it('resume after handover gets a grid with the current owner and the adopt', () => {
+      race(3);
+      // The first owner resuming before any handover gets no adopt: its grid already says which cars it drives.
+      room.detach(1, now);
+      room.attach(1, 7);
+      room.resync(1);
+      expect(sentTo(7, 'adopt')).toHaveLength(0);
+      room.remove(1);
+      room.detach(2, now);
+      room.attach(2, 9);
+      room.resync(2);
+      const [g] = sentTo(9, 'grid');
+      expect(g.grid.filter(e => e.ai).map(e => e.netId)).toEqual(botIds());
+      expect(g.grid.filter(e => e.ai).every(e => e.slot === 2)).toBe(true);
+      expect(sentTo(9, 'adopt')).toEqual([{ t: 'adopt', netIds: botIds() }]);
+      room.detach(3, now);
+      room.attach(3, 10);
+      room.resync(3);
+      expect(sentTo(10, 'grid')[0].grid.every(e => !e.ai)).toBe(true);
+      expect(sentTo(10, 'adopt')).toHaveLength(0);
+    });
+
+    it("friends rooms still DNF the host's AI", () => {
+      quickRoom(7, false);
+      human(1);
+      human(2);
+      room.lobby(1, { ready: true });
+      room.lobby(2, { ready: true });
+      room.lobby(1, { fillAI: true });
+      expect(room.startRace(1, now, Math.random)).toBeNull();
+      room.markLoaded(1, now);
+      room.markLoaded(2, now);
+      now += START_LEAD_MS;
+      room.tick(now);
+      expect(room.phase).toBe('racing');
+      const hostCars = real().filter(e => e.slot === 1).map(e => e.netId);
+      expect(real().filter(e => e.ai).every(e => e.slot === 1)).toBe(true);
+      room.remove(1);
+      expect(sentTo(2, 'dnf')).toEqual([{ t: 'dnf', netIds: hostCars }]);
+      expect(sent.some(s => s.msg.t === 'adopt')).toBe(false);
+      expect(real().filter(e => e.ai).every(e => e.slot === 1)).toBe(true);
+    });
+  });
+
+  it('view shows bots only after their appearance time and hides one when a human takes the seat', () => {
+    human(1, 'Ade');
+    const start = now;
+    now = start + 2999;
+    room.tick(now);
+    expect(room.view().players.map(p => p.slot)).toEqual([1]);
+    expect(sentTo(1, 'room')).toHaveLength(0);
+
+    // Each second, a room broadcast goes out only when the number of bots shown has changed.
+    let shown = 0;
+    for (let t = 3000; t <= 26_000; t += 1000) {
+      now = start + t;
+      const before = sentTo(1, 'room').length;
+      room.tick(now);
+      const bots = room.view().players.length - 1;
+      expect(sentTo(1, 'room').length - before).toBe(bots === shown ? 0 : 1);
+      if (bots !== shown) expect(sentTo(1, 'room').at(-1)!.room.players).toHaveLength(bots + 1);
+      expect(bots).toBeGreaterThanOrEqual(shown);
+      shown = bots;
+    }
+    expect(room.phase).toBe('lobby');
+    const players = room.view().players;
+    expect(players).toHaveLength(6);
+    expect(players[0]).toMatchObject({ slot: 1, name: 'Ade' });
+    for (const bot of players.slice(1)) {
+      expect(bot.slot).toBeGreaterThanOrEqual(BOT_SLOT_BASE);
+      expect(bot).toMatchObject({ ready: true, connected: true });
+      expect(bot.name).not.toBe('Ade');
+    }
+    // Bots are not members.
+    expect(room.size).toBe(1);
+
+    human(2, 'Bola');
+    const after = room.view().players;
+    expect(after).toHaveLength(6);
+    expect(after.filter(p => p.slot < BOT_SLOT_BASE).map(p => p.slot)).toEqual([1, 2]);
+    expect(after.filter(p => p.slot >= BOT_SLOT_BASE)).toHaveLength(4);
+  });
+});
+
+describe('quick matchmaking', () => {
+  function quick(name = 'Ade') {
+    const c = connect();
+    send(c.conn, { t: 'quick', name, vehicle: 'okada' });
+    return { ...c, welcome: msgs(c.peer, 'welcome')[0] };
+  }
+  const codes = () => [...server.rooms.keys()];
+
+  it('quick creates a room for the first caller and joins the second to it', () => {
+    const a = quick('Ade');
+    const b = quick('Bola');
+    expect(server.rooms.size).toBe(1);
+    expect(b.welcome.code).toBe(a.welcome.code);
+    expect(b.welcome.slot).toBe(2);
+    const room = lastRoom(a.peer);
+    expect(room.quick).toBeDefined();
+    expect(room.players.filter(p => p.connected).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('quick skips a full room and a started room', () => {
+    const first = quick('P1');
+    for (let i = 2; i <= 6; i++) quick('P' + i);
+    // Six humans start the race on the next tick; until then the room is full.
+    const seventh = quick('P7');
+    expect(seventh.welcome.code).not.toBe(first.welcome.code);
+    expect(server.rooms.size).toBe(2);
+    server.tick();
+    expect(server.rooms.get(first.welcome.code)!.phase).toBe('loading');
+    const eighth = quick('P8');
+    expect(eighth.welcome.code).toBe(seventh.welcome.code);
+  });
+
+  it('quick picks the room with least time left', () => {
+    const a = quick('A');
+    const full = [quick('x2'), quick('x3'), quick('x4'), quick('x5'), quick('x6')];
+    expect(full).toHaveLength(5);
+    // A is full now; b opens a second room later, c a third later still.
+    now += 10_000;
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    server.rooms.get(a.welcome.code)!.remove(6);
+    server.rooms.get(a.welcome.code)!.remove(5);
+    now += 5_000;
+    const c = connect();
+    // Room A has 15 s left, room B has 25 s left: A wins.
+    send(c.conn, { t: 'quick', name: 'C', vehicle: 'okada' });
+    expect(msgs(c.peer, 'welcome')[0].code).toBe(a.welcome.code);
+  });
+
+  it('busy at 50 quick rooms', () => {
+    for (let i = 0; i < 50; i++) {
+      // Fill each room so the next caller must open another.
+      const first = quick('F' + i);
+      const room = server.rooms.get(first.welcome.code)!;
+      for (let s = 2; s <= 6; s++) room.add(-1, 'x', 'okada', '', 't');
+    }
+    expect(server.rooms.size).toBe(50);
+    const late = connect();
+    send(late.conn, { t: 'quick', name: 'Late', vehicle: 'okada' });
+    expect(msgs(late.peer, 'error')).toEqual([{ t: 'error', error: 'busy' }]);
+    expect(msgs(late.peer, 'welcome')).toHaveLength(0);
+    expect(server.rooms.size).toBe(50);
+  });
+
+  it('a joiner after loading begins lands in a new room', () => {
+    const a = quick('A');
+    now += QUICK_WAIT_MS;
+    server.tick();
+    expect(server.rooms.get(a.welcome.code)!.phase).toBe('loading');
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    expect(server.rooms.size).toBe(2);
+  });
+
+  it('a quick room that has raced and returned to the lobby is not offered again', () => {
+    const a = quick('A');
+    const room = server.rooms.get(a.welcome.code)!;
+    room.phase = 'lobby';
+    room.raceSeq = 1;
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+  });
+
+  it('an abandoned quick room is skipped and a new room opened', () => {
+    const a = quick('A');
+    server.close(a.conn);
+    const room = server.rooms.get(a.welcome.code)!;
+    // A is still a member, inside the lobby grace, but nobody is connected.
+    expect(room.size).toBe(1);
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    expect(server.rooms.size).toBe(2);
+  });
+
+  it('a quick room whose wait has run out is skipped', () => {
+    const a = quick('A');
+    const room = server.rooms.get(a.welcome.code)!;
+    // The wait is over but the room has not ticked yet.
+    now += QUICK_WAIT_MS;
+    expect(room.phase).toBe('lobby');
+    expect(room.view().quick!.startsInMs).toBe(0);
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+  });
+
+  it('quick rooms that have raced do not count toward the room limit', () => {
+    for (let i = 0; i < 50; i++) {
+      const first = quick('F' + i);
+      const room = server.rooms.get(first.welcome.code)!;
+      if (i === 0) {
+        // Raced once and back in the lobby: it only lingers until its members leave.
+        room.phase = 'lobby';
+        room.raceSeq = 1;
+      } else for (let s = 2; s <= 6; s++) room.add(-1, 'x', 'okada', '', 't');
+    }
+    expect(server.rooms.size).toBe(50);
+    const late = quick('Late');
+    expect(msgs(late.peer, 'error')).toHaveLength(0);
+    expect(late.welcome).toBeDefined();
+    expect(server.rooms.size).toBe(51);
+  });
+
+  it('re-voting the same track does not broadcast', () => {
+    const a = quick('A');
+    const b = quick('B');
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    const before = msgs(b.peer, 'room').length;
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    expect(msgs(b.peer, 'room')).toHaveLength(before);
+    send(a.conn, { t: 'vote', trackId: 'ojuelegba' });
+    expect(msgs(b.peer, 'room')).toHaveLength(before + 1);
+  });
+
+  it('bad nickname gives bad-name', () => {
+    const c = connect();
+    send(c.conn, { t: 'quick', name: '   ', vehicle: 'okada' });
+    expect(msgs(c.peer, 'error')).toEqual([{ t: 'error', error: 'bad-name' }]);
+    expect(server.rooms.size).toBe(0);
+  });
+
+  it('vote message updates the tally for everyone', () => {
+    const a = quick('A');
+    const b = quick('B');
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    for (const p of [a.peer, b.peer]) expect(lastRoom(p).quick!.votes.ikorodu).toBe(1);
+    send(b.conn, { t: 'vote', trackId: 'nowhere' });
+    expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
+    send(b.conn, { t: 'vote', trackId: 'x'.repeat(41) });
+    expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
+  });
+
+  it('a friends join by code into a quick room is refused as not-found', () => {
+    const a = quick('A');
+    const c = connect();
+    send(c.conn, { t: 'join', code: a.welcome.code, name: 'Bola', vehicle: 'keke' });
+    expect(msgs(c.peer, 'error').at(-1)?.error).toBe('not-found');
+    expect(msgs(c.peer, 'welcome')).toHaveLength(0);
+  });
+
+  it('friends rooms never receive quick joiners', () => {
+    const f = create('Host');
+    const q = quick('Q');
+    expect(q.welcome.code).not.toBe(f.welcome.code);
+    expect(server.rooms.size).toBe(2);
+    expect(codes()).toContain(f.welcome.code);
+    expect(lastRoom(f.peer).players).toHaveLength(1);
+    // And a vote in a friends' room is ignored.
+    send(f.conn, { t: 'vote', trackId: 'ikorodu' });
+    expect(lastRoom(f.peer).quick).toBeUndefined();
   });
 });

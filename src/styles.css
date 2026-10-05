@@ -91,24 +91,29 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side .card h2 { margin-bottom: 2px; }
 .menu-side .row { flex-wrap: nowrap; gap: 8px; }
 .menu-side .row .btn { flex: 1 1 auto; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
-.track-pick { display: flex; gap: 6px; margin-top: 8px; }
-.track-pick .btn { flex: 1 1 0; min-height: 36px; padding: 6px 8px; font-size: 13px; }
-.track-line { margin: 8px 0 0; font-size: 14px; }
-.credit { margin: 4px 0 0; font-size: 11px; }
-.keys { font-size: 12px; margin: 0; background: rgba(255, 250, 240, .75); padding: 6px 10px; border-radius: 8px; }
-@media (pointer: coarse) { .keys { display: none; } }
-@media (max-width: 720px) and (orientation: portrait) {
-  .menu { grid-template-columns: 1fr; grid-template-rows: auto minmax(180px, 1fr) auto; }
-}
+.credit { margin: 0; font-size: 11px; }
+.menu-side > .credit { align-self: flex-start; background: rgba(255, 250, 240, .75); padding: 2px 8px; border-radius: 8px; color: var(--ink); }
+.menu-entries { display: flex; flex-direction: column; gap: 8px; }
+.menu-corner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.coins.gems { border: 0; cursor: pointer; font-family: inherit; }
+.garage-btn { position: relative; }
+.hint-dot { position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; border-radius: 50%; background: #ff4d4d; border: 2px solid var(--ink); }
+.btn.small { padding: 6px 12px; min-height: 36px; font-size: 14px; }
+.menu-caption { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); margin: 0; padding: 4px 14px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); white-space: nowrap; font-family: 'Bungee', system-ui, sans-serif; font-size: 16px; color: var(--ink); pointer-events: none; }
+.entry { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 14px 18px; min-height: 64px; border: 3px solid var(--ink); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; font: inherit; box-shadow: 0 4px 0 var(--ink); }
+.entry b { font-family: 'Bungee', system-ui, sans-serif; font-size: 22px; font-weight: 400; }
+.entry span { font-size: 14px; opacity: .8; }
+.entry.primary { background: var(--yellow); }
+.entry:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
+.entry:disabled { opacity: .6; cursor: default; }
 @media (max-height: 480px) {
-  .menu-side .card .muted { display: none; }
-  .menu-side .card .eyebrow { display: none; }
-  .menu-side .card .credit { display: block; margin-top: 2px; }
-  .track-picker { margin-top: 4px; }
-  .track-chip { min-height: 34px; padding: 0 12px; font-size: 14px; }
-  .menu-side .card h2 { font-size: 26px; }
   .board h1 { font-size: 28px; }
-  .btn.big { font-size: 20px; padding: 10px 18px; }
+  .menu-side { gap: 6px; justify-content: center; }
+  .menu-entries { gap: 6px; }
+  .entry { padding: 8px 14px; min-height: 52px; }
+  .entry b { font-size: 18px; }
+  .entry span { font-size: 12px; }
+  .menu-caption { font-size: 14px; }
 }
 
 /* ---------- garage ---------- */
@@ -132,7 +137,27 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .paint-name { font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; margin-left: 4px; }
 .stats span { color: var(--muted); }
 .bar { height: 10px; border-radius: 5px; background: rgba(35, 31, 27, .12); overflow: hidden; }
+.bar { display: flex; }
 .bar i { display: block; height: 100%; background: var(--yellow); border-right: 2px solid var(--ink); transition: width .35s ease; }
+.bar i.up { background: var(--green); }
+/* One row per stat: name, bar, level pips and the price of the next level. */
+.stat-rows { display: grid; gap: 8px; margin: 10px 0 14px; }
+.stat-row {
+  display: grid; grid-template-columns: 76px minmax(48px, 1fr) auto auto; grid-template-areas: 'name bar pips buy';
+  align-items: center; gap: 8px; font-size: 14px; font-weight: 700;
+}
+.stat-row.locked { grid-template-columns: 76px 1fr; grid-template-areas: 'name bar'; }
+.stat-name { grid-area: name; color: var(--muted); }
+.stat-row .bar { grid-area: bar; }
+.pips { grid-area: pips; display: flex; gap: 2px; }
+/* Narrow phones: the level pips go under the bar so the price button is never clipped. */
+@media (max-width: 400px) {
+  .stat-row:not(.locked) { grid-template-columns: 78px minmax(40px, 1fr) auto; grid-template-areas: 'name bar buy' 'name pips buy'; row-gap: 4px; }
+}
+.pips i { box-sizing: border-box; flex: 0 0 11px; height: 11px; border-radius: 3px; border: 2px solid var(--ink); background: rgba(35, 31, 27, .12); }
+.pips i.on { background: var(--green); }
+.upgrade-buy { grid-area: buy; min-height: 46px; padding: 4px 8px; font-size: 14px; min-width: 78px; }
+.upgrade-max { grid-area: buy; min-width: 78px; text-align: center; font-weight: 900; color: var(--green); }
 .stops { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
 .stops::-webkit-scrollbar { display: none; }
 .stops button {
@@ -154,8 +179,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .drivers small { flex-basis: 100%; font-size: 12px; line-height: 1.25; opacity: .8; }
 .driver-line { margin: 0 0 4px; font-size: 14px; }
 @media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
-@media (max-width: 720px) and (orientation: portrait) { .garage-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
-@media (max-height: 480px) { .garage-card .muted { display: none; } .garage-card h2 { font-size: 20px; } }
+@media (max-height: 480px) {
+  .garage-card .muted { display: none; }
+  .garage-card h2 { font-size: 20px; margin: 6px 0 0; }
+  .garage-card .stat-rows { gap: 6px; margin: 6px 0 10px; }
+  .upgrade-buy { min-height: 42px; }
+}
 
 /* ---------- modal ---------- */
 .modal { position: absolute; inset: 0; background: rgba(20, 18, 16, .55); display: grid; place-items: center; z-index: 30; padding: 16px; overflow-y: auto; }
@@ -209,6 +238,11 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .lobby .btn.ready { background: #bfe8c9; }
 .lobby .btn.ready::after { content: ' ✓'; }
 .lobby .btn { white-space: nowrap; }
+.quick-title { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(20px, 6vw, 28px); line-height: 1.1; }
+.quick-count { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); line-height: 1; color: var(--green); }
+.quick-votes { display: flex; flex-direction: column; gap: 6px; }
+.lobby .btn.quick-vote { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
+.lobby .btn.quick-vote.on { background: #bfe8c9; border-color: var(--green); }
 @media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
 @media (max-height: 480px) {
   .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
@@ -252,8 +286,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .hud-progress i { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 3px solid #141210; }
 .hud-progress i.me { width: 20px; height: 20px; margin: -10px 0 0 -10px; border-width: 4px; }
 /* Elimination: seconds to the next LASTMA clamp, next to "5/6 left". */
-/* Narrow portrait screens: the clamp timer would collide with the clock, so the bar drops below the position board. */
-@media (max-width: 720px) and (orientation: portrait) { .hud-progress.elim { top: calc(78px + var(--safe-t)); width: min(92vw, 420px); } }
 .hud-progress .elim-timer { flex: none; min-width: 40px; text-align: center; background: var(--board); color: var(--led); border-radius: 8px; padding: 2px 8px; font-size: 22px; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .hud-progress .elim-timer.warn { background: #d9261c; color: #fff; animation: pulse .6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .hud-progress .elim-timer.warn { animation: none; } }
@@ -370,9 +402,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   .hud-item { width: 78px; height: 78px; }
   .hud-special { --size: 78px; }
 }
-.track-picker { display: flex; gap: 6px; margin: 8px 0 0; flex-wrap: wrap; }
-.track-chip { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid rgba(255,255,255,.35); background: rgba(0,0,0,.25); color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
-.track-chip.on { background: #f5b400; color: #1a1a1a; border-color: #f5b400; }
 
 /* ---------- campaign ---------- */
 .campaign {
@@ -382,7 +411,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   color: var(--paper);
 }
 .stops-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; flex: 1; align-content: center; }
-@media (max-width: 720px) and (orientation: portrait) { .stops-list { grid-template-columns: 1fr; align-content: start; } }
 .stop {
   width: 100%; min-height: 76px; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
   background: var(--chip); color: var(--ink); border: 2px solid var(--ink); border-radius: 12px; padding: 10px 14px; box-shadow: 0 3px 0 var(--ink);
@@ -415,3 +443,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-row { flex-wrap: nowrap; }
 .menu-row .btn { flex: 1 1 0; padding-left: 8px; padding-right: 8px; }
 .campaign .card { color: var(--ink); }
+.stars { color: #f5b301; letter-spacing: .08em; font-size: 22px; line-height: 1; white-space: nowrap; }
+.stop .stars { font-size: 16px; }
+.new-best { margin: 12px 0 0; padding: 2px 12px; border-radius: 8px; background: var(--yellow); border: 2px solid var(--ink); font-family: Bungee, Impact, sans-serif; font-size: 16px; color: var(--ink); }
+.payout-note { margin: -8px 0 12px; font-weight: 700; color: var(--muted); }
+.earned.none { color: var(--muted); }
+.reward-ladder { list-style: none; margin: 4px 0 8px; padding: 0; font-weight: 800; font-size: 14px; }
+
+/* Phones held upright: ask for landscape. Above the race, HUD and modals. */
+.rotate-prompt { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; background: var(--board); color: #fff; font-family: Bungee, Impact, sans-serif; font-size: 22px; }
+.rotate-prompt p { margin: 0; }
+.rotate-phone { width: 56px; height: 96px; border: 5px solid var(--yellow); border-radius: 12px; animation: rotate-phone 2.4s ease-in-out infinite; }
+@keyframes rotate-phone { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }

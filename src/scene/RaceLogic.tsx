@@ -4,7 +4,7 @@ import { aiState, getRace, type Racer } from '../game/runtime';
 import { isIn } from '../game/modes';
 import { updateProgress, trackRemote, standings, currentLap, lapMessage } from '../game/race';
 import { clearQueuedPresses, readPlayer } from '../game/input';
-import { catchUpGap, driveAI } from '../game/ai';
+import { catchUpGap, driveAI, humanize } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
 import { resetSpecialsAudio, updateSpecials } from '../game/specials';
 import { driverById } from '../config/drivers';
@@ -103,6 +103,8 @@ export function RaceLogic() {
       else {
         if (!r.ai) r.ai = aiState(r.progress.lateral, 0.95, 3, 0);
         driveAI(r, race, dt, catchUpGap(race, r, player));
+        // Quick room bots drive like people; the player's own car brought home by the AI does not.
+        if (race.humanize && r.kind === 'ai') humanize(r, dt, race);
       }
     }
 

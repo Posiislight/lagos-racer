@@ -4,7 +4,7 @@ import { trackOrDefault, trackFor } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
 import { SnapshotBuffer } from '../net/interpolation';
-import { AI_NAMES } from './ai';
+import { AI_NAMES, botAI } from './ai';
 import { makeCritters } from './critters';
 import { makePickups } from './items';
 import { pickRivals, type Pick } from './lineup';
@@ -13,11 +13,15 @@ import { createProgress } from './race';
 import { seededRandom } from './random';
 import { aiState, makeRacer, type RaceRuntime, type Racer } from './runtime';
 import { sampleAt } from './track';
+import { NO_UPGRADES, applyUpgrades, type UpgradeLevels } from './upgrades';
 
 export type Spawn = { x: number; y: number; z: number; yaw: number };
 
-/** A room race: the server's grid, which slot is this phone, and the seed every phone shares. */
-export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number };
+/**
+ * A room race: the server's grid, which slot is this phone, the seed every phone shares, and whether it is a Quick
+ * room (whose AI cars are disguised bots that drive like people).
+ */
+export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number; quick: boolean };
 
 /** Lap limit of a mode: elimination has none. */
 const lapsOf = (mode: RaceSetup['mode']) => (mode.kind === 'elimination' ? Infinity : mode.laps);
@@ -29,7 +33,7 @@ const rivalAI = (lane: number, k: number, rand: () => number) => aiState(lane, 0
  * mode that decides how it ends. `spec` is the campaign race this is (null for a quick race); `online`
  * lays the grid out from a room's grid instead of picking rivals.
  */
-export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId, spec: RaceSpec | null = null, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
+export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId, spec: RaceSpec | null = null, online?: OnlineSetup, upgrades: UpgradeLevels = NO_UPGRADES): { race: RaceRuntime; spawns: Spawn[] } {
   const config = { ...trackOrDefault(setup.track), laps: lapsOf(setup.mode) };
   const track = trackFor(config);
   const duel = setup.mode.kind === 'duel' && !online;
@@ -53,12 +57,13 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       const mine = g.slot === online.mySlot;
       const kind = !mine ? 'remote' : g.ai ? 'ai' : 'local';
       const v = vehicleById(g.vehicle);
-      const r = makeRacer(g.netId, g.name, v, paintOf(v, g.paint), kind === 'local', progress, kind === 'local' ? playerDriver : DEFAULT_DRIVER);
+      const r = makeRacer(g.netId, g.name, kind === 'local' ? applyUpgrades(v, upgrades) : v, paintOf(v, g.paint), kind === 'local', progress, kind === 'local' ? playerDriver : DEFAULT_DRIVER);
       r.kind = kind;
       r.owner = g.slot;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
-      // Every phone rolls every AI's skill in grid order, so they all agree whoever drives it.
-      if (g.ai) r.ai = rivalAI(lane, g.netId, rand);
+      // Only the phone driving an AI car gives it a skill. In a friends' room every phone sees the AI flags and rolls
+      // them in grid order, so they agree; a Quick room's bots get a skill in the bot range on their owner's phone.
+      if (g.ai) r.ai = online.quick ? botAI(lane, rand) : rivalAI(lane, g.netId, rand);
       return r;
     });
   } else {
@@ -73,7 +78,8 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       const isPlayer = k === lineup.length - 1;
       const v = vehicleById(vid);
       const driver = isPlayer ? playerDriver : duel ? 'mamaput' : randomDriver(Math.random, setup.excludeDrivers);
-      const r = makeRacer(k, isPlayer ? 'You' : duel ? 'Mama Put' : names[k], v, paintOf(v, paint), isPlayer, progress, driver);
+      // Only the player's vehicle gets upgrades; the AI always races stock.
+      const r = makeRacer(k, isPlayer ? 'You' : duel ? 'Mama Put' : names[k], isPlayer ? applyUpgrades(v, upgrades) : v, paintOf(v, paint), isPlayer, progress, driver);
       if (!isPlayer) {
         r.ai = setup.mode.kind === 'duel' ? aiState(lane, setup.mode.skill, 2, lane, true) : rivalAI(lane, k, Math.random);
       }
@@ -88,7 +94,7 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
     // Online, each phone numbers its own hazards from its own block so ids never clash.
     nextId: online ? online.mySlot * 100000 : 1000,
     puffs: [], critters: makeCritters({ config, track }, online ? seededRandom(online.seed) : undefined), net: null,
-    mode: createMode(setup.mode), spec,
+    mode: createMode(setup.mode), spec, humanize: online?.quick ?? false,
   };
   return { race, spawns };
 }

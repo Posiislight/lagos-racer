@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGrid } from './grid';
+import { buildGrid, buildQuickGrid } from './grid';
 import { AI_NAMES } from '../src/game/names';
 
 const rnd = () => {
@@ -64,5 +64,28 @@ describe('buildGrid', () => {
   it('adds nothing when the grid is already full', () => {
     const six = Array.from({ length: 6 }, (_, i) => ({ slot: i + 1, name: `P${i}`, vehicle: 'okada' as const, paint: 'red' }));
     expect(buildGrid(six, true, 1, rnd()).every(e => !e.ai)).toBe(true);
+  });
+});
+
+describe('buildQuickGrid', () => {
+  it('buildQuickGrid puts bots in front owned by the owner, ai true, humans after', () => {
+    const bots = [
+      { slot: 7, name: 'Tunde', vehicle: 'danfo' as const, paint: 'red' },
+      { slot: 9, name: 'Femi99', vehicle: 'brt' as const, paint: 'white' },
+    ];
+    const grid = buildQuickGrid(
+      [
+        { slot: 3, name: 'Chidi', vehicle: 'keke', paint: 'yellow' },
+        { slot: 2, name: 'Bola', vehicle: 'okada', paint: 'red' },
+      ],
+      bots,
+      2,
+    );
+    expect(grid).toEqual([
+      { netId: 0, slot: 2, name: 'Tunde', vehicle: 'danfo', paint: 'red', ai: true },
+      { netId: 1, slot: 2, name: 'Femi99', vehicle: 'brt', paint: 'white', ai: true },
+      { netId: 2, slot: 2, name: 'Bola', vehicle: 'okada', paint: 'red', ai: false },
+      { netId: 3, slot: 3, name: 'Chidi', vehicle: 'keke', paint: 'yellow', ai: false },
+    ]);
   });
 });
