@@ -167,7 +167,6 @@ describe('buyUpgrade', () => {
     expect(state().upgrades.danfo).toBeUndefined();
   });
 });
-
 describe('premium currency', () => {
   beforeEach(() => {
     useGame.setState({ premium: 0, ownedPaints: [], adViews: {}, unlocked: [], paint: {}, vehicle: 'okada' });
