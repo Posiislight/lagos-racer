@@ -1,7 +1,7 @@
 import type { RaceRuntime, Racer } from './runtime';
 import { SPECIALS, driverById } from '../config/drivers';
 import { lasting } from './items';
-import { sfx } from './audio';
+import { duck, Loop, sfx } from './audio';
 import { isIn } from './modes';
 
 /**
@@ -20,6 +20,13 @@ export function speedFactors(r: Pick<Racer, 'boost' | 'curse' | 'push' | 'cough'
   return { accel, top };
 }
 
+/** The bubbling heard while the player's own Pepper Soup Trail is on. */
+let bubbling: Loop | null = null;
+export function resetSpecialsAudio() {
+  bubbling?.stop();
+  bubbling = null;
+}
+
 export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string) => void) {
   for (const r of race.racers) {
     // The race is on for everyone but during the countdown; a racer who has finished or is out stops charging.
@@ -31,7 +38,7 @@ export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string)
       if (on && r.body && r.charge >= 1) {
         if (special.kind === 'push') {
           r.push = SPECIALS.push.duration;
-          if (r.isPlayer) sfx('push');
+          if (r.isPlayer) { sfx('push'); duck(1); }
         } else {
           r.trail = SPECIALS.soup.duration; r.trailDist = 0; r.trailCount = 0;
           if (r.isPlayer) sfx('soup');
@@ -46,6 +53,10 @@ export function updateSpecials(race: RaceRuntime, dt: number, flash: (m: string)
     r.trail = Math.max(0, r.trail - dt);
     if (r.progress.finishTime !== null) { r.push = 0; r.trail = 0; }
     if (r.trail > 0 && r.body && isIn(r)) dropSoup(race, r, dt);
+    if (r.isPlayer) {
+      if (r.trail > 0 && isIn(r)) { if (!bubbling) { bubbling = new Loop('soupBubble'); bubbling.start(); } bubbling.set(1, 1, 0); }
+      else resetSpecialsAudio();
+    }
   }
 
   // Anyone who drives through a patch coughs: slower and swerving, with a second's grace afterwards.

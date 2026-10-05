@@ -6,12 +6,13 @@ import { updateProgress, trackRemote, standings, currentLap, lapMessage } from '
 import { clearQueuedPresses, readPlayer } from '../game/input';
 import { catchUpGap, driveAI } from '../game/ai';
 import { updateItems, ITEM_LABEL } from '../game/items';
-import { updateSpecials } from '../game/specials';
+import { resetSpecialsAudio, updateSpecials } from '../game/specials';
 import { driverById } from '../config/drivers';
 import { updateCritters } from '../game/critters';
 import { useGame } from '../game/store';
 import { buildResults } from '../game/results';
-import { beep, Engine, sfx } from '../game/audio';
+import { beep, Engine, sfx, startAmbience, stopAmbience } from '../game/audio';
+import { resetWarnings, updateWarnings } from '../game/warnings';
 import { itemHint } from '../game/hints';
 
 const COUNT = ['3', '2', '1'];
@@ -49,7 +50,8 @@ export function RaceLogic() {
     const player = race?.racers.find(r => r.isPlayer);
     engine.current = new Engine(player?.vehicle.id === 'okada' ? 70 : player?.vehicle.id === 'keke' ? 60 : 42);
     engine.current.start();
-    return () => engine.current?.stop();
+    startAmbience();
+    return () => { engine.current?.stop(); stopAmbience(); resetWarnings(); resetSpecialsAudio(); };
   }, []);
 
   useFrame((_, dtRaw) => {
@@ -122,6 +124,7 @@ export function RaceLogic() {
 
     if (race.phase !== 'countdown') updateItems(race, dt, m => store.flash(m));
     updateSpecials(race, dt, m => store.flash(m));
+    updateWarnings(race);
 
     // Just picked something up: say what it is and, the first few times, how to use it.
     if (player.item && !heldItem.current) {
@@ -141,6 +144,7 @@ export function RaceLogic() {
 
     // Engine note.
     const top = player.vehicle.tuning.topSpeed;
+    engine.current?.setBoost(player.boost > 0 || player.push > 0);
     engine.current?.update(Math.min(1, Math.abs(player.speed) / top), player.controls.throttle);
 
     // HUD, a few times a second.

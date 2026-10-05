@@ -2,7 +2,7 @@ import type { Hazard, ItemKind, Pickup, RaceRuntime, Racer } from './runtime';
 import { heightAt, sampleAt } from './track';
 import { standings } from './race';
 import { isIn } from './modes';
-import { sfx } from './audio';
+import { duck, sfx } from './audio';
 
 export const ITEM_LABEL: Record<ItemKind, string> = { fuel: 'Fuel', oil: 'Crude oil', juju: 'Juju', odeshi: 'Odeshi' };
 
@@ -68,13 +68,13 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
     const id = race.nextId++;
     if (r.item === 'fuel') {
       r.boost = 2.6;
-      if (r.isPlayer) sfx('boost');
+      if (r.isPlayer) { sfx('fuelBoost'); duck(0.8); }
     } else if (r.item === 'oil') {
       const h: Hazard = { id, kind: 'oil', x: t.x - fx * (len + 2.2), y: ground, z: t.z - fz * (len + 2.2), vx: 0, vy: 0, vz: 0,
         owner: r.id, target: null, life: 22, armed: 1, ground };
       race.hazards.push(h);
       race.net?.use(h);
-      if (r.isPlayer) sfx('oil');
+      if (r.isPlayer) sfx('oilDrop');
     } else if (r.item === 'odeshi') {
       r.shield = ODESHI_TIME;
       if (r.isPlayer) sfx('odeshi');
@@ -96,7 +96,9 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
     r.boost = Math.max(0, r.boost - dt);
     r.slip = Math.max(0, r.slip - dt);
     r.curse = Math.max(0, r.curse - dt);
+    const hadShield = r.shield > 0;
     r.shield = Math.max(0, r.shield - dt);
+    if (hadShield && r.shield === 0 && r.isPlayer) sfx('odeshiBreak');
     r.wobble = Math.max(0, r.wobble - dt);
   }
 
@@ -111,7 +113,8 @@ export function updateItems(race: RaceRuntime, dt: number, flash: (m: string) =>
         if ((t.x - h.x) ** 2 + (t.z - h.z) ** 2 < OIL_RADIUS * OIL_RADIUS) {
           r.slip = Math.max(r.slip, lasting(r, 2.6));
           r.immune = r.slip + 1;
-          if (r.isPlayer) { sfx('slip'); flash('OIL!'); }
+          if (r.isPlayer) { sfx('oilSlip'); flash('OIL!'); }
+          else if (race.racers.find(o => o.id === h.owner)?.isPlayer) sfx('oilSlip');
           h.life = Math.min(h.life, 8); // the slick gets smeared away
           race.net?.hit(h.id, r.id);
         }
@@ -157,8 +160,8 @@ function updateJuju(race: RaceRuntime, h: Hazard, dt: number, flash: (m: string)
     r.curse = Math.max(r.curse, lasting(r, 2.6));
     r.boost = 0;
     race.puffs.push({ x: h.x, y: h.ground, z: h.z, age: 0, color: 'juju' });
-    if (r.isPlayer) { sfx('juju'); flash('JUJU!'); }
-    else if (race.racers.find(o => o.id === h.owner)?.isPlayer) sfx('juju');
+    if (r.isPlayer) { sfx('jujuHit'); duck(0.6); flash('JUJU!'); }
+    else if (race.racers.find(o => o.id === h.owner)?.isPlayer) sfx('jujuHit');
     h.life = 0;
     race.net?.hit(h.id, r.id);
     return;
