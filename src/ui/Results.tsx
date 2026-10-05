@@ -1,4 +1,6 @@
+import { Show, SignInButton, SignUpButton } from '@clerk/react';
 import { useGame, type Result } from '../game/store';
+import { AUTH_ENABLED } from './AuthControls';
 import { formatTime } from '../game/race';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { driverById } from '../config/drivers';
@@ -79,14 +81,17 @@ export function Results() {
             <button className="btn primary" onClick={() => { setDriver(unlocked.id); setScreen('campaign'); }}>Use her</button>
           </div>
         )}
-        {showAccountPrompt && !online && (
-          <div className="account">
-            <p><b>Keep your naira safe.</b> Create an account to save your naira and high score on any phone.</p>
-            <div className="row">
-              <button className="btn" disabled title="Accounts are coming soon">Create account (soon)</button>
-              <button className="btn ghost" onClick={dismissAccountPrompt}>Not now</button>
+        {showAccountPrompt && !online && AUTH_ENABLED && (
+          <Show when="signed-out">
+            <div className="account">
+              <p><b>Keep your naira safe.</b> Create an account to save your naira and high score on any phone.</p>
+              <div className="row">
+                <SignUpButton mode="modal"><button className="btn">Create account</button></SignUpButton>
+                <SignInButton mode="modal"><button className="btn">Sign in</button></SignInButton>
+                <button className="btn ghost" onClick={dismissAccountPrompt}>Not now</button>
+              </div>
             </div>
-          </div>
+          </Show>
         )}
         {online && quickRoom ? (
           <div className="row">
