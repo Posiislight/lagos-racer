@@ -3,6 +3,7 @@ import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { TRACKS, trackOrDefault } from '../config/tracks';
 import { driverById } from '../config/drivers';
+import { formatNaira } from '../config/economy';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
 import { enableTilt } from '../game/input';
@@ -39,7 +40,7 @@ export function Menu() {
           <small>{t.name} Grand Prix</small>
           <h1>LAGOS RACER</h1>
         </div>
-        <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
+        <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
       </header>
       <div className="menu-preview">
         <Suspense fallback={null}><Preview id={vehicle} color={p.color} driver={driver} /></Suspense>

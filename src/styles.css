@@ -128,7 +128,27 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .paint-name { font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; margin-left: 4px; }
 .stats span { color: var(--muted); }
 .bar { height: 10px; border-radius: 5px; background: rgba(35, 31, 27, .12); overflow: hidden; }
+.bar { display: flex; }
 .bar i { display: block; height: 100%; background: var(--yellow); border-right: 2px solid var(--ink); transition: width .35s ease; }
+.bar i.up { background: var(--green); }
+/* One row per stat: name, bar, level pips and the price of the next level. */
+.stat-rows { display: grid; gap: 8px; margin: 10px 0 14px; }
+.stat-row {
+  display: grid; grid-template-columns: 76px minmax(48px, 1fr) auto auto; grid-template-areas: 'name bar pips buy';
+  align-items: center; gap: 8px; font-size: 14px; font-weight: 700;
+}
+.stat-row.locked { grid-template-columns: 76px 1fr; grid-template-areas: 'name bar'; }
+.stat-name { grid-area: name; color: var(--muted); }
+.stat-row .bar { grid-area: bar; }
+.pips { grid-area: pips; display: flex; gap: 2px; }
+/* Narrow phones: the level pips go under the bar so the price button is never clipped. */
+@media (max-width: 400px) {
+  .stat-row:not(.locked) { grid-template-columns: 78px minmax(40px, 1fr) auto; grid-template-areas: 'name bar buy' 'name pips buy'; row-gap: 4px; }
+}
+.pips i { box-sizing: border-box; flex: 0 0 11px; height: 11px; border-radius: 3px; border: 2px solid var(--ink); background: rgba(35, 31, 27, .12); }
+.pips i.on { background: var(--green); }
+.upgrade-buy { grid-area: buy; min-height: 46px; padding: 4px 8px; font-size: 14px; min-width: 78px; }
+.upgrade-max { grid-area: buy; min-width: 78px; text-align: center; font-weight: 900; color: var(--green); }
 .stops { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
 .stops::-webkit-scrollbar { display: none; }
 .stops button {
@@ -151,7 +171,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .driver-line { margin: 0 0 4px; font-size: 14px; }
 @media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
 @media (max-width: 720px) and (orientation: portrait) { .garage-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
-@media (max-height: 480px) { .garage-card .muted { display: none; } .garage-card h2 { font-size: 20px; } }
+@media (max-height: 480px) {
+  .garage-card .muted { display: none; }
+  .garage-card h2 { font-size: 20px; margin: 6px 0 0; }
+  .garage-card .stat-rows { gap: 6px; margin: 6px 0 10px; }
+  .upgrade-buy { min-height: 42px; }
+}
 
 /* ---------- modal ---------- */
 .modal { position: absolute; inset: 0; background: rgba(20, 18, 16, .55); display: grid; place-items: center; z-index: 30; padding: 16px; overflow-y: auto; }

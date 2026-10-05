@@ -2,6 +2,7 @@ import { VEHICLES, type VehicleId } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
 import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
 import { driverAvailable, sanitizeCleared } from './campaign';
+import { sanitizeUpgrades, type UpgradeMap } from './upgrades';
 
 /**
  * What the game keeps in localStorage between visits. Version 2 has four vehicles with paints; a
@@ -17,6 +18,8 @@ export type Saved = {
   races: number;
   vehicle: VehicleId;
   unlocked: VehicleId[];
+  /** Stat upgrade levels bought per vehicle. */
+  upgrades: UpgradeMap;
   accountPromptDismissed: boolean;
   /** Chosen paint id per vehicle (missing: the vehicle's usual colour). */
   paint: Partial<Record<VehicleId, string>>;
@@ -43,7 +46,7 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -70,6 +73,7 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     races: num(raw.races, 0),
     vehicle: typeof raw.vehicle === 'string' && IDS.has(raw.vehicle) ? raw.vehicle as VehicleId : d.vehicle,
     unlocked,
+    upgrades: sanitizeUpgrades(raw.upgrades),
     accountPromptDismissed: raw.accountPromptDismissed === true,
     paint: isObj(raw.paint) ? raw.paint as Saved['paint'] : {},
     itemHints: num(raw.itemHints, 0),

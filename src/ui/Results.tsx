@@ -5,6 +5,7 @@ import { driverById } from '../config/drivers';
 import { nextRace } from '../game/campaign';
 import { trackOrDefault } from '../config/tracks';
 import { useNet } from '../net/store';
+import { formatNaira } from '../config/economy';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 const CHEER = ['Oga at the top! 🏆', 'Second place no bad o!', 'Third. You fit do better.', 'Last? Na wa o. Try again!'];
@@ -54,7 +55,7 @@ export function Results() {
             ))}
           </tbody>
         </table>
-        <p className="earned">+ ₦ {coinsEarned} coins{outcome?.firstClear && spec ? ` (includes ₦ ${spec.firstClearCoins} first-clear bonus)` : ''}</p>
+        <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time'}{outcome?.firstClear && spec ? ` (includes ${formatNaira(spec.firstClearCoins)} first-clear bonus)` : ''}</p>
         {unlocked && (
           <div className="unlocked">
             <p><b>{unlocked.name} unlocked!</b> Now playable from the Garage.</p>

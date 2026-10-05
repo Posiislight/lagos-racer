@@ -193,13 +193,16 @@ screen, with no effect on that car.
 - The referee accepts the finish only if all of these hold:
   - the referee's own tracked distance for that car (from snapshots, using the same `updateProgress`) is at
     least `laps × track.length − 30 m`;
-  - no lap is shorter than `track.length / (topSpeed × 1.6)`. The 1.6 allows for fuel boosts and cutting
+  - no lap is shorter than `track.length / (topSpeed × 1.6)`, where `topSpeed` is the vehicle's maxed-out
+    top speed (`applyUpgrades(base, { speed: 5, handling: 5, toughness: 5 }).tuning.topSpeed`, see
+    `2026-10-04-vehicle-upgrades-design.md`), because upgraded cars are faster than base. The 1.6 allows for fuel boosts and cutting
     the inside line.
   - A rejected finish marks the car DNF.
 - When the first car finishes, a 30 s timer starts. At the end of it, or when every car has finished or
   dropped, the server ranks unfinished cars by distance (with projected times, as in the current results
   screen) and sends one `results` message.
-- Coins are awarded by place, using the same table as single-player.
+- Naira is awarded by place with `payoutForPlace` (1st ₦200,000, 2nd ₦150,000, 3rd ₦100,000, nothing below),
+  the same as single-player. Upgrades count in rooms. See `2026-10-04-vehicle-upgrades-design.md`.
 
 ## Dropped connections and errors
 

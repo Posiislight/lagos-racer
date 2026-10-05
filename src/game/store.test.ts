@@ -71,3 +71,63 @@ describe('setDriver', () => {
     expect(state().driver).toBe('mamaput');
   });
 });
+
+describe('buyUpgrade', () => {
+  const reset = (coins: number) => useGame.setState({ coins, unlocked: [], upgrades: {} });
+
+  it('charges the level price and raises the level', () => {
+    reset(100_000);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(true);
+    expect(state().coins).toBe(20_000);
+    expect(state().upgrades.okada?.speed).toBe(1);
+  });
+
+  it('does nothing when the player is short of naira', () => {
+    reset(79_999);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
+    expect(state().coins).toBe(79_999);
+    expect(state().upgrades.okada).toBeUndefined();
+  });
+
+  it('does nothing at level 5', () => {
+    useGame.setState({ coins: 10_000_000, unlocked: [], upgrades: { okada: { speed: 5, handling: 0, toughness: 0 } } });
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
+    expect(state().coins).toBe(10_000_000);
+    expect(state().upgrades.okada?.speed).toBe(5);
+  });
+
+  it('does nothing for a vehicle that is still locked, then works once it is unlocked', () => {
+    reset(10_000_000);
+    expect(state().buyUpgrade('brt', 'toughness')).toBe(false);
+    expect(state().coins).toBe(10_000_000);
+    useGame.setState({ unlocked: ['brt'] });
+    expect(state().buyUpgrade('brt', 'toughness')).toBe(true);
+    expect(state().upgrades.brt?.toughness).toBe(1);
+  });
+
+  it('buys once when a second tap arrives with money for only one', () => {
+    reset(100_000);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(true);
+    expect(state().buyUpgrade('okada', 'speed')).toBe(false);
+    expect(state().upgrades.okada?.speed).toBe(1);
+    expect(state().coins).toBe(20_000);
+  });
+
+  it("keeps each vehicle's upgrades separate", () => {
+    reset(500_000);
+    state().buyUpgrade('okada', 'speed');
+    expect(state().upgrades.danfo).toBeUndefined();
+  });
+});
+
+describe('unlock', () => {
+  it('costs the rescaled price', () => {
+    useGame.setState({ coins: 1_999_999, unlocked: [], upgrades: {} });
+    state().unlock('brt');
+    expect(state().unlocked).not.toContain('brt');
+    useGame.setState({ coins: 2_000_000, unlocked: [], upgrades: {} });
+    state().unlock('brt');
+    expect(state().unlocked).toContain('brt');
+    expect(state().coins).toBe(0);
+  });
+});

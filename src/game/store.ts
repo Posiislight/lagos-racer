@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { VEHICLES, type VehicleId } from '../config/vehicles';
 import { driverAvailable, settle } from './campaign';
 import { CHAPTER_1, type RaceSpec } from '../config/campaign';
+import { upgradePrice } from '../config/economy';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
 import { loadSave, writeSave, type Saved, type Settings } from './save';
+import { levelsFor, type UpgradeKind } from './upgrades';
 
 export type { Quality, Settings } from './save';
 export type Screen = 'menu' | 'garage' | 'campaign' | 'online' | 'lobby' | 'race';
@@ -68,6 +70,8 @@ export type State = Saved & {
   /** One more pickup has shown its how-to hint. */
   countItemHint: () => void;
   unlock: (v: VehicleId) => void;
+  /** Buy the next level of one upgrade. True if it was bought. */
+  buyUpgrade: (v: VehicleId, kind: UpgradeKind) => boolean;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
   /** Start a campaign race, or a quick race when no spec is given. */
   startRace: (spec?: RaceSpec) => void;
@@ -116,6 +120,15 @@ export const useGame = create<State>((set, get) => ({
     set({ coins: s.coins - price, unlocked: [...s.unlocked, v], vehicle: v });
     save();
   },
+  buyUpgrade: (v, kind) => {
+    const s = get(), config = VEHICLES.find(x => x.id === v);
+    if (!config || (config.locked && !s.unlocked.includes(v))) return false;
+    const levels = levelsFor(s.upgrades, v), price = upgradePrice(levels[kind]);
+    if (price === null || s.coins < price) return false;
+    set({ coins: s.coins - price, upgrades: { ...s.upgrades, [v]: { ...levels, [kind]: levels[kind] + 1 } } });
+    save();
+    return true;
+  },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
   startRace: spec => set(s => ({ screen: 'race', online: false, spec: spec ?? null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, showAccountPrompt: false })),
   // Room races are always on the server's track (see ONLINE_TRACK); the solo track pick is left alone.
@@ -144,7 +157,7 @@ export const useGame = create<State>((set, get) => ({
 function save() {
   const s = useGame.getState();
   writeSave({
-    settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked,
+    settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades,
     accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, itemHints: s.itemHints, driver: s.driver, track: s.track,
     campaign: s.campaign,
   });

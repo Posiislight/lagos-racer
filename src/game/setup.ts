@@ -13,6 +13,7 @@ import { createProgress } from './race';
 import { seededRandom } from './random';
 import { aiState, makeRacer, type RaceRuntime, type Racer } from './runtime';
 import { sampleAt } from './track';
+import { NO_UPGRADES, applyUpgrades, type UpgradeLevels } from './upgrades';
 
 export type Spawn = { x: number; y: number; z: number; yaw: number };
 
@@ -29,7 +30,7 @@ const rivalAI = (lane: number, k: number, rand: () => number) => aiState(lane, 0
  * mode that decides how it ends. `spec` is the campaign race this is (null for a quick race); `online`
  * lays the grid out from a room's grid instead of picking rivals.
  */
-export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId, spec: RaceSpec | null = null, online?: OnlineSetup): { race: RaceRuntime; spawns: Spawn[] } {
+export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId, spec: RaceSpec | null = null, online?: OnlineSetup, upgrades: UpgradeLevels = NO_UPGRADES): { race: RaceRuntime; spawns: Spawn[] } {
   const config = { ...trackOrDefault(setup.track), laps: lapsOf(setup.mode) };
   const track = trackFor(config);
   const duel = setup.mode.kind === 'duel' && !online;
@@ -53,7 +54,7 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       const mine = g.slot === online.mySlot;
       const kind = !mine ? 'remote' : g.ai ? 'ai' : 'local';
       const v = vehicleById(g.vehicle);
-      const r = makeRacer(g.netId, g.name, v, paintOf(v, g.paint), kind === 'local', progress, kind === 'local' ? playerDriver : DEFAULT_DRIVER);
+      const r = makeRacer(g.netId, g.name, kind === 'local' ? applyUpgrades(v, upgrades) : v, paintOf(v, g.paint), kind === 'local', progress, kind === 'local' ? playerDriver : DEFAULT_DRIVER);
       r.kind = kind;
       r.owner = g.slot;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
@@ -73,7 +74,8 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       const isPlayer = k === lineup.length - 1;
       const v = vehicleById(vid);
       const driver = isPlayer ? playerDriver : duel ? 'mamaput' : randomDriver(Math.random, setup.excludeDrivers);
-      const r = makeRacer(k, isPlayer ? 'You' : duel ? 'Mama Put' : names[k], v, paintOf(v, paint), isPlayer, progress, driver);
+      // Only the player's vehicle gets upgrades; the AI always races stock.
+      const r = makeRacer(k, isPlayer ? 'You' : duel ? 'Mama Put' : names[k], isPlayer ? applyUpgrades(v, upgrades) : v, paintOf(v, paint), isPlayer, progress, driver);
       if (!isPlayer) {
         r.ai = setup.mode.kind === 'duel' ? aiState(lane, setup.mode.skill, 2, lane, true) : rivalAI(lane, k, Math.random);
       }
