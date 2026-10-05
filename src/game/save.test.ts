@@ -30,7 +30,7 @@ describe('migrateSave (v1 → v2)', () => {
   it('survives junk', () => {
     for (const junk of [null, 'x', 42, { vehicle: 'helicopter', unlocked: 'all' }]) {
       const s = migrateSave(junk);
-      expect(s.vehicle).toBe('okada');
+      expect(s.vehicle).toBe('danfo');
       expect(s.unlocked).toEqual([]);
       expect(s.itemHints).toBe(0);
     }
