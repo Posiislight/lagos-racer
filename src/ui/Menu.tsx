@@ -6,6 +6,8 @@ import { driverById } from '../config/drivers';
 import { formatNaira } from '../config/economy';
 import { PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
 import { Settings } from './Settings';
+import { HowToRace } from './HowToRace';
+import { shouldShowHowTo } from '../game/onboarding';
 import { AuthControls } from './AuthControls';
 import { SyncChip } from './SyncManager';
 import { MENU_TAGLINE, menuCredit } from './menuText';
@@ -32,7 +34,8 @@ export function launchRace(spec: RaceSpec) {
 }
 
 export function Menu() {
-  const { vehicle, coins, premium, unlocked, setScreen, paint, driver } = useGame();
+  const { vehicle, coins, premium, unlocked, setScreen, paint, driver, onboarded, races, campaign, finishOnboarding } = useGame();
+  const [howTo, setHowTo] = useState(false);
   const [settings, setSettings] = useState(false);
   const [shop, setShop] = useState(false);
   const v = vehicleById(vehicle), p = paintOf(v, paint[v.id]), d = driverById(driver), credit = menuCredit(TRACKS);
@@ -53,6 +56,7 @@ export function Menu() {
           <button className="btn small garage-btn" onClick={() => setScreen('garage')}>
             Garage{garageHint && <i className="hint-dot" role="img" aria-label="something you can afford" />}
           </button>
+          <button className="btn small" onClick={() => setHowTo(true)} aria-label="How to play">?</button>
           <button className="btn small" onClick={() => setSettings(true)}>Settings</button>
           <AuthControls />
           <SyncChip />
@@ -75,6 +79,9 @@ export function Menu() {
         </div>
         {credit && <p className="credit muted">Ojuelegba road layout {credit}</p>}
       </div>
+      {(howTo || shouldShowHowTo(onboarded, races, campaign.cleared.length)) && (
+        <HowToRace onDone={() => { setHowTo(false); finishOnboarding(); }} />
+      )}
       {settings && <Settings onClose={() => setSettings(false)} />}
       {shop && (
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">

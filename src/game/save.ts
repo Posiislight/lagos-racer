@@ -32,6 +32,8 @@ export type Saved = {
   ownedPaints: string[];
   /** Rewarded ads watched toward unlocking a locked vehicle. */
   adViews: Partial<Record<VehicleId, number>>;
+  /** The first-race how-to card has been seen (or skipped) on this phone. */
+  onboarded: boolean;
   /** How many power-up pickups have shown the full how-to hint. */
   itemHints: number;
   /** The chosen driver (who sits in the vehicle and which special power you get). */
@@ -49,7 +51,7 @@ const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
   settings: { quality: 'high', autoQuality: true, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -118,6 +120,7 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     unlocked,
     upgrades: sanitizeUpgrades(raw.upgrades),
     accountPromptDismissed: raw.accountPromptDismissed === true,
+    onboarded: raw.onboarded === true,
     paint,
     ownedPaints,
     premium: Math.max(0, Math.floor(num(raw.premium, 0))),

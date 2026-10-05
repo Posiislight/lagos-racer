@@ -89,6 +89,8 @@ export type State = Saved & {
   /** One rewarded ad finished for a locked vehicle: unlocks it at its ad count. Returns the new count, or 0 if nothing counted. */
   addAdView: (v: VehicleId) => number;
   setDriver: (d: DriverId) => void;
+  /** The first-race how-to card was seen or skipped. */
+  finishOnboarding: () => void;
   /** One more pickup has shown its how-to hint. */
   countItemHint: () => void;
   /** Unlocks a locked vehicle for its premium price. */
@@ -162,6 +164,7 @@ export const useGame = create<State>((set, get) => ({
     set({ driver });
     save();
   },
+  finishOnboarding: () => { set({ onboarded: true }); save(); },
   countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), rule = vehicleById(v).locked;
@@ -235,7 +238,7 @@ export function snapshot(): Saved {
   const s = useGame.getState();
   return {
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades,
-    accountPromptDismissed: s.accountPromptDismissed, paint: s.paint, premium: s.premium, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
+    accountPromptDismissed: s.accountPromptDismissed, onboarded: s.onboarded, paint: s.paint, premium: s.premium, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
     campaign: s.campaign, roomEarned: s.roomEarned,
   };
 }

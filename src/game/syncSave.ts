@@ -1,7 +1,7 @@
 import { defaultSave, normaliseSave, type Saved } from './save';
 
-/** What follows the account. Settings, the dismissed prompt and the how-to hint counter stay on each phone. */
-export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'itemHints'>;
+/** What follows the account. Settings, the dismissed prompt, the how-to card and the hint counter stay on each phone. */
+export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'onboarded' | 'itemHints'>;
 
 export const SYNCED_KEYS = [
   'coins', 'best', 'races', 'vehicle', 'unlocked', 'upgrades', 'paint', 'premium', 'ownedPaints',

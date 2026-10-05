@@ -110,6 +110,8 @@ Milestones 1–3 are built, and milestone 4 is partly done.
 
 **Stars and naira** (spec `docs/superpowers/specs/2026-10-05-menu-stars-economy-design.md`): races pay by the stars earned in that run, every time: 1st ★★★ = ₦100,000, 2nd ★★ = ₦60,000, 3rd ★ = ₦30,000, nothing below 3rd (the duel overrides to win = ★★★ only). Best stars per race are saved (`campaign.stars`); a race counts as passed with at least one star. Only race 1 starts open; each next race opens when the one before is passed. Room races pay half with a ₦300,000 daily cap (`src/config/economy.ts`). The main menu has only two entries, Single player and Multiplayer (no quick race), with Garage and Settings as small icon buttons. Phones are forced to landscape: a rotate prompt (`src/ui/RotatePrompt.tsx`) covers every screen in portrait and pauses a race in progress.
 
+**First-time onboarding**: a four-card how-to (drive, power-ups, special, podium) shows over the main menu to a player with no races or campaign progress (`src/ui/HowToRace.tsx`, copy and rules in `src/game/onboarding.ts`); wording follows keys or touch. Skip or finish sets `onboarded` (per phone, not synced). The "?" button on the menu reopens it.
+
 Do not start a later milestone until the earlier one feels fun.
 
 The room server deploys to Railway (`railway.json`); the Vercel site points at it through `VITE_ROOM_SERVER`.
