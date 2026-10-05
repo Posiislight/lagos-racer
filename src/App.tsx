@@ -7,6 +7,7 @@ import { Garage } from './ui/Garage';
 import { Campaign } from './ui/Campaign';
 import { Online } from './ui/Online';
 import { Lobby } from './ui/Lobby';
+import { RotatePrompt } from './ui/RotatePrompt';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
 const Race = lazy(() => import('./ui/Race'));
@@ -39,6 +40,7 @@ export function App() {
           <Race />
         </Suspense>
       )}
+      <RotatePrompt />
     </div>
   );
 }

@@ -18,7 +18,7 @@ better handling or tougher. Success looks like:
 |---|---|
 | Currency | Naira replaces the existing `coins` balance. One currency, same save field (`coins`), shown as ₦. |
 | Payout | 1st ₦200,000, 2nd ₦150,000, 3rd ₦100,000, 4th–6th ₦0. Replaces the 150/100/60/30/20 table. |
-| Structure | Per vehicle. Three categories (Engine, Tyres, Body), levels 0 to 5. |
+| Structure | Per vehicle. You upgrade the three stats themselves: Speed, Handling, Toughness, levels 0 to 5. No parts. |
 | Pacing | About 12 wins to max one vehicle. |
 | AI | Unchanged. AI cars always use base stats. |
 | Multiplayer | Upgrades count in rooms. Top 3 earn the same payouts. |
@@ -43,17 +43,21 @@ base tuning.
 
 | Category | Per level | At level 5 |
 |---|---|---|
-| Engine | `topSpeed` +4%, `accel` +6% | +20% top speed, +30% accel |
-| Tyres | `grip` +4%, `steerAtSpeed` +3%, `brake` +4% | +20% grip, +15% steer at speed (capped at 1.0), +20% brake |
-| Body | impact multiplier −10%, `mass` +3% | impact ×0.5, +15% mass |
+| Speed | `topSpeed` +4%, `accel` +6% | +20% top speed, +30% accel |
+| Handling | `grip` +4%, `steerAtSpeed` +3%, `brake` +4% | +20% grip, +15% steer at speed (capped at 1.0), +20% brake |
+| Toughness | impact multiplier −10%, `mass` +3% | impact ×0.5, +15% mass |
 
 **Impact multiplier (new).** Add `tuning.impact` to `VehicleConfig` (base value 1 for every vehicle). It
 scales the speed lost to wall and vehicle knocks (`racer.knock` in `Vehicle.tsx`) and the scrape drag while
-rubbing a wall. This gives Body a real effect: today the toughness stat is display-only.
+rubbing a wall. This gives Toughness a real effect: today the toughness stat is display-only.
 
-**Stat bars.** Each Garage bar shows the base value (out of 10) plus a coloured segment for upgrades, capped at
-10: Engine adds to Speed (+0.4 per level), Tyres to Handling (+0.4 per level), Body to Toughness (+0.4 per
-level).
+**Stat bars.** Each Garage row is one stat: its bar shows the base value (out of 10) plus a coloured segment
+for upgrades (+0.4 per level, capped at 10), the level pips, and the price of the next level. The upgraded
+value is also written to the effective vehicle's `stats`, so anything that reads a stat (for example the
+juju slowdown, which uses `stats.toughness`) sees the upgrade.
+
+*Revision 2026-10-04:* upgrades were first drawn as Engine, Tyres and Body parts. They are now the stats
+themselves (Speed, Handling, Toughness); the effects in the table are unchanged.
 
 ## Components
 
@@ -69,7 +73,7 @@ level).
 
 ## Data and flow
 
-- Save shape adds `upgrades: Partial<Record<VehicleId, { engine: number; tyres: number; body: number }>>`.
+- Save shape adds `upgrades: Partial<Record<VehicleId, { speed: number; handling: number; toughness: number }>>`.
   Missing entries mean level 0, so existing saves load unchanged. Loaded levels are clamped to
   0..`MAX_UPGRADE_LEVEL` and non-integers are discarded, because the save is plain `localStorage` text.
 - `buyUpgrade(vehicle, kind)`: no-op if the vehicle is locked, the category is at max level, or `coins` is
@@ -83,7 +87,7 @@ level).
 
 - Each phone simulates its own upgraded car, so no tuning data is synced.
 - **Change to the multiplayer spec:** the referee's too-fast-lap check (`track.length / (topSpeed × 1.6)`)
-  must use the vehicle's maxed-out top speed (`applyUpgrades` at level 5 Engine), or an upgraded player would
+  must use the vehicle's maxed-out top speed (`applyUpgrades` at level 5 Speed), or an upgraded player would
   be flagged as cheating. Update `2026-10-03-multiplayer-design.md` and its plan when that milestone is built.
 - Room results use `payoutForPlace` on the server-sent finishing order. The multiplayer spec line "Coins are
   awarded by place, using the same table as single-player" already matches.
@@ -114,4 +118,4 @@ level).
   - `buyUpgrade`: rejected when poor, at max level, or locked; success deducts the exact price;
   - save load: out-of-range and non-integer levels are clamped or discarded.
 - Manual check at a phone viewport: Garage layout with upgrade rows, buying an upgrade, and feeling the
-  difference in the next race (Engine and Tyres at level 5 on the Okada).
+  difference in the next race (Speed and Handling at level 5 on the Okada).

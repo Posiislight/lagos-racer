@@ -200,14 +200,14 @@ export function Vehicle({ racer, spawn, merge = true, quick = false }: { racer: 
 
       // Hitting things costs speed: a knock on impact (walls, other vehicles) and a steady drag
       // while scraping along a wall. You keep accelerating, so it's a penalty, not a stop.
-      if (racer.knock > 0) { nx *= 1 - racer.knock; nz *= 1 - racer.knock; racer.knock = 0; }
+      if (racer.knock > 0) { const k = racer.knock * t.impact; nx *= 1 - k; nz *= 1 - k; racer.knock = 0; }
       // Scraping: the vehicle's outermost corner is at the kerb wall (worked out from where it
       // sits across the road and the angle it's at, which is steadier than contact events).
       const at = race.track.points[racer.progress.index];
       const along = Math.abs(_fwd.x * at.tangent.x + _fwd.z * at.tangent.z), across = Math.sqrt(Math.max(0, 1 - along * along));
       const reach = Math.abs(racer.progress.lateral) + lay.half[2] * along + lay.half[0] * across;
       racer.scraping = reach > race.config.halfWidth + 0.28;
-      if (racer.scraping) { const drag = Math.pow(0.55, dt); nx *= drag; nz *= drag; }
+      if (racer.scraping) { const drag = Math.pow(0.55, dt * t.impact); nx *= drag; nz *= drag; }
       b.setLinvel({ x: nx + racer.bump.x, y: lin.y, z: nz + racer.bump.z }, true);
       // Fuel: a push from behind on top of the extra engine power.
       if (boosting && v < t.topSpeed * f.top) b.applyImpulse({ x: _fwd.x * t.mass * 9 * dt, y: 0, z: _fwd.z * t.mass * 9 * dt }, true);

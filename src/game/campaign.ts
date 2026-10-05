@@ -1,11 +1,6 @@
-import { CHAPTER_1, QUICK_COINS, type RaceSpec } from '../config/campaign';
+import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import { driverById, type DriverId } from '../config/drivers';
-
-/** Coins for a 1-based place from a table whose last entry repeats. Nonsense places get the last entry. */
-export function coinsForPlace(table: number[], place: number): number {
-  const i = Number.isInteger(place) && place >= 1 ? Math.min(place, table.length) - 1 : table.length - 1;
-  return table[i];
-}
+import { DEFAULT_STARS, payoutForStars, starsForPlace, type Stars } from '../config/economy';
 
 /** Where the player finished in `ranking` (racer ids, best first) and whether that clears the race. */
 export function evaluatePass(spec: Pick<RaceSpec, 'pass'>, ranking: number[], playerId: number): { place: number; passed: boolean } {
@@ -14,22 +9,40 @@ export function evaluatePass(spec: Pick<RaceSpec, 'pass'>, ranking: number[], pl
   return { place: i + 1, passed: i + 1 <= spec.pass.place };
 }
 
-export type Settled = { coins: number; passed: boolean; firstClear: boolean; cleared: string[]; unlocked: DriverId | null };
+/** What the campaign remembers: which races are cleared and the best stars on each. */
+export type CampaignSave = { cleared: string[]; stars: Record<string, Stars> };
+
+export type Settled = {
+  /** Stars this run earned (0 to 3). */
+  stars: Stars;
+  /** Naira for this run, paid on every attempt. */
+  payout: number;
+  /** This run beat the previous best (no previous counts as 0) and earned at least one star. */
+  newBest: boolean;
+  passed: boolean;
+  firstClear: boolean;
+  saved: CampaignSave;
+  unlocked: DriverId | null;
+};
 
 /**
- * What a finished race is worth and what it changes. Coins are paid on every attempt by place; the
- * first pass of a campaign race adds its bonus, records the clear and may unlock a driver.
- * `spec` null is a quick race: place coins and nothing else.
+ * What a finished race is worth and what it changes. Every attempt pays by the stars it earned; the
+ * best stars are kept, the first run with at least one star records the clear and may unlock a driver.
  */
-export function settle(spec: RaceSpec | null, place: number, cleared: string[]): Settled {
-  if (!spec) return { coins: coinsForPlace(QUICK_COINS, place), passed: false, firstClear: false, cleared, unlocked: null };
-  const passed = place <= spec.pass.place;
-  const firstClear = passed && !cleared.includes(spec.id);
+export function settle(spec: RaceSpec, place: number, saved: CampaignSave): Settled {
+  const stars = starsForPlace(spec.stars ?? DEFAULT_STARS, place);
+  const previous = saved.stars[spec.id] ?? 0;
+  const firstClear = stars >= 1 && !saved.cleared.includes(spec.id);
   return {
-    coins: coinsForPlace(spec.coins, place) + (firstClear ? spec.firstClearCoins : 0),
-    passed,
+    stars,
+    payout: payoutForStars(stars),
+    newBest: stars >= 1 && stars > previous,
+    passed: Number.isInteger(place) && place >= 1 && place <= spec.pass.place,
     firstClear,
-    cleared: firstClear ? [...cleared, spec.id] : cleared,
+    saved: {
+      cleared: firstClear ? [...saved.cleared, spec.id] : saved.cleared,
+      stars: stars >= 1 ? { ...saved.stars, [spec.id]: Math.max(previous, stars) as Stars } : saved.stars,
+    },
     unlocked: firstClear ? spec.reward?.driver ?? null : null,
   };
 }
@@ -52,6 +65,18 @@ export function nextRace(spec: RaceSpec, chapter: RaceSpec[] = CHAPTER_1): RaceS
 export function sanitizeCleared(raw: unknown, chapter: RaceSpec[] = CHAPTER_1): string[] {
   if (!Array.isArray(raw)) return [];
   return chapter.map(r => r.id).filter(id => raw.includes(id));
+}
+
+/** Best stars from anything (a saved game can hold junk): known ids only, integer values 1 to 3. */
+export function sanitizeStars(raw: unknown, chapter: RaceSpec[] = CHAPTER_1): Record<string, Stars> {
+  const out: Record<string, Stars> = {};
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return out;
+  const map = raw as Record<string, unknown>;
+  for (const { id } of chapter) {
+    const v = map[id];
+    if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 3) out[id] = v as Stars;
+  }
+  return out;
 }
 
 /** Whether the player may pick this driver: not locked, or the race that unlocks them is cleared. */

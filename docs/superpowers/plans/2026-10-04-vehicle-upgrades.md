@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-04-vehicle-upgrades-design.md`
 
+> **Revision after execution:** the categories Engine, Tyres and Body in the tasks below were renamed to the stats themselves: `speed`, `handling`, `toughness` (types, keys, tests and Garage labels). The Garage shows one row per stat (bar, level pips, next price) instead of separate bars and upgrade rows, and `applyUpgrades` also writes the upgraded values into the vehicle's `stats`. Everything else is as written.
+
 ## Global Constraints
 
 - Payouts: 1st ₦200,000, 2nd ₦150,000, 3rd ₦100,000, 4th to 6th ₦0. They replace the 150/100/60/30/20 table.

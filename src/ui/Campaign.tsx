@@ -3,10 +3,12 @@ import { useGame } from '../game/store';
 import { campaignStatus } from '../game/campaign';
 import { trackOrDefault } from '../config/tracks';
 import type { ModeSpec, RaceSpec } from '../config/campaign';
+import { DEFAULT_STARS, PAYOUT_BY_STARS, formatNaira } from '../config/economy';
 import { launchRace } from './Menu';
+import { Stars, payoutLine } from './Stars';
 
 const MODE_NAME: Record<ModeSpec['kind'], string> = { laps: 'Laps', elimination: 'Elimination', duel: 'Duel' };
-const STATE_NAME = { locked: 'Locked', open: 'Open', cleared: 'Cleared' } as const;
+const STATE_NAME = { locked: '', open: 'Open', cleared: 'Cleared' } as const;
 
 /** Chapter 1: four races in order, each opening when the one before it is cleared. */
 export function Campaign() {
@@ -17,7 +19,7 @@ export function Campaign() {
       <header className="garage-head">
         <button className="btn" onClick={() => setScreen('menu')}>← Back</button>
         <h1>Chapter 1</h1>
-        <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
+        <div className="coins" aria-label={`${formatNaira(coins)}`}>{formatNaira(coins)}</div>
       </header>
       <ol className="stops-list">
         {campaignStatus(campaign.cleared).map(({ spec, state }, i) => (
@@ -30,7 +32,9 @@ export function Campaign() {
               <span className="what">
                 <b>{spec.title}</b>
                 <small>{trackOrDefault(spec.track).name} · {MODE_NAME[spec.mode.kind]}</small>
+                {state === 'locked' && <small>Pass the previous race to unlock</small>}
               </span>
+              {state !== 'locked' && <Stars earned={campaign.stars[spec.id] ?? 0} />}
               <span className="state">{state === 'locked' ? '🔒 ' : state === 'cleared' ? '✓ ' : ''}{STATE_NAME[state]}</span>
             </button>
           </li>
@@ -43,6 +47,11 @@ export function Campaign() {
             <h2 id="intro-title">{picked.title}</h2>
             <p className="story">{picked.story}</p>
             <p className="rule"><b>{picked.rule}</b></p>
+            <ul className="reward-ladder" aria-label="Rewards">
+              {(picked.stars ?? DEFAULT_STARS).map((n, i) => (
+                <li key={i}>{payoutLine(i + 1, n, PAYOUT_BY_STARS[n] ?? 0)}</li>
+              ))}
+            </ul>
             {picked.taunts && <p className="taunt">“{picked.taunts.before}”</p>}
             <div className="row">
               <button className="btn primary" onClick={() => launchRace(picked)}>Race</button>
