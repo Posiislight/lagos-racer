@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { RoomServer, type Peer } from './rooms';
 import { trackById } from '../src/config/tracks';
+import { vehicleById } from '../src/config/vehicles';
+import { maxTopSpeed } from '../src/game/upgrades';
 import { buildTrack, sampleAt } from '../src/game/track';
 import {
   FINISH_CUTOFF_MS,
@@ -960,7 +962,7 @@ describe('finish and results', () => {
     drive(startAt, [{ conn: a.conn, slot: 1, netId: 0, speed: 25, sent: true }], 0, 20);
     server.message(a.conn, encodeSnapshot({ slot: 1, raceSeq: 1, time: 1e6, cars: [carAt(0, LAPS * L - 5)] }));
     // Clamped to the room's race time + 1 s: one second at full speed plus the step slack, not a whole race.
-    expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + 33 * 1.6 + 10);
+    expect(room['referee']!.distanceOf(0)).toBeCloseTo(25 * 20 + maxTopSpeed(vehicleById('okada')) * 1.6 + 10);
   });
 
   it('accepts a finish re-sent after a reconnect, claiming the time the car really crossed the line', () => {

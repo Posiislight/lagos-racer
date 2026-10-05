@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildTrack, sampleAt } from '../src/game/track';
 import type { CarState, GridEntry } from '../src/net/protocol';
+import { vehicleById } from '../src/config/vehicles';
+import { maxTopSpeed } from '../src/game/upgrades';
 import { Referee } from './referee';
 
 // The race.test.ts track: a 100 x 60 rounded rectangle, about 370 m a lap.
@@ -8,8 +10,9 @@ const control: [number, number][] = [[0, 0], [50, 0], [70, 15], [70, 45], [50, 6
 const track = buildTrack(control, 1);
 const L = track.length;
 const LAPS = 3;
-// Okada top speed is 33 m/s, so no lap may be quicker than L / 52.8.
-const MIN_LAP = L / (33 * 1.6);
+// The referee allows for every upgrade bought, so an okada's ceiling is its maxed top speed (33 m/s x 1.2).
+const OKADA_MAX = maxTopSpeed(vehicleById('okada'));
+const MIN_LAP = L / (OKADA_MAX * 1.6);
 
 const entry = (netId: number): GridEntry => ({ netId, slot: netId + 1, name: `P${netId}`, vehicle: 'okada', paint: 'red', ai: false });
 const grid = (n: number) => Array.from({ length: n }, (_, i) => entry(i));
@@ -104,7 +107,7 @@ describe('Referee', () => {
     drive(ref, 0, 25, 0, 5);
     // Thirty snapshots all stamped 5 s, each 10 m further on: the per-step slack alone would allow 300 m.
     for (let k = 1; k <= 30; k++) ref.observe(at(0, 125 + 10 * k), 5);
-    expect(ref.distanceOf(0)).toBeCloseTo(33 * 1.6 * 5 + 50 + 30);
+    expect(ref.distanceOf(0)).toBeCloseTo(OKADA_MAX * 1.6 * 5 + 50 + 30);
   });
 
   it('accepts a late finish (a reconnect), but not one from the future or from before the car was last seen short of the line', () => {
