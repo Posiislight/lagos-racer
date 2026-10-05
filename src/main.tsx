@@ -8,6 +8,9 @@ import { AUTH_ENABLED } from './ui/AuthControls';
 import { SyncManager } from './ui/SyncManager';
 import { createGoogleAdProvider } from './game/googleAds';
 import { syncBaseUrl } from './game/sync';
+import { Sentry, initMonitoring } from './monitoring';
+
+initMonitoring();
 
 // Rewarded ads come from Google H5 Games Ads when VITE_ADSENSE_CLIENT is set. They are placeholder
 // test ads everywhere except a production build with VITE_ADS_LIVE=1. With no id, dev builds get a stub.
@@ -24,7 +27,12 @@ if (import.meta.env.PROD) {
 }
 
 // Accounts are optional: with no Clerk key the game runs exactly as before.
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById('root')!, {
+  // React 19 reports render errors here instead of rethrowing them to window.onerror.
+  onUncaughtError: Sentry.reactErrorHandler(),
+  onCaughtError: Sentry.reactErrorHandler(),
+  onRecoverableError: Sentry.reactErrorHandler(),
+}).render(
   <StrictMode>
     {AUTH_ENABLED ? (
       <ClerkProvider afterSignOutUrl="/"><SyncManager /><App /></ClerkProvider>
