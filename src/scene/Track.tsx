@@ -23,6 +23,12 @@ const BARRIER_PROFILE: [number, number][] = [[0.1, 0], [0.13, 0.85], [0.22, 0.95
  * wall), and everything follows the road's gentle hills.
  */
 export function Track({ cfg, track, density, animateWater = true }: { cfg: TrackConfig; track: TrackData; density: number; animateWater?: boolean }) {
+  // Out-and-back roads: where the other leg runs alongside, the left edge is a painted median
+  // (black and white, red and white on one stretch) instead of pavement. Each leg draws its half.
+  const median = useMemo(() => cfg.median ? medianMask(track, cfg.halfWidth, cfg.median.width) : null, [cfg, track]);
+  // The road, the colliders and the textures are built once per race. Only the scenery and the lagoon's
+  // props depend on `density` (the graphics level, which can drop mid-race), so they are built apart:
+  // changing the level must not rebuild the road or swap the physics colliders under the cars.
   const parts = useMemo(() => {
     const hw = cfg.halfWidth;
     const water = cfg.setting?.water;
@@ -34,9 +40,6 @@ export function Track({ cfg, track, density, animateWater = true }: { cfg: Track
     const onCauseway = water && land ? track.points.map((p, i) => !raised![i] && !land.isLand(p.pos.x, p.pos.z)) : null;
     const tex = { road: asphaltTexture(), kerb: kerbConcreteTexture(), ground: groundTexture(cfg.ground), pave: pavementTexture() };
     const mat = (map: Texture, o: Partial<MeshStandardMaterial> = {}) => new MeshStandardMaterial({ map, roughness: 0.9, ...o });
-    // Out-and-back roads: where the other leg runs alongside, the left edge is a painted median
-    // (black and white, red and white on one stretch) instead of pavement. Each leg draws its half.
-    const median = cfg.median ? medianMask(track, hw, cfg.median.width) : null;
     const notMedian = median?.map(m => !m);
     const redWhite = median && cfg.median?.redWhite && cfg.axis ? roadRangeMask(track, cfg.axis, cfg.median.redWhite, 2 * hw + cfg.median.width) : null;
     const barrier = median && cfg.median?.barrier && cfg.axis ? roadRangeMask(track, cfg.axis, cfg.median.barrier, 2 * hw + cfg.median.width) : null;
@@ -57,20 +60,29 @@ export function Track({ cfg, track, density, animateWater = true }: { cfg: Track
       paveL: new Mesh(ribbon(track, -(hw + KERB), -(hw + PAVEMENT + 0.6), 0.18, 6, mask(notMedian, grounded)), mat(tex.pave)),
       paveR: new Mesh(ribbon(track, hw + KERB, hw + PAVEMENT + 0.6, 0.18, 6, grounded ?? undefined), mat(tex.pave)),
       ground: new Mesh(water && land ? lagoonTerrain(track, land, water) : terrainGeometry(track, hw), mat(tex.ground, { roughness: 1, ...(water ? { vertexColors: true } : {}) })),
-      lagoon: water && land ? lagoonParts(cfg, track, density, land, tex.road) : null,
+      land,
+      lagoon: water && land ? lagoonParts(track, cfg, tex.road) : null,
       bank: onCauseway ? bankParts(track, hw, onCauseway) : [],
       surface: surfaceCollider(track, -hw - 1.5, hw + 1.5),
       walls: [...wallBoxes(track, -(hw + 0.35)), ...wallBoxes(track, hw + 0.35)],
-      scenery: buildScenery(cfg, track, density, median),
       startLine: startLine(cfg, track),
     };
-  }, [cfg, track, density]);
+  }, [cfg, track, median]);
+
+  const scenery = useMemo(() => buildScenery(cfg, track, density, median), [cfg, track, density, median]);
+  const lagoonProps = useMemo(
+    () => parts.land && parts.lagoon ? buildLagoon(cfg, track, density, parts.land, parts.lagoon.oncoming) : null,
+    [cfg, track, density, parts],
+  );
 
   useFrame((_, dt) => { if (animateWater) parts.lagoon?.surface.scroll(Math.min(dt, 0.05)); });
 
   useEffect(() => () => {
-    parts.scenery.traverse(o => { const m = o as Mesh; if (m.isMesh) m.geometry.dispose(); });
-  }, [parts]);
+    scenery.traverse(o => { const m = o as Mesh; if (m.isMesh) m.geometry.dispose(); });
+  }, [scenery]);
+  useEffect(() => () => {
+    lagoonProps?.traverse(o => { const m = o as Mesh; if (m.isMesh) m.geometry.dispose(); });
+  }, [lagoonProps]);
 
   const shadowy = (m: Mesh, cast = false) => { m.receiveShadow = true; m.castShadow = cast; return m; };
 
@@ -87,10 +99,10 @@ export function Track({ cfg, track, density, animateWater = true }: { cfg: Track
       {parts.lagoon && <>
         <primitive object={parts.lagoon.surface.mesh} />
         <primitive object={parts.lagoon.deck} />
-        <primitive object={parts.lagoon.props} />
+        {lagoonProps && <primitive object={lagoonProps} />}
       </>}
       <primitive object={parts.startLine} />
-      <primitive object={parts.scenery} />
+      <primitive object={scenery} />
       <RigidBody type="fixed" colliders={false} friction={0.9}>
         <TrimeshCollider args={[parts.surface.vertices, parts.surface.indices]} friction={1} />
         {/* Safety net far below, in case anything ever slips through. */}
@@ -122,14 +134,9 @@ function mask(a: boolean[] | undefined, b: boolean[] | undefined) {
 }
 
 /** The lagoon: the water, the concrete deck and the props on and around it. */
-function lagoonParts(cfg: TrackConfig, track: TrackData, density: number, land: ReturnType<typeof makeLand>, roadTexture: Texture) {
-  const water = cfg.setting!.water!;
+function lagoonParts(track: TrackData, cfg: TrackConfig, roadTexture: Texture) {
   const deck = deckMeshes(track, cfg.halfWidth, { road: roadTexture, concrete: kerbConcreteTexture() });
-  return {
-    surface: lagoonSurface(track, water),
-    deck: deck.group,
-    props: buildLagoon(cfg, track, density, land, deck.oncoming),
-  };
+  return { surface: lagoonSurface(track, cfg.setting!.water!), deck: deck.group, oncoming: deck.oncoming };
 }
 
 /** A rocky bank down into the water along each side of the causeway. */

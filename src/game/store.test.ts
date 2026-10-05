@@ -228,3 +228,19 @@ describe('premium currency', () => {
     expect(state().adViews.brt).toBe(1);
   });
 });
+
+describe('setQualityMode', () => {
+  it('picking a level by hand turns automatic lowering off', () => {
+    state().setQualityMode('low');
+    expect(state().settings).toMatchObject({ quality: 'low', autoQuality: false });
+    state().setQualityMode('high');
+    expect(state().settings).toMatchObject({ quality: 'high', autoQuality: false });
+  });
+
+  it('picking Auto turns it on again and starts over from the starting level', () => {
+    state().setQualityMode('low');
+    state().setQualityMode('auto');
+    expect(state().settings.autoQuality).toBe(true);
+    expect(['high', 'medium']).toContain(state().settings.quality);
+  });
+});

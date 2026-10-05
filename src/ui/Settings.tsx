@@ -1,9 +1,9 @@
-import { useGame, type Quality } from '../game/store';
+import { useGame } from '../game/store';
 import { enableTilt } from '../game/input';
 import { useIsTouch } from './TouchControls';
 
 export function Settings({ onClose }: { onClose: () => void }) {
-  const { settings, setSetting } = useGame();
+  const { settings, setSetting, setQualityMode } = useGame();
   const isTouch = useIsTouch();
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -11,14 +11,21 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <h2 id="settings-title">Settings</h2>
         <fieldset className="seg">
           <legend>Graphics quality</legend>
-          {(['low', 'medium', 'high'] as Quality[]).map(q => (
-            <label key={q} className={settings.quality === q ? 'on' : ''}>
-              <input type="radio" name="quality" checked={settings.quality === q} onChange={() => setSetting('quality', q)} />
-              {q[0].toUpperCase() + q.slice(1)}
-            </label>
-          ))}
+          {(['auto', 'low', 'medium', 'high'] as const).map(m => {
+            const on = (settings.autoQuality ? 'auto' : settings.quality) === m;
+            return (
+              <label key={m} className={on ? 'on' : ''}>
+                <input type="radio" name="quality" checked={on} onChange={() => setQualityMode(m)} />
+                {m[0].toUpperCase() + m.slice(1)}
+              </label>
+            );
+          })}
         </fieldset>
-        <p className="muted small">Low is best for budget phones: no shadows, less scenery, lower resolution.</p>
+        <p className="muted small">
+          {settings.autoQuality
+            ? `Auto starts on high and lowers itself if your phone can't keep up. Now: ${settings.quality}.`
+            : 'Low is best for budget phones: no shadows, less scenery, lower resolution.'}
+        </p>
         {isTouch && (
           <>
             <fieldset className="seg">

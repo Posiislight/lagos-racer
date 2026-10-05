@@ -9,25 +9,23 @@ import { paintOf, vehicleById } from '../config/vehicles';
 import { setRace, getRace } from '../game/runtime';
 import { makeRace } from '../game/setup';
 import { levelsFor } from '../game/upgrades';
-import { useGame, type Quality } from '../game/store';
+import { useGame } from '../game/store';
+import { PROFILES } from '../game/adaptiveQuality';
 import { resetPlayerInput } from '../game/input';
 import { getSession, useNet } from '../net/store';
 import { Track } from './Track';
 import { Vehicle } from './Vehicle';
 import { ChaseCamera } from './ChaseCamera';
 import { FxBridge } from './FxBridge';
+import { AdaptiveQuality } from './AdaptiveQuality';
 import { RaceLogic } from './RaceLogic';
 import { Effects } from './Effects';
 import { makeSkyline } from './art/skyline';
 import { makeShore } from './art/shore';
 import { Critters } from './Critters';
 
-// View distance matters most on tight streets: what's beyond it is never drawn.
-const QUALITY: Record<Quality, { density: number; shadows: number; far: number }> = {
-  low: { density: 0.5, shadows: 0, far: 170 },
-  medium: { density: 0.8, shadows: 1024, far: 230 },
-  high: { density: 1, shadows: 2048, far: 300 },
-};
+// Fog starts and ends at these shares of the view distance, which matters most on tight streets: what's beyond it is never drawn.
+const FOG_NEAR = 0.3, FOG_FAR = 0.97;
 
 export function RaceScene() {
   const raceId = useGame(s => s.raceId);
@@ -39,7 +37,7 @@ export function RaceScene() {
   const quality = useGame(s => s.settings.quality);
   const paused = useGame(s => s.paused);
   const online = useGame(s => s.online);
-  const q = QUALITY[quality];
+  const q = PROFILES[quality];
 
   // A fresh race whenever a new one is started; a room race is laid out from the server's grid.
   const { setup, session } = useMemo(() => {
@@ -61,10 +59,10 @@ export function RaceScene() {
 
   return (
     <>
-      <SkyAndLight shadows={q.shadows} far={q.far} setting={setup.race.config.setting ?? STREET} />
+      <SkyAndLight shadows={q.shadowMap} far={q.far} setting={setup.race.config.setting ?? STREET} />
       {/* A room race never stops for one phone's menu. */}
       <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
-        <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={quality !== 'low'} />
+        <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={q.animateWater} />
         {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} quick={setup.race.humanize} />)}
       </Physics>
       <Effects />
@@ -72,6 +70,7 @@ export function RaceScene() {
       <RaceLogic key={raceId} />
       <ChaseCamera />
       <FxBridge quality={quality} />
+      <AdaptiveQuality />
     </>
   );
 }
@@ -130,9 +129,32 @@ function SkyAndLight({ shadows, far, setting }: { shadows: number; far: number; 
     const rt = pm.fromScene(env, 0.04);
     scene.environment = rt.texture;
     scene.environmentIntensity = 0.7;
-    scene.fog = new Fog(setting.fog, far * 0.3, far * 0.97);
-    return () => { rt.dispose(); pm.dispose(); scene.environment = null; scene.fog = null; };
-  }, [gl, scene, sky, far, setting]);
+    return () => { rt.dispose(); pm.dispose(); scene.environment = null; };
+  }, [gl, scene, sky]);
+
+  // The fog's colour belongs to the track; its range follows the draw distance, so a change of quality
+  // moves the range in place instead of rebuilding the reflections or the fog.
+  useEffect(() => {
+    scene.fog = new Fog(setting.fog, far * FOG_NEAR, far * FOG_FAR);
+    return () => { scene.fog = null; };
+  }, [scene, setting]);
+  useEffect(() => {
+    if (scene.fog instanceof Fog) { scene.fog.near = far * FOG_NEAR; scene.fog.far = far * FOG_FAR; }
+  }, [scene, setting, far]);
+
+  // A shadow map keeps the size it was allocated at, so free it and let three allocate one at the new
+  // size (none at all when shadows go off). Turning shadows off or on also changes every lit shader.
+  const shadowed = useRef(shadows > 0);
+  useEffect(() => {
+    const light = sun.current;
+    if (light?.shadow.map) { light.shadow.map.dispose(); light.shadow.map = null; }
+    if (shadowed.current === shadows > 0) return;
+    shadowed.current = shadows > 0;
+    scene.traverse(o => {
+      const m = (o as Mesh).material;
+      for (const mat of Array.isArray(m) ? m : m ? [m] : []) mat.needsUpdate = true;
+    });
+  }, [scene, shadows]);
 
   useFrame(() => {
     sky.position.copy(camera.position); sky.scale.setScalar(far * 0.9);

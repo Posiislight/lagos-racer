@@ -6,6 +6,8 @@ import {
 } from 'three';
 import { ITEM_COLOR, ITEM_KINDS, itemAtlas } from './art/items';
 import { getRace } from '../game/runtime';
+import { fx } from '../game/fx';
+import { PROFILES } from '../game/adaptiveQuality';
 import { SPECIALS } from '../config/drivers';
 import { canvasTex } from './trackGeometry';
 
@@ -68,6 +70,9 @@ export function Effects() {
     const race = getRace();
     if (!race || !orbs.current || !halos.current || !jujus.current || !trails.current || !oils.current || !soups.current || !puffs.current) return;
     const t = clock.elapsedTime;
+    // Lower quality draws shorter juju trails and fewer puffs (the instance counts below are the draw ranges).
+    const share = PROFILES[fx.quality].particles;
+    const trailLen = Math.max(3, Math.round(TRAIL * share)), maxPuffs = Math.max(6, Math.round(MAX * share));
 
     // Pickups: the item's icon bobbing over the road, with a glow in its colour.
     if (sprites.current.length !== race.pickups.length && icons.current) {
@@ -96,15 +101,15 @@ export function Effects() {
       if (h.kind === 'juju' && nj < MAX) {
         live.add(h.id);
         const hist = history.current.get(h.id) ?? [];
-        hist.unshift({ x: h.x, y: h.y, z: h.z }); if (hist.length > TRAIL) hist.pop();
+        hist.unshift({ x: h.x, y: h.y, z: h.z }); while (hist.length > trailLen) hist.pop();
         history.current.set(h.id, hist);
         _o.position.set(h.x, h.y, h.z); _o.rotation.set(t * 6, t * 4, 0); _o.scale.setScalar(0.9 + Math.sin(t * 20) * 0.1); _o.updateMatrix();
         jujus.current.setMatrixAt(nj++, _o.matrix);
         hist.forEach((q, i) => {
-          if (nt >= MAX * TRAIL) return;
-          _o.position.set(q.x, q.y, q.z); _o.scale.setScalar(0.9 * (1 - i / TRAIL) + 0.15); _o.updateMatrix();
+          if (nt >= MAX * trailLen) return;
+          _o.position.set(q.x, q.y, q.z); _o.scale.setScalar(0.9 * (1 - i / trailLen) + 0.15); _o.updateMatrix();
           trails.current!.setMatrixAt(nt, _o.matrix);
-          trails.current!.setColorAt(nt, _c.copy(PUFF.juju).multiplyScalar(1 - i / TRAIL));
+          trails.current!.setColorAt(nt, _c.copy(PUFF.juju).multiplyScalar(1 - i / trailLen));
           nt++;
         });
       } else if (h.kind === 'oil' && no < MAX) {
@@ -124,7 +129,7 @@ export function Effects() {
     // Puffs: expand and fade (additive, so fading is just a darker colour).
     let np = 0;
     for (const p of race.puffs) {
-      if (np >= MAX) break;
+      if (np >= maxPuffs) break;
       const k = p.age / 1.2;
       // Steam off the soup is a small, faint wisp that rises; the others are big bursts.
       const steam = p.color === 'steam';

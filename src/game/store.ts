@@ -5,11 +5,13 @@ import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import { roomPayout, upgradePrice, type Stars } from '../config/economy';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
-import { SAVE_KEY, loadSave, roomEarnedToday, todayKey, writeSave, type Saved, type Settings } from './save';
+import { SAVE_KEY, hasSave, loadSave, roomEarnedToday, todayKey, writeSave, type Saved, type Settings } from './save';
+import { startQuality } from './adaptiveQuality';
 import { mergeRemote, pickSynced, type SyncedSave } from './syncSave';
 import { levelsFor, type UpgradeKind } from './upgrades';
 
 export type { Quality, Settings } from './save';
+import type { Quality } from './save';
 export type Screen = 'menu' | 'garage' | 'campaign' | 'online' | 'lobby' | 'race';
 
 /**
@@ -45,6 +47,8 @@ export type Hud = {
 };
 
 const initial = loadSave();
+// A first visit on a clearly weak phone starts on Medium; everyone else, and anyone with a saved level, keeps theirs.
+if (!hasSave()) initial.settings = { ...initial.settings, quality: startQuality() };
 // Reviewer shortcuts (they go when payments land): ?unlock=all opens every vehicle, paint and campaign
 // race; ?premium=N sets the premium balance.
 const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
@@ -92,6 +96,8 @@ export type State = Saved & {
   /** Buy the next level of one upgrade. True if it was bought. */
   buyUpgrade: (v: VehicleId, kind: UpgradeKind) => boolean;
   setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
+  /** A level picked by hand turns automatic lowering off; 'auto' turns it on again and starts over from the starting level. */
+  setQualityMode: (mode: Quality | 'auto') => void;
   /** Start a campaign race. */
   startRace: (spec: RaceSpec) => void;
   startOnlineRace: () => void;
@@ -173,6 +179,11 @@ export const useGame = create<State>((set, get) => ({
     return true;
   },
   setSetting: (k, v) => { set({ settings: { ...get().settings, [k]: v } }); save(); },
+  setQualityMode: mode => {
+    const settings = get().settings;
+    set({ settings: mode === 'auto' ? { ...settings, autoQuality: true, quality: startQuality() } : { ...settings, autoQuality: false, quality: mode } });
+    save();
+  },
   startRace: spec => set(s => ({ screen: 'race', online: false, spec, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, earnedStars: 0, roomCapped: false, showAccountPrompt: false })),
   // Room races are always on the server's track (see ONLINE_TRACK); the solo track pick is left alone.
   startOnlineRace: () => set(s => ({ screen: 'race', online: true, spec: null, outcome: null, raceId: s.raceId + 1, paused: false, results: null, hud: emptyHud(), coinsEarned: 0, earnedStars: 0, roomCapped: false, showAccountPrompt: false })),

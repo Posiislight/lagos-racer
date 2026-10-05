@@ -23,7 +23,7 @@ Most players will be on budget Android phones (Tecno, Infinix) on mobile data.
 - Low-poly models, compressed (Draco or meshopt for geometry, KTX2 for textures)
 - Baked lighting where possible; keep real-time shadows to one directional light, low resolution
 - Short, enclosed tracks; never render a whole city
-- A quality setting (low/medium/high)
+- A quality setting (low/medium/high, or Auto). Auto starts on high (medium on a clearly weak phone, first visit only) and steps down one level when the frame rate stays under 40 for three one-second windows in a row; it never steps back up. Tunables and what each level means are in `src/game/adaptiveQuality.ts`; the scene reads the level from `settings.quality`. `?debug=1` shows an FPS and renderer-stats overlay.
 - Keep the initial download small; lazy-load tracks and vehicles
 
 ## Art direction

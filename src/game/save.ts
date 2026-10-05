@@ -11,7 +11,8 @@ import { sanitizeUpgrades, type UpgradeMap } from './upgrades';
  * with one star per race already cleared and no room earnings.
  */
 export type Quality = 'low' | 'medium' | 'high';
-export type Settings = { quality: Quality; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
+/** quality is the level in use; with autoQuality on, the race lowers it when the device can't keep up. */
+export type Settings = { quality: Quality; autoQuality: boolean; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
 
 export type Saved = {
   settings: Settings;
@@ -47,7 +48,7 @@ export const SAVE_KEY = 'lagos-racer:v2';
 const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
-  settings: { quality: 'high', sound: true, steering: 'buttons', invertTilt: false, showFps: false },
+  settings: { quality: 'high', autoQuality: true, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
   coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
@@ -144,6 +145,11 @@ export function migrateSave(v1: unknown): Saved {
 }
 
 /** Read the save: version 2 if there is one, else a migrated version 1, else a fresh start. */
+/** True if this phone has a save from an earlier visit. */
+export function hasSave(): boolean {
+  try { return localStorage.getItem(SAVE_KEY) !== null || localStorage.getItem(OLD_KEY) !== null; } catch { return false; }
+}
+
 export function loadSave(): Saved {
   try {
     const v2 = localStorage.getItem(SAVE_KEY);

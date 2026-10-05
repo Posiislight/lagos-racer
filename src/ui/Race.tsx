@@ -4,6 +4,8 @@ import { ACESFilmicToneMapping } from 'three';
 import { useGame } from '../game/store';
 import { getRace } from '../game/runtime';
 import { RaceScene } from '../scene/RaceScene';
+import { DEBUG_OVERLAY, PROFILES } from '../game/adaptiveQuality';
+import { DebugOverlay } from './DebugOverlay';
 import { Hud } from './Hud';
 import { ScreenFx } from './ScreenFx';
 import { TouchControls, useIsTouch } from './TouchControls';
@@ -12,8 +14,6 @@ import { PauseMenu } from './PauseMenu';
 import { ConnectionCut } from './Online';
 import { useNet } from '../net/store';
 import { Loading } from '../App';
-
-const DPR = { low: [0.75, 1], medium: [1, 1.5], high: [1, 2] } as const;
 
 export default function Race() {
   const quality = useGame(s => s.settings.quality);
@@ -43,7 +43,8 @@ export default function Race() {
       <Canvas
         className="race-canvas"
         shadows={quality !== 'low'}
-        dpr={[...DPR[quality]]}
+        dpr={PROFILES[quality].dpr}
+        // Antialiasing is fixed when the canvas is created: a level change mid-race can't toggle it, the next race picks it up.
         gl={{ antialias: quality !== 'low', powerPreference: 'high-performance', toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
         camera={{ fov: 62, near: 0.2, far: 2000, position: [0, 5, 10] }}
         onCreated={state => {
@@ -58,6 +59,7 @@ export default function Race() {
       </Canvas>
       {!ready && <Loading />}
       <ScreenFx />
+      {DEBUG_OVERLAY && <DebugOverlay />}
       <Hud onPause={() => setPaused(true)} />
       {online && reconnecting && <div className="net-badge" role="status">Reconnecting…</div>}
       {touch && !results && !cut && <TouchControls />}
