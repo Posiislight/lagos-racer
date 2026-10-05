@@ -1868,3 +1868,47 @@ describe('quick matchmaking', () => {
     expect(lastRoom(f.peer).quick).toBeUndefined();
   });
 });
+
+describe('voice signalling', () => {
+  const offer = { kind: 'offer', sdp: 'v=0' };
+
+  function pair() {
+    const a = create('Ade');
+    const b = join(msgs(a.peer, 'welcome')[0].code, 'Bola');
+    return { a, b, aSlot: msgs(a.peer, 'welcome')[0].slot, bSlot: msgs(b.peer, 'welcome')[0].slot };
+  }
+
+  it('passes a signal to the named player, saying who sent it', () => {
+    const { a, b, aSlot, bSlot } = pair();
+    send(a.conn, { t: 'rtc', to: bSlot, signal: offer });
+    expect(msgs(b.peer, 'rtc')).toEqual([{ t: 'rtc', from: aSlot, signal: offer }]);
+    expect(msgs(a.peer, 'rtc')).toEqual([]);
+  });
+
+  it('relays ice candidates and drops malformed or oversize signals', () => {
+    const { a, b, bSlot } = pair();
+    send(a.conn, { t: 'rtc', to: bSlot, signal: { kind: 'ice', candidate: 'candidate:1', mid: '0', index: 0 } });
+    send(a.conn, { t: 'rtc', to: bSlot, signal: { kind: 'offer', sdp: 'x'.repeat(4000) } });
+    send(a.conn, { t: 'rtc', to: bSlot, signal: { kind: 'bogus' } });
+    send(a.conn, { t: 'rtc', to: 'b', signal: offer });
+    expect(msgs(b.peer, 'rtc')).toHaveLength(1);
+  });
+
+  it('goes nowhere for yourself, an empty seat or another room', () => {
+    const { a, aSlot } = pair();
+    const other = create('Chidi');
+    send(a.conn, { t: 'rtc', to: aSlot, signal: offer });
+    send(a.conn, { t: 'rtc', to: 5, signal: offer });
+    expect(msgs(a.peer, 'rtc')).toEqual([]);
+    expect(msgs(other.peer, 'rtc')).toEqual([]);
+  });
+
+  it('is not offered in a Quick room', () => {
+    const a = connect();
+    const b = connect();
+    send(a.conn, { t: 'quick', name: 'Ade', vehicle: 'okada' });
+    send(b.conn, { t: 'quick', name: 'Bola', vehicle: 'okada' });
+    send(a.conn, { t: 'rtc', to: msgs(b.peer, 'welcome')[0].slot, signal: offer });
+    expect(msgs(b.peer, 'rtc')).toEqual([]);
+  });
+});

@@ -14,6 +14,7 @@ import { PauseMenu } from './PauseMenu';
 import { ConnectionCut } from './Online';
 import { useNet } from '../net/store';
 import { Loading } from '../App';
+import { VoiceControls } from './VoiceControls';
 
 export default function Race() {
   const quality = useGame(s => s.settings.quality);
@@ -61,6 +62,7 @@ export default function Race() {
       <ScreenFx />
       {DEBUG_OVERLAY && <DebugOverlay />}
       <Hud onPause={() => setPaused(true)} />
+      {online && !results && !cut && <div className="voice-float"><VoiceControls compact /></div>}
       {online && reconnecting && <div className="net-badge" role="status">Reconnecting…</div>}
       {touch && !results && !cut && <TouchControls />}
       {paused && !results && !cut && <PauseMenu />}

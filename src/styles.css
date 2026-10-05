@@ -390,6 +390,15 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   top: 45%; left: 50%; transform: translateX(-50%); background: var(--red); padding: 8px 18px; border-radius: 10px; font-size: 24px;
   animation: blink .5s steps(2) infinite;
 }
+.voice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.voice .net-note { flex-basis: 100%; }
+.voice-btn { display: inline-flex; align-items: center; gap: 6px; }
+.lobby .btn.voice-btn.live { background: #bfe8c9; border-color: var(--green); }
+/* In the race the buttons sit mid-left, clear of the touch pads at the bottom corners. */
+.voice-float { position: absolute; z-index: 11; top: 50%; left: calc(12px + var(--safe-l)); transform: translateY(-50%); }
+.voice.compact { flex-direction: column; }
+.voice.compact .btn { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 50%; opacity: .85; }
+.voice.compact .btn.live { background: #bfe8c9; color: var(--ink); }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
 @keyframes msg { 0% { transform: translateX(-50%) scale(1.5); opacity: 0; } 12% { transform: translateX(-50%) scale(1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
 @keyframes blink { 50% { opacity: .55; } }

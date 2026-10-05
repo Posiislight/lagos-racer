@@ -13,6 +13,7 @@ import {
   normalizeCode,
   type ClientMessage,
   type ErrorCode,
+  type RtcSignal,
   type ServerMessage,
 } from '../src/net/protocol';
 import type { Hazard } from '../src/game/runtime';
@@ -26,7 +27,7 @@ export interface Peer {
   close(dead?: boolean): void;
 }
 
-type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'quick' | 'vote' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' }>;
+type Handled = Extract<ClientMessage, { t: 'create' | 'join' | 'quick' | 'vote' | 'resume' | 'ping' | 'lobby' | 'leave' | 'start' | 'loaded' | 'pickup' | 'use' | 'hit' | 'finish' | 'rtc' }>;
 
 /** One second's count of JSON messages. */
 type Budget = { start: number; count: number };
@@ -89,6 +90,26 @@ function parseHazard(v: unknown): Hazard | null {
   };
 }
 
+const SDP_MAX = 3500;
+const CANDIDATE_MAX = 400;
+
+/** A well-formed voice signal, rebuilt field by field so nothing extra is relayed. */
+function parseSignal(v: unknown): RtcSignal | null {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  if (o.kind === 'offer' || o.kind === 'answer') {
+    if (typeof o.sdp !== 'string' || o.sdp.length > SDP_MAX) return null;
+    return o.kind === 'offer' ? { kind: 'offer', sdp: o.sdp } : { kind: 'answer', sdp: o.sdp };
+  }
+  if (o.kind === 'ice') {
+    if (typeof o.candidate !== 'string' || o.candidate.length > CANDIDATE_MAX) return null;
+    if (o.mid !== null && (typeof o.mid !== 'string' || o.mid.length > 32)) return null;
+    if (o.index !== null && !Number.isInteger(o.index)) return null;
+    return { kind: 'ice', candidate: o.candidate, mid: o.mid as string | null, index: o.index as number | null };
+  }
+  return null;
+}
+
 function parse(raw: string): Handled | null {
   let m: unknown;
   try {
@@ -126,6 +147,10 @@ function parse(raw: string): Handled | null {
       if (ready !== undefined && typeof ready !== 'boolean') return null;
       if (fillAI !== undefined && typeof fillAI !== 'boolean') return null;
       return { t: 'lobby', vehicle, paint, ready, fillAI };
+    }
+    case 'rtc': {
+      const signal = parseSignal(o.signal);
+      return Number.isInteger(o.to) && signal ? { t: 'rtc', to: o.to as number, signal } : null;
     }
     case 'leave':
       return { t: 'leave' };
@@ -205,6 +230,13 @@ export class RoomServer {
     const room = c.room;
     if (!room) return;
     if (m.t === 'pickup' || m.t === 'use' || m.t === 'hit') return this.relayEvent(c, room, m);
+    if (m.t === 'rtc') {
+      // Voice is for friends' rooms only (a Quick room's bots are silent, and strangers are not patched through), and
+      // only between two people in the same room.
+      const to = room.quick || m.to === c.slot ? null : room.connOf(m.to);
+      if (to !== null) this.send(to, { t: 'rtc', from: c.slot, signal: m.signal });
+      return;
+    }
     if (m.t === 'finish') {
       if (room.finish(c.slot, m.netId, m.laps, m.time, this.now())) room.lastActivity = this.now();
       return;
