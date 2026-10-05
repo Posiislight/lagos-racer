@@ -83,3 +83,38 @@ describe('saved track', () => {
     expect(normaliseSave({ best: { ojuelegba: 61.2, ikorodu: 80.5 } }).best).toEqual({ ojuelegba: 61.2, ikorodu: 80.5 });
   });
 });
+
+describe('premium currency fields', () => {
+  it('defaults to no premium, no bought paints and no ad views', () => {
+    const s = defaultSave();
+    expect([s.premium, s.ownedPaints, s.adViews]).toEqual([0, [], {}]);
+  });
+
+  it('grandfathers a non-default paint chosen in an older save', () => {
+    const s = normaliseSave({ paint: { okada: 'red' } });
+    expect(s.ownedPaints).toContain('okada/red');
+    expect(s.paint.okada).toBe('red');
+  });
+
+  it('drops a chosen paint that is not owned when ownedPaints exists', () => {
+    expect(normaliseSave({ ownedPaints: [], paint: { okada: 'red' } }).paint.okada).toBeUndefined();
+  });
+
+  it('ignores unknown vehicles and paints in ownedPaints', () => {
+    const s = normaliseSave({ ownedPaints: ['okada/red', 'helicopter/red', 'okada/pink', 42] });
+    expect(s.ownedPaints).toEqual(['okada/red']);
+  });
+
+  it('loads a bad premium balance as 0', () => {
+    const premium = (x: unknown) => normaliseSave({ premium: x }).premium;
+    expect([premium(-5), premium(NaN), premium('9'), premium(1.7)]).toEqual([0, 0, 0, 1]);
+  });
+
+  it('clamps ad views to the vehicle rule and ignores other vehicles', () => {
+    expect(normaliseSave({ adViews: { brt: 9, okada: 3 } }).adViews).toEqual({ brt: 1 });
+  });
+
+  it('keeps a BRT already unlocked with naira', () => {
+    expect(normaliseSave({ unlocked: ['brt'] }).unlocked).toEqual(['brt']);
+  });
+});

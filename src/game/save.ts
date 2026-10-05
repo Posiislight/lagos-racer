@@ -1,4 +1,4 @@
-import { VEHICLES, type VehicleId } from '../config/vehicles';
+import { VEHICLES, ownsPaint, paintKey, vehicleById, type VehicleId } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
 import { DEFAULT_DRIVER, sanitizeDriver, type DriverId } from '../config/drivers';
 import { driverAvailable, sanitizeCleared } from './campaign';
@@ -18,8 +18,14 @@ export type Saved = {
   vehicle: VehicleId;
   unlocked: VehicleId[];
   accountPromptDismissed: boolean;
-  /** Chosen paint id per vehicle (missing: the vehicle's usual colour). */
+  /** Chosen paint id per vehicle (missing: the vehicle's usual colour). Always a paint the player owns. */
   paint: Partial<Record<VehicleId, string>>;
+  /** Premium currency balance. */
+  premium: number;
+  /** Bought paints as `vehicle/paint` keys (the usual paint of each vehicle is always owned). */
+  ownedPaints: string[];
+  /** Rewarded ads watched toward unlocking a locked vehicle. */
+  adViews: Partial<Record<VehicleId, number>>;
   /** How many power-up pickups have shown the full how-to hint. */
   itemHints: number;
   /** The chosen driver (who sits in the vehicle and which special power you get). */
@@ -43,7 +49,7 @@ function detectQuality(): Quality {
 
 export const defaultSave = (): Saved => ({
   settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
+  coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [] },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -57,12 +63,35 @@ const OLD_IDS: Record<string, { vehicle: VehicleId; paint?: string }> = {
   'brt-red': { vehicle: 'brt', paint: 'red' },
 };
 
+const paintExists = (vehicle: string, paint: string) => IDS.has(vehicle) && vehicleById(vehicle as VehicleId).paints.some(p => p.id === paint);
+
+/** Chosen paints (only real ones) and the bought paints. An older save with no list owns whatever it had chosen. */
+function sanitizePaints(rawPaint: unknown, rawOwned: unknown): { paint: Saved['paint']; ownedPaints: string[] } {
+  const chosen = Object.entries(isObj(rawPaint) ? rawPaint : {}).filter((e): e is [string, string] => typeof e[1] === 'string' && paintExists(e[0], e[1]));
+  const keys = Array.isArray(rawOwned) ? rawOwned.filter((k): k is string => typeof k === 'string' && paintExists(...(k.split('/') as [string, string]))) : chosen.map(([v, p]) => paintKey(v as VehicleId, p));
+  const ownedPaints = [...new Set(keys)];
+  const paint = Object.fromEntries(chosen.filter(([v, p]) => ownsPaint(ownedPaints, vehicleById(v as VehicleId), p))) as Saved['paint'];
+  return { paint, ownedPaints };
+}
+
+/** Ad views per locked vehicle, whole numbers up to the number of ads it asks for. */
+function sanitizeAdViews(raw: unknown): Saved['adViews'] {
+  const out: Saved['adViews'] = {};
+  if (!isObj(raw)) return out;
+  for (const v of VEHICLES) {
+    const n = Math.floor(num(raw[v.id], 0));
+    if (v.locked && n > 0) out[v.id] = Math.min(n, v.locked.ads);
+  }
+  return out;
+}
+
 /** Fill in anything missing or malformed in a version 2 save. */
 export function normaliseSave(raw: Record<string, unknown>): Saved {
   const d = defaultSave();
   const unlocked = Array.isArray(raw.unlocked) ? [...new Set(raw.unlocked.filter((v): v is VehicleId => typeof v === 'string' && IDS.has(v)))] : [];
   const cleared = sanitizeCleared(isObj(raw.campaign) ? raw.campaign.cleared : undefined);
   const driver = sanitizeDriver(raw.driver);
+  const { paint, ownedPaints } = sanitizePaints(raw.paint, raw.ownedPaints);
   return {
     settings: { ...d.settings, ...(isObj(raw.settings) ? raw.settings : {}) } as Settings,
     coins: num(raw.coins, 0),
@@ -71,7 +100,10 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     vehicle: typeof raw.vehicle === 'string' && IDS.has(raw.vehicle) ? raw.vehicle as VehicleId : d.vehicle,
     unlocked,
     accountPromptDismissed: raw.accountPromptDismissed === true,
-    paint: isObj(raw.paint) ? raw.paint as Saved['paint'] : {},
+    paint,
+    ownedPaints,
+    premium: Math.max(0, Math.floor(num(raw.premium, 0))),
+    adViews: sanitizeAdViews(raw.adViews),
     itemHints: num(raw.itemHints, 0),
     // A driver the campaign has not unlocked yet falls back to the default.
     driver: driverAvailable(driver, cleared) ? driver : DEFAULT_DRIVER,
