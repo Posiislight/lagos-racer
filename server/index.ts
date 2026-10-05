@@ -32,10 +32,18 @@ const saveDeps: SaveDeps = {
     try { return (await verifyToken(token, { secretKey })).sub; } catch { return null; }
   },
 };
+if (process.env.DATABASE_URL && !process.env.CLERK_SECRET_KEY) console.warn('DATABASE_URL is set but CLERK_SECRET_KEY is not: every /save request will be refused');
 if (process.env.DATABASE_URL) {
   const pg = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false } });
+  // An idle connection dropped by Postgres emits 'error' on the pool; unhandled, it would end the process and every race with it.
+  pg.on('error', (err) => console.error('pg pool error', err));
   const store = new PgSaveStore(pg);
-  store.ensureSchema().then(() => { saveDeps.store = store; console.log('cloud saves ready'); }, (err) => console.error('cloud saves unavailable', err));
+  // Postgres may come up after this service does: keep trying until the table is ready (saves answer 503 meanwhile).
+  const init = () => store.ensureSchema().then(
+    () => { saveDeps.store = store; console.log('cloud saves ready'); },
+    (err) => { console.error('cloud saves unavailable, retrying in 10s', err.message); setTimeout(init, 10_000); },
+  );
+  void init();
 }
 
 const http = createServer((req, res) => {

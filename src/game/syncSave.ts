@@ -1,4 +1,4 @@
-import { normaliseSave, type Saved } from './save';
+import { defaultSave, normaliseSave, type Saved } from './save';
 
 /** What follows the account. Settings, the dismissed prompt and the how-to hint counter stay on each phone. */
 export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'itemHints'>;
@@ -25,7 +25,10 @@ export function mergeRemote(local: Saved, remote: SyncedSave): Saved {
   return { ...local, ...remote };
 }
 
-export const hasProgress = (s: Pick<Saved, 'races' | 'coins' | 'premium'>) => s.races > 0 || s.coins > 0 || s.premium > 0;
+/** Anything beyond a brand-new save counts: races, naira, gems, but also paints bought, upgrades, stars, picks. */
+export function hasProgress(s: Saved | SyncedSave): boolean {
+  return JSON.stringify(pickSynced(s as Saved)) !== JSON.stringify(pickSynced(defaultSave()));
+}
 
 /**
  * On sign-in: the account wins when it has real progress. An account with no save, or an empty

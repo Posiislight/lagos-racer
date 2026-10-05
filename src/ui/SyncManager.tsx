@@ -11,14 +11,15 @@ const LABEL: Record<SyncStatus, string> = { idle: '', syncing: 'Syncing…', sav
 
 /** Keeps a signed-in player's progress in step with their account. Renders nothing. */
 function Engine() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, userId, getToken } = useAuth();
   // Held in a ref so a new getToken identity does not restart the sync.
   const tokenRef = useRef(getToken);
   tokenRef.current = getToken;
   useEffect(() => {
-    if (!isSignedIn) { useSyncStatus.getState().set('idle'); return; }
+    if (!isSignedIn || !userId) { useSyncStatus.getState().set('idle'); return; }
     const sync = createSync({
       baseUrl: syncBaseUrl(),
+      userId,
       getToken: () => tokenRef.current(),
       fetch: (...a) => fetch(...a),
       getLocal: snapshot,
@@ -28,9 +29,12 @@ function Engine() {
     const offSaved = onSaved(sync.schedulePush);
     // A finished race is worth saving now, not in three seconds.
     const offResults = useGame.subscribe((s, prev) => { if (s.results && s.results !== prev.results) void sync.flush(); });
+    // Closing the tab inside the debounce window must not lose the last change.
+    const onHide = () => { if (document.hidden) void sync.flush(); };
+    document.addEventListener('visibilitychange', onHide);
     void sync.start();
-    return () => { offSaved(); offResults(); sync.stop(); };
-  }, [isSignedIn]);
+    return () => { document.removeEventListener('visibilitychange', onHide); offSaved(); offResults(); sync.stop(); };
+  }, [isSignedIn, userId]);
   return null;
 }
 

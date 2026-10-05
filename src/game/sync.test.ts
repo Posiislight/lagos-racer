@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSave, type Saved } from './save';
 import { pickSynced, type SyncedSave } from './syncSave';
-import { createSync, syncBaseUrl, type SyncStatus } from './sync';
+import { createSync, syncBaseUrl, type SyncStatus, type SyncStorage } from './sync';
 
 type Stored = { data: SyncedSave; rev: number } | null;
 
@@ -25,17 +25,22 @@ function fakeServer(initial: Stored = null) {
 
 const played = (): Saved => ({ ...defaultSave(), races: 3, coins: 400 });
 
-function setup(initial: Stored, local: Saved = played(), getToken: () => Promise<string | null> = async () => 'tok') {
-  const srv = fakeServer(initial);
+function memStorage(): SyncStorage {
+  const m = new Map<string, string>();
+  return { get: k => m.get(k) ?? null, set: (k, v) => void m.set(k, v) };
+}
+
+function setup(initial: Stored, local: Saved = played(), getToken: () => Promise<string | null> = async () => 'tok', storage: SyncStorage = memStorage(), srvIn = fakeServer(initial)) {
+  const srv = srvIn;
   const statuses: SyncStatus[] = [];
   const applied: SyncedSave[] = [];
   let current = local;
   const sync = createSync({
-    baseUrl: 'http://x', getToken, fetch: srv.fetchFn,
+    baseUrl: 'http://x', userId: 'user-1', storage, getToken, fetch: srv.fetchFn,
     getLocal: () => current, applyRemote: r => { applied.push(r); },
     onStatus: st => statuses.push(st),
   });
-  return { srv, statuses, applied, sync, setLocal: (l: Saved) => { current = l; } };
+  return { srv, statuses, applied, sync, storage, setLocal: (l: Saved) => { current = l; } };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -149,5 +154,52 @@ describe('pushing', () => {
     await t.sync.start();
     expect(t.srv.fetchFn).not.toHaveBeenCalled();
     expect(t.statuses.at(-1)).toBe('idle');
+  });
+});
+
+describe('remembering what was last synced', () => {
+  /** A phone that has synced once (rev 1), then starts again with the given local progress. */
+  async function restart(local: Saved, mutateServer?: (s: ReturnType<typeof fakeServer>['s']) => void) {
+    const storage = memStorage();
+    const srv = fakeServer(null);
+    const first = setup(null, played(), async () => 'tok', storage, srv);
+    await first.sync.start();
+    first.sync.stop();
+    mutateServer?.(srv.s);
+    srv.s.puts.length = 0;
+    const second = setup(null, local, async () => 'tok', storage, srv);
+    await second.sync.start();
+    return second;
+  }
+
+  it('pushes unsynced local progress instead of letting the cloud copy overwrite it', async () => {
+    const t = await restart({ ...played(), coins: 9999 });
+    expect(t.applied).toHaveLength(0);
+    expect(t.srv.s.puts).toHaveLength(1);
+    expect(t.srv.s.puts[0].rev).toBe(1);
+    expect(t.srv.s.puts[0].data.coins).toBe(9999);
+  });
+
+  it('downloads when another device moved the account on and this phone has nothing new', async () => {
+    const t = await restart(played(), s => { s.row = { data: { ...pickSynced(played()), coins: 5000 }, rev: 4 }; });
+    expect(t.applied[0].coins).toBe(5000);
+    expect(t.srv.s.puts).toHaveLength(0);
+  });
+
+  it('downloads when both this phone and another device changed (account wins)', async () => {
+    const t = await restart({ ...played(), coins: 9999 }, s => { s.row = { data: { ...pickSynced(played()), coins: 5000 }, rev: 4 }; });
+    expect(t.applied[0].coins).toBe(5000);
+  });
+});
+
+describe('a 409 with no save on the server', () => {
+  it('resets the revision and retries instead of wedging', async () => {
+    const t = setup(null);
+    await t.sync.start();
+    t.srv.s.row = null;
+    t.setLocal({ ...played(), coins: 55 });
+    await t.sync.flush();
+    expect((t.srv.s.row as Stored)?.data.coins).toBe(55);
+    expect(t.statuses.at(-1)).toBe('saved');
   });
 });

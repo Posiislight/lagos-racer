@@ -39,10 +39,20 @@ describe('decideSignIn', () => {
   it('uploads over an empty cloud save', () => expect(decideSignIn(played(), empty)).toBe('upload'));
 });
 
+describe('purchases count as progress', () => {
+  const bought = { ...pickSynced(defaultSave()), ownedPaints: ['okada/blue'] };
+  it('does not let an account with only purchases be overwritten', () => {
+    expect(decideSignIn({ ...defaultSave(), races: 1 }, bought)).toBe('download');
+  });
+  it('uploads a phone that only bought things', () => {
+    expect(decideSignIn({ ...defaultSave(), ownedPaints: ['okada/blue'] }, null)).toBe('upload');
+  });
+});
+
 describe('hasProgress', () => {
   it('is false for a fresh save and true once anything is earned', () => {
     expect(hasProgress(defaultSave())).toBe(false);
-    expect(hasProgress({ races: 0, coins: 0, premium: 5 })).toBe(true);
+    expect(hasProgress({ ...defaultSave(), premium: 5 })).toBe(true);
   });
 });
 

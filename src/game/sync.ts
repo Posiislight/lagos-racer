@@ -3,8 +3,18 @@ import { decideSignIn, pickSynced, type SyncedSave } from './syncSave';
 
 export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'offline';
 
+/** Where the last synced revision is remembered between launches (localStorage in the app). */
+export type SyncStorage = { get: (key: string) => string | null; set: (key: string, value: string) => void };
+
+const localStorageBacked: SyncStorage = {
+  get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* the sync still works, it just forgets on restart */ } },
+};
+
 export type SyncDeps = {
   baseUrl: string;
+  userId: string;
+  storage?: SyncStorage;
   /** A fresh session token each call (they expire), or null when signed out. */
   getToken: () => Promise<string | null>;
   fetch: typeof fetch;
@@ -35,6 +45,13 @@ export function createSync(deps: SyncDeps) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let lastJson = '';
+  const storage = deps.storage ?? localStorageBacked;
+  const memoKey = `lagos-racer:sync:${deps.userId}`;
+  /** The revision and data this phone last had in step with the account, or null on a first sign-in here. */
+  const recall = (): { rev: number; json: string } | null => {
+    try { const m = JSON.parse(storage.get(memoKey) ?? 'null'); return typeof m?.rev === 'number' && typeof m?.json === 'string' ? m : null; } catch { return null; }
+  };
+  const remember = () => storage.set(memoKey, JSON.stringify({ rev, json: lastJson }));
   let queue: Promise<void> = Promise.resolve();
 
   const setStatus = (s: SyncStatus) => { if (!stopped) deps.onStatus(s); };
@@ -54,16 +71,22 @@ export function createSync(deps: SyncDeps) {
     deps.applyRemote(remote);
     lastJson = JSON.stringify(remote);
     rev = newRev;
+    remember();
   }
 
-  async function put(): Promise<boolean> {
+  async function put(retry = true): Promise<boolean> {
     const data = pickSynced(deps.getLocal());
     const json = JSON.stringify(data);
     if (json === lastJson) { setStatus('saved'); return true; }
     const r = await request('PUT', { data, rev });
     if (!r) return false;
-    if (r.status === 200 && typeof r.body?.rev === 'number') { rev = r.body.rev; lastJson = json; setStatus('saved'); return true; }
-    if (r.status === 409 && r.body?.data) { take(r.body.data, r.body.rev ?? 0); setStatus('saved'); return true; }
+    if (r.status === 200 && typeof r.body?.rev === 'number') { rev = r.body.rev; lastJson = json; remember(); setStatus('saved'); return true; }
+    if (r.status === 409) {
+      rev = r.body?.rev ?? 0;
+      if (r.body?.data) { take(r.body.data, rev); setStatus('saved'); return true; }
+      // The account has no save after all: start again from revision 0, once.
+      if (retry) return put(false);
+    }
     setStatus('offline');
     return false;
   }
@@ -74,8 +97,18 @@ export function createSync(deps: SyncDeps) {
     if (r.status !== 200 && r.status !== 404) return setStatus('offline');
     const remote = r.status === 200 ? r.body?.data ?? null : null;
     rev = r.status === 200 ? r.body?.rev ?? 0 : 0;
-    const action = decideSignIn(deps.getLocal(), remote);
+    const memo = recall();
+    const unsynced = memo !== null && JSON.stringify(pickSynced(deps.getLocal())) !== memo.json;
+    let action = decideSignIn(deps.getLocal(), remote);
+    if (memo) {
+      // This phone has synced this account before: its own newer progress is pushed, unless
+      // another device has moved the account on since (then the account wins).
+      if (unsynced && memo.rev === rev) action = 'upload';
+      else if (remote && (memo.rev !== rev || unsynced)) action = 'download';
+      else action = 'none';
+    }
     if (action === 'download' && remote) take(remote, rev);
+    else if (action === 'none' && remote) { lastJson = JSON.stringify(remote); remember(); }
     ready = true;
     if (action === 'upload') await put();
     else setStatus('saved');
