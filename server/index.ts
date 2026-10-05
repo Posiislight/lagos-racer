@@ -3,15 +3,26 @@ import { WebSocketServer } from 'ws';
 import { MAX_MESSAGE_BYTES } from '../src/net/protocol';
 import { verifyToken } from '@clerk/backend';
 import { Pool } from 'pg';
+import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
 import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
+
+// Error reporting is off unless SENTRY_DSN is set. The uncaught-exception integrations are left out because the
+// handlers below already keep the process alive; they report to Sentry themselves.
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.SENTRY_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME ?? 'production',
+  release: process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA,
+  tracesSampleRate: 0,
+  integrations: (defaults) => defaults.filter((i) => i.name !== 'OnUncaughtException' && i.name !== 'OnUnhandledRejection'),
+});
 
 const port = Number(process.env.PORT ?? 8787);
 const rooms = new RoomServer();
 
 // One bad message or room must not take every other race down with it: log, and keep serving.
-process.on('uncaughtException', (err) => console.error('uncaught exception', err));
-process.on('unhandledRejection', (err) => console.error('unhandled rejection', err));
+process.on('uncaughtException', (err) => { console.error('uncaught exception', err); Sentry.captureException(err); });
+process.on('unhandledRejection', (err) => { console.error('unhandled rejection', err); Sentry.captureException(err); });
 
 /** Runs fn, logging instead of throwing. */
 function guard(what: string, fn: () => void) {
@@ -19,6 +30,7 @@ function guard(what: string, fn: () => void) {
     fn();
   } catch (err) {
     console.error(`${what} failed`, err);
+    Sentry.captureException(err, { tags: { where: what } });
   }
 }
 
@@ -53,6 +65,7 @@ const http = createServer((req, res) => {
   } else if (path === '/save') {
     handleSaveRequest(req, res, saveDeps).catch((err) => {
       console.error('save request failed', err);
+      Sentry.captureException(err, { tags: { where: 'save' } });
       if (!res.headersSent) res.writeHead(500).end();
     });
   } else {
