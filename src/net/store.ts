@@ -4,6 +4,7 @@ import type { VehicleId } from '../config/vehicles';
 import { useGame } from '../game/store';
 import { ClockSync } from './clock';
 import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connection';
+import { roomServerUrl } from './server';
 import { NetSession } from './session';
 import { toResults } from './results';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
@@ -78,7 +79,7 @@ function writeToken(token: string | null) {
   } catch { /* private mode: reconnecting still works within this page */ }
 }
 
-const serverUrl = () => import.meta.env.VITE_ROOM_SERVER ?? `ws://${location.hostname}:8787`;
+const serverUrl = () => roomServerUrl();
 
 let conn: Connection | null = null;
 // Bumped whenever the socket is replaced or dropped, so callbacks from an old one are ignored.

@@ -1,4 +1,5 @@
 import type { Saved } from './save';
+import { roomServerUrl } from '../net/server';
 import { decideSignIn, pickSynced, type SyncedSave } from './syncSave';
 
 export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'offline';
@@ -26,8 +27,7 @@ export type SyncDeps = {
 };
 
 /** The room server's http address: the same host as VITE_ROOM_SERVER. */
-export function syncBaseUrl(server: string | undefined = import.meta.env.VITE_ROOM_SERVER): string {
-  if (!server) return `http://${location.hostname}:8787`;
+export function syncBaseUrl(server: string = roomServerUrl()): string {
   return server.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
 }
 
