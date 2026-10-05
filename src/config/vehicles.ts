@@ -4,6 +4,8 @@
  * Physics uses four raycast wheels on every vehicle (bikes and kekes too, for stability); the
  * okada leans and the keke tips visually instead.
  */
+import { PAINT_PRICE } from './premium';
+
 export type VehicleId = 'okada' | 'keke' | 'danfo' | 'brt';
 
 /** A body colour. Paint is cosmetic: the same vehicle, the same stats. */
@@ -12,11 +14,12 @@ export type Paint = { id: string; name: string; color: string };
 export type VehicleConfig = {
   id: VehicleId;
   name: string;
-  /** Body colours; the first is the vehicle's usual one. */
+  /** Body colours; the first is the vehicle's usual one, free and always owned. */
   paints: Paint[];
   stats: { speed: number; handling: number; toughness: number };
   blurb: string;
-  locked?: { coins: number };
+  /** Locked until the player watches `ads` rewarded ads or pays `premium` premium currency. */
+  locked?: { premium: number; ads: number };
   scale: number;
   /** Chassis box (model units): length, height, width, and the box centre height. */
   chassis: { length: number; height: number; width: number; centreY: number };
@@ -52,7 +55,7 @@ const paints = (...list: [string, string][]): Paint[] => list.map(([name, color]
 export const VEHICLES: VehicleConfig[] = [
   {
     id: 'okada', name: 'Okada',
-    paints: paints(['Red', '#d0141a'], ['Blue', '#0b55c4'], ['Black', '#1b1b1b'], ['Green', '#1f9d55'], ['Orange', '#ff7a00'], ['Purple', '#7b2cbf']),
+    paints: paints(['Yellow', '#ffb000'], ['Red', '#d0141a'], ['Blue', '#0b55c4'], ['Black', '#1b1b1b'], ['Green', '#1f9d55'], ['Purple', '#7b2cbf']),
     stats: { speed: 9, handling: 9, toughness: 2 },
     blurb: 'Gold forks, angry LED eyes, madam side-saddle. Squeezes through gaps a cat would think twice about.',
     scale: 1.15,
@@ -100,7 +103,7 @@ export const VEHICLES: VehicleConfig[] = [
     paints: paints(['Blue', '#0f86cf'], ['Red', '#d4141c'], ['Green', '#1f9d55'], ['Yellow', '#f5b400'], ['Purple', '#7b2cbf'], ['Black', '#1b1b1b']),
     stats: { speed: 4, handling: 3, toughness: 10 },
     blurb: 'The boss bus on gold alloys with a roof wing and quad pipes. Has its own lane. Will use yours too.',
-    locked: { coins: 500 },
+    locked: { premium: 500, ads: 1 },
     scale: 0.72,
     chassis: { length: 11.4, height: 2.4, width: 2.5, centreY: 1.75 },
     wheels: { frontX: 3.3, rearX: -3.3, frontZ: 1.1, rearZ: 1.1, radius: 0.6 },
@@ -117,3 +120,12 @@ export const vehicleById = (id: VehicleId) => VEHICLES.find(v => v.id === id) ??
 
 /** The paint with this id, or the vehicle's usual one. */
 export const paintOf = (v: VehicleConfig, id?: string) => v.paints.find(p => p.id === id) ?? v.paints[0];
+
+/** The key a bought paint is stored under in the save. */
+export const paintKey = (vehicle: VehicleId, paintId: string) => `${vehicle}/${paintId}`;
+
+/** Premium currency a paint costs: nothing for the vehicle's usual paint. */
+export const paintPrice = (v: VehicleConfig, paintId: string) => (v.paints[0].id === paintId ? 0 : PAINT_PRICE);
+
+/** Whether the player may use this paint: the usual one, or one they bought. */
+export const ownsPaint = (owned: string[], v: VehicleConfig, paintId: string) => v.paints[0].id === paintId || owned.includes(paintKey(v.id, paintId));
