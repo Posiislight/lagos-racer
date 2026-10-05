@@ -30,7 +30,7 @@ export function Online() {
   const vehicle = useGame(s => s.vehicle);
   // Your ride goes to the room in the paint you picked for it in the garage.
   const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
-  const { status, error, cut, nickname, create, join, leave } = useNet();
+  const { status, error, cut, nickname, create, quick, join, leave } = useNet();
   const [name, setName] = useState(nickname);
   const [code, setCode] = useState(codeFromUrl);
   const busy = status === 'connecting' || status === 'reconnecting';
@@ -43,7 +43,9 @@ export function Online() {
           <span>Your nickname</span>
           <input value={name} maxLength={NICK_MAX} autoComplete="nickname" placeholder="Odogwu Rider" onChange={e => setName(e.target.value)} />
         </label>
-        <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
+        <button className="btn primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>Quick race</button>
+        <p className="muted">Race whoever is online now. Bots fill any empty seats.</p>
+        <button className="btn" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
         <p className="or" aria-hidden="true">or</p>
         <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
           <label className="field">

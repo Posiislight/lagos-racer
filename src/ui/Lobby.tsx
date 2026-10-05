@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { TRACKS } from '../config/tracks';
 import { useGame } from '../game/store';
 import { VEHICLES, paintOf, vehicleById } from '../config/vehicles';
 import { ERROR_TEXT, useNet } from '../net/store';
@@ -21,11 +22,24 @@ async function shareLink(code: string): Promise<'shared' | 'copied' | 'failed'> 
   }
 }
 
+/** Whole seconds left, counted down locally from when the last room message arrived; never negative. */
+function useCountdown(startsInMs: number | undefined, arrivedAt: number): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (startsInMs === undefined) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [startsInMs, arrivedAt]);
+  return startsInMs === undefined ? 0 : Math.max(0, Math.ceil((startsInMs - (now - arrivedAt)) / 1000));
+}
+
 export function Lobby() {
   const unlocked = useGame(s => s.unlocked);
   const paints = useGame(s => s.paint);
-  const { status, code, mySlot, room, error, setVehicle, setReady, setFillAI, start, leave } = useNet();
+  const { status, code, mySlot, room, roomAt, myVote, error, vote, setVehicle, setReady, setFillAI, start, leave } = useNet();
   const [copied, setCopied] = useState(false);
+  const seconds = useCountdown(room?.quick?.startsInMs, roomAt);
   if (!room || !code) return null;
 
   const me = room.players.find(p => p.slot === mySlot);
@@ -43,6 +57,59 @@ export function Lobby() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const quick = room.quick;
+  if (quick) {
+    const racing = room.phase !== 'lobby';
+    return (
+      <div className="lobby">
+        <div className="card lobby-room">
+          <p className="eyebrow">Quick race</p>
+          <p className="quick-title">{racing ? 'Race don start' : 'Looking for racers…'}</p>
+          {!racing && <p className="quick-count" role="timer" aria-label={`Race starts in ${seconds} seconds`}>{seconds}s</p>}
+          <button className="btn ghost" onClick={leave}>Leave</button>
+          <table className="table">
+            <thead><tr><th>Player</th><th>Ride</th></tr></thead>
+            <tbody>
+              {room.players.map(p => {
+                const v = vehicleById(p.vehicle);
+                return (
+                  <tr key={p.slot} className={p.slot === mySlot ? 'me' : ''}>
+                    <td>{p.name}{!p.connected && <span className="muted"> · reconnecting</span>}</td>
+                    <td><span className="dot" style={{ background: paintOf(v, p.paint).color }} /> {v.name}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="card lobby-controls">
+          <p className="eyebrow">Vote for a track</p>
+          <div className="quick-votes" role="radiogroup" aria-label="Track vote">
+            {TRACKS.map(t => (
+              <button key={t.id} role="radio" aria-checked={myVote === t.id} className={`btn quick-vote${myVote === t.id ? ' on' : ''}`} disabled={racing} onClick={() => vote(t.id)}>
+                <span>{t.name}</span><b>{quick.votes[t.id] ?? 0}</b>
+              </button>
+            ))}
+          </div>
+          <p className="eyebrow">Your ride</p>
+          <div className="stops lobby-picks" role="tablist" aria-label="Vehicles">
+            {VEHICLES.filter(v => !v.locked || unlocked.includes(v.id)).map(v => {
+              const paint = paintOf(v, paints[v.id]);
+              return (
+                <button key={v.id} role="tab" aria-selected={me?.vehicle === v.id} disabled={racing} onClick={() => setVehicle(v.id, paint.id)}>
+                  <span className="dot" style={{ background: paint.color }} />{v.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className={`net-note${error || away ? ' bad' : ''}`} role="status">
+            {error ? ERROR_TEXT[error] : away ? 'Reconnecting…' : racing ? 'Race in progress' : ''}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lobby">

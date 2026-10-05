@@ -205,6 +205,11 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .lobby .btn.ready { background: #bfe8c9; }
 .lobby .btn.ready::after { content: ' ✓'; }
 .lobby .btn { white-space: nowrap; }
+.quick-title { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(20px, 6vw, 28px); line-height: 1.1; }
+.quick-count { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); line-height: 1; color: var(--green); }
+.quick-votes { display: flex; flex-direction: column; gap: 6px; }
+.lobby .btn.quick-vote { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
+.lobby .btn.quick-vote.on { background: #bfe8c9; border-color: var(--green); }
 @media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
 @media (max-height: 480px) {
   .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }

@@ -16,12 +16,18 @@ type NetState = {
   code: string | null;
   mySlot: number | null;
   room: RoomView | null;
+  /** Date.now() when the latest room message arrived: the Quick lobby counts down from it. */
+  roomAt: number;
+  /** The track this player last voted for in a Quick room. */
+  myVote: string | null;
   error: NetError | null;
   /** True once a room we were in is out of reach for good: the "Connection don cut" screen. */
   cut: boolean;
   nickname: string;
   pendingGrid: PendingGrid | null;
   create: (name: string, vehicle: VehicleId, paint: string) => void;
+  quick: (name: string, vehicle: VehicleId, paint: string) => void;
+  vote: (trackId: string) => void;
   join: (code: string, name: string, vehicle: VehicleId, paint: string) => void;
   setVehicle: (v: VehicleId, paint: string) => void;
   setReady: (ready: boolean) => void;
@@ -126,7 +132,7 @@ function drop() {
   old?.close();
 }
 
-const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, pendingGrid: null, cut: false };
+const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false };
 
 export const useNet = create<NetState>((set, get) => {
   /** Opens a fresh socket; `first` (create or join) goes out as soon as it is open. */
@@ -191,7 +197,7 @@ export const useNet = create<NetState>((set, get) => {
         break;
       }
       case 'room':
-        set({ room: m.room });
+        set({ room: m.room, roomAt: Date.now() });
         if (resyncPending) {
           resyncPending = false;
           // Back from a drop mid-race: catch the room up on what was lost while the socket was down, unless it has
@@ -290,6 +296,15 @@ export const useNet = create<NetState>((set, get) => {
       const clean = normalizeCode(code);
       if (!/^[A-Z]{4}$/.test(clean)) return set({ error: 'bad-code' });
       open({ t: 'join', code: clean, name: nick, vehicle, paint });
+    },
+    quick: (name, vehicle, paint) => {
+      const nick = rememberNick(name);
+      if (nick === null) return set({ error: 'bad-name' });
+      open({ t: 'quick', name: nick, vehicle, paint });
+    },
+    vote: trackId => {
+      set({ myVote: trackId, error: null });
+      conn?.sendJson({ t: 'vote', trackId });
     },
     setVehicle: (vehicle, paint) => sendLobby({ vehicle, paint }),
     setReady: ready => sendLobby({ ready }),
