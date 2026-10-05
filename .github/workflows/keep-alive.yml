@@ -9,17 +9,10 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Ping /health
-        env:
-          # Set under Settings > Secrets and variables > Actions > Variables
-          # e.g. https://your-app.up.railway.app
-          ROOM_SERVER_URL: ${{ vars.ROOM_SERVER_URL }}
         run: |
-          if [ -z "$ROOM_SERVER_URL" ]; then
-            echo "ROOM_SERVER_URL variable is not set"; exit 1
-          fi
           curl --fail --silent --show-error \
             --retry 3 --retry-delay 10 --retry-all-errors \
-            --max-time 60 "${ROOM_SERVER_URL%/}/health"
+            --max-time 90 https://lagos-racer-server.onrender.com/health
