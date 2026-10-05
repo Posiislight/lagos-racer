@@ -35,7 +35,7 @@ export const driverById = (id: DriverId) => DRIVERS.find(d => d.id === id)!;
 
 /** What each special does, in seconds, metres and multipliers. */
 export const SPECIALS = {
-  push: { duration: 4, topSpeed: 1.18, accel: 1.6 },
+  push: { duration: 4, topSpeed: 1.35, accel: 2.6 },
   soup: {
     /** Seconds the trail keeps dropping patches. */
     duration: 5,

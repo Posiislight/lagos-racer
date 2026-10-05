@@ -33,33 +33,56 @@ export function Online() {
   const { status, error, cut, nickname, create, quick, join, leave } = useNet();
   const [name, setName] = useState(nickname);
   const [code, setCode] = useState(codeFromUrl);
+  // A ?room= link goes straight to the friends form; otherwise first choose how to play.
+  const [friends, setFriends] = useState(() => codeFromUrl() !== '');
   const busy = status === 'connecting' || status === 'reconnecting';
+  const nickField = (
+    <label className="field">
+      <span>Your nickname</span>
+      <input value={name} maxLength={NICK_MAX} autoComplete="nickname" placeholder="Odogwu Rider" onChange={e => setName(e.target.value)} />
+    </label>
+  );
+  const note = (
+    <p className={`net-note${error ? ' bad' : ''}`} role="status">
+      {error ? ERROR_TEXT[error] : busy ? 'Connecting…' : ''}
+    </p>
+  );
   return (
     <div className="online">
-      <div className="card online-card">
-        <h2>Race with friends</h2>
-        <p className="muted">Make a room and send the code, or type the code your friend sent.</p>
-        <label className="field">
-          <span>Your nickname</span>
-          <input value={name} maxLength={NICK_MAX} autoComplete="nickname" placeholder="Odogwu Rider" onChange={e => setName(e.target.value)} />
-        </label>
-        <button className="btn primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>Quick race</button>
-        <p className="muted">Race whoever is online now.</p>
-        <button className="btn" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
-        <p className="or" aria-hidden="true">or</p>
-        <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
-          <label className="field">
-            <span>Room code</span>
-            <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
-              placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
-          </label>
-          <button className="btn primary" type="submit" disabled={busy}>Join room</button>
-        </form>
-        <p className={`net-note${error ? ' bad' : ''}`} role="status">
-          {error ? ERROR_TEXT[error] : busy ? 'Connecting…' : ''}
-        </p>
-        <button className="btn" onClick={leave}>← Back</button>
-      </div>
+      {friends ? (
+        <div className="card online-card">
+          <h2>Play with friends</h2>
+          <p className="muted">Make a room and send the code, or type the code your friend sent.</p>
+          {nickField}
+          <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
+          <p className="or" aria-hidden="true">or</p>
+          <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
+            <label className="field">
+              <span>Room code</span>
+              <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
+                placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
+            </label>
+            <button className="btn primary" type="submit" disabled={busy}>Join room</button>
+          </form>
+          {note}
+          <button className="btn" onClick={() => setFriends(false)}>← Back</button>
+        </div>
+      ) : (
+        <div className="card online-card">
+          <h2>Multiplayer</h2>
+          {nickField}
+          <button className="entry primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>
+            <b>QUICK PLAY</b>
+            <span>Jump in and race whoever is online now.</span>
+          </button>
+          <button className="entry" disabled={busy} onClick={() => setFriends(true)}>
+            <b>PLAY WITH FRIENDS</b>
+            <span>Make a room and share the code.</span>
+          </button>
+          {note}
+          <button className="btn" onClick={leave}>← Back</button>
+        </div>
+      )}
       {cut && <ConnectionCut />}
     </div>
   );

@@ -28,7 +28,7 @@ const BLOBS = [0, 1, 2, 3].map(blob);
 
 /**
  * Full-screen power-up effects over the race, drawn without React re-renders and switched off when
- * nothing is happening: speed lines rushing in from the edges on a fuel boost, a purple flash when
+ * nothing is happening: speed lines rushing in from the edges on a fuel boost or Push Squad, a purple flash when
  * juju hits you, oily splats while you slide on crude oil, a hot, blurry vignette while you cough from pepper soup, and picked-up items flying into the
  * item button.
  */

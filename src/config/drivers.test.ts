@@ -17,7 +17,7 @@ describe('DRIVERS', () => {
   });
 
   it('keeps the special numbers the spec fixes', () => {
-    expect(SPECIALS.push).toEqual({ duration: 4, topSpeed: 1.18, accel: 1.6 });
+    expect(SPECIALS.push).toEqual({ duration: 4, topSpeed: 1.35, accel: 2.6 });
     expect(SPECIALS.soup.maxPatches).toBe(40);
     expect(SPECIALS.soup.spacing).toBe(3.5);
   });

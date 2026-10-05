@@ -1,5 +1,5 @@
 import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Vector3 } from 'three';
-import { buildBRT, buildDanfo, buildKeke, buildOkada } from './generated/showroom.js';
+import { buildBRT, buildDanfo, buildKeke, buildOkada, squadBoy } from './generated/showroom.js';
 import { findAnimated, mergeDecals, mergeStatic } from './optimize';
 
 import type { VehicleId } from '../config/vehicles';
@@ -78,6 +78,30 @@ export function buildVehicleModel(id: VehicleId, color: string, scale = 1, opts:
   return { root, wheels, anim, size };
 }
 
+/** How far the boys lean into the shove (radians about z; negative tips them forward). */
+export const SQUAD_LEAN = -0.3;
+
+/**
+ * Moshood's Push Squad: three angry agberos in union vests, each in a pivot group that leans into
+ * the shove (the game bobs and sways the pivots). Faces +x with feet at y = 0, spaced `spread` apart.
+ */
+export function buildSquad(spread: number): Group {
+  const root = new Group(), pivots = new Set<Object3D>();
+  for (let i = 0; i < 3; i++) {
+    const pivot = new Group();
+    pivot.add(squadBoy(i));
+    pivot.rotation.z = SQUAD_LEAN;
+    pivot.position.z = (i - 1) * spread;
+    root.add(pivot);
+    pivots.add(pivot);
+  }
+  // Same mirroring as the vehicles: flip text decals, merge, then flip the whole group.
+  root.traverse(o => { if (o.userData.decal) o.scale.x *= -1; });
+  mergeStatic(root, pivots, { flatColors: true });
+  root.scale.z = -1;
+  root.traverse(o => { o.castShadow = false; });
+  return root;
+}
 /** Dev only: how many meshes a built, merged model has (to check a driver doesn't blow the draw-call budget). */
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as unknown as { __meshCount: (id: string, driver?: string) => number }).__meshCount = (id, driver) => {

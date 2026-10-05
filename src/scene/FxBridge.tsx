@@ -7,7 +7,7 @@ import type { Quality } from '../game/save';
 
 const _p = new Vector3();
 
-/** Feeds the screen effects from the player's racer: boost, juju hits, oil, cough, and pickups. */
+/** Feeds the screen effects from the player's racer: boost and Push Squad, juju hits, oil, cough, and pickups. */
 export function FxBridge({ quality }: { quality: Quality }) {
   const { camera, gl } = useThree();
   const prev = useRef({ curse: 0, item: null as string | null });
@@ -18,7 +18,7 @@ export function FxBridge({ quality }: { quality: Quality }) {
     if (!p) return;
     const dt = Math.min(dtRaw, 0.05), s = prev.current;
     // Ease in over a quarter of a second, out over 0.4 s.
-    fx.boost = p.boost > 0 ? Math.min(1, fx.boost + dt / 0.25) : Math.max(0, fx.boost - dt / 0.4);
+    fx.boost = p.boost > 0 || p.push > 0 ?Math.min(1, fx.boost + dt / 0.25) : Math.max(0, fx.boost - dt / 0.4);
     fx.slip = p.slip > 0 ? Math.min(1, fx.slip + dt / 0.2) : Math.max(0, fx.slip - dt / 0.5);
     fx.cough = p.cough > 0 ? Math.min(1, fx.cough + dt / 0.2) : Math.max(0, fx.cough - dt / 0.5);
     fx.juju = p.curse > s.curse + 0.5 ? 0 : fx.juju + dt;

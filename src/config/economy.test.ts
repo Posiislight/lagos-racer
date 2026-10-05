@@ -65,7 +65,6 @@ describe('pacing', () => {
     expect(races).toBeGreaterThanOrEqual(25);
     expect(races).toBeLessThanOrEqual(50);
   });
-
 });
 
 describe('upgradePrice', () => {
@@ -100,4 +99,3 @@ describe('formatNaira', () => {
     expect(formatNaira(-5)).toBe('₦0');
   });
 });
-

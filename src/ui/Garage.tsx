@@ -48,7 +48,7 @@ export function Garage() {
         <button className="btn" onClick={() => setScreen('menu')}>← Back</button>
         <h1>Garage</h1>
         <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
-        <div className="coins premium">{PREMIUM_LABEL} {premium}</div>
+        <div className="coins premium" aria-label={`${premium} ${PREMIUM_LABEL}`}>{PREMIUM_LABEL} {premium}</div>
       </header>
       <div className="garage-body">
         <div className="garage-preview">
@@ -101,7 +101,6 @@ export function Garage() {
             </button>
           ) : isLocked ? (
             <div className="unlock-options">
-              <p className="muted">Unlock this ride to upgrade it.</p>
               {adsAvailable() && (
                 <>
                   <button className="btn primary" disabled={adRunning} onClick={watchAd}>

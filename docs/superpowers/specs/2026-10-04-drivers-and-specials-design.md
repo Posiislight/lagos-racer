@@ -44,7 +44,7 @@ Both are parody characters (no real people). Look and attitude come from the app
 
 His boys run behind the vehicle and shove for **4 s**. A steady boost, different from fuel's short burst:
 
-- top speed ×1.18 and acceleration ×1.6 while it lasts (fuel: ×1.3 and ×2.2 for 2.6 s, plus a forward impulse);
+- top speed ×1.35 and acceleration ×2.6 while it lasts (fuel: ×1.3 and ×2.2 for 2.6 s, plus a forward impulse);
 - three small boys run behind the vehicle (visual only), with a "Oya push!" sound cue;
 - stacks with fuel (the two timers are independent). Multiplayer referee allowance is unaffected (see below).
 
@@ -158,8 +158,8 @@ stay low.
 - Snapshot flags (a `u8`) gain `push` and `cough` bits, which exactly fills the byte (boost, slip, curse,
   wobble, horn, finished, push, cough).
 - The lobby start message carries each car's driver id, so every phone builds the same model.
-- Referee: push (×1.18) stacks with fuel (×1.3) to ×1.53, inside the existing ×1.6 too-fast-lap allowance on
-  the vehicle's maxed-out top speed. No change needed.
+- Referee: push (×1.35) stacks with fuel (×1.3) to ×1.76, which is over the ×1.6 too-fast-lap allowance on
+  the vehicle's maxed-out top speed. When the referee is built, raise the allowance to ×1.8.
 - **Changes to the multiplayer spec and plan** (do when that milestone is built): add the two use kinds, the
   two flag bits, and the driver id in the start message.
 

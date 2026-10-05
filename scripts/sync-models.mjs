@@ -48,7 +48,7 @@ for (const [from, to] of LITE) {
 }
 
 const exportsList = [
-  'buildOkada', 'buildKeke', 'buildDanfo', 'buildBRT', 'person', 'driverFigure', 'fixedChild',
+  'buildOkada', 'buildKeke', 'buildDanfo', 'buildBRT', 'person', 'driverFigure', 'squadBoy', 'fixedChild',
   'mat', 'paint', 'glow', 'MAT', 'mcache', 'ctex', 'textTex', 'plateTex', 'raceNumberTex', 'speedTex', 'checkerTex',
   'ANKARA', 'ANKARA2', 'PLAID', 'GELE', 'rustTex',
   'V', 'V2', 'mesh', 'rbox', 'rbGeo', 'sph', 'cylm', 'rod', 'limb', 'fender', 'decal', 'FACE',
