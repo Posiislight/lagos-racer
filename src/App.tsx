@@ -10,13 +10,24 @@ import { Lobby } from './ui/Lobby';
 import { RotatePrompt } from './ui/RotatePrompt';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
-const Race = lazy(() => import('./ui/Race'));
+const loadRace = () => import('./ui/Race');
+const Race = lazy(loadRace);
+
+// Once the menu is up and the browser is idle, fetch the race chunk in the background so the first race starts fast.
+function prefetchRace() {
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  if (conn?.saveData) return; // respect Data Saver
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback;
+  if (idle) idle(() => { void loadRace(); });
+  else setTimeout(() => { void loadRace(); }, 2000);
+}
 
 export function App() {
   const screen = useGame(s => s.screen);
   const sound = useGame(s => s.settings.sound);
 
   useEffect(() => { startKeyboard(); }, []);
+  useEffect(() => { prefetchRace(); }, []);
   // A friend's invite link (?room=CODE) lands straight on the join screen.
   useEffect(() => { if (new URLSearchParams(location.search).has('room')) useGame.getState().setScreen('online'); }, []);
   useEffect(() => { setSoundEnabled(sound); }, [sound]);
