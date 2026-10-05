@@ -29,6 +29,14 @@ body {
 button { font: inherit; color: inherit; }
 button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .app { position: fixed; inset: 0; }
+/* A touch device held upright: turn the whole app 90° clockwise so it plays sideways. The app is as wide as the screen is tall. */
+.app[data-rotated] {
+  inset: auto; top: 0; left: 0; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw;
+  transform-origin: 0 0; transform: translateX(100vw) rotate(90deg); transform: translateX(100dvw) rotate(90deg);
+  /* The notch edges move with it: the app's top is the screen's right, and so on round. */
+  --safe-t: env(safe-area-inset-right, 0px); --safe-r: env(safe-area-inset-bottom, 0px);
+  --safe-b: env(safe-area-inset-left, 0px); --safe-l: env(safe-area-inset-top, 0px);
+}
 
 /* ---------- shared ---------- */
 .board {
@@ -525,8 +533,6 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .reward-ladder { list-style: none; margin: 4px 0 8px; padding: 0; font-weight: 800; font-size: 14px; }
 
 /* Phones held upright: ask for landscape. Above the race, HUD and modals. */
-.rotate-prompt { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 24px; text-align: center; background: var(--board); color: #fff; font-family: Bungee, Impact, sans-serif; font-size: 22px; }
-.rotate-prompt p { margin: 0; }
 .rotate-phone { width: 56px; height: 96px; border: 5px solid var(--yellow); border-radius: 12px; animation: rotate-phone 2.4s ease-in-out infinite; }
 @keyframes rotate-phone { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
 @media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }
@@ -537,3 +543,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, .6); color: #7dff9b;
   font: 11px/1.35 ui-monospace, Menlo, Consolas, monospace; pointer-events: none; white-space: pre;
 }
+
+/* ---------- in-app browser hint ---------- */
+.iab-banner { position: absolute; left: calc(12px + var(--safe-l)); right: calc(12px + var(--safe-r)); bottom: calc(10px + var(--safe-b)); z-index: 20; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--board); color: #fff; font-size: 13px; box-shadow: 0 4px 0 rgba(0, 0, 0, .35); }
+.iab-banner span { flex: 1; }
+.iab-banner .btn { white-space: nowrap; text-decoration: none; }

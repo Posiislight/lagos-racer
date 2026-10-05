@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { touch } from '../game/input';
 import { useGame } from '../game/store';
+import { appRotated, localSize, toLocalPoint } from './rotate';
 
 export function useIsTouch() {
   const [isTouch, setTouch] = useState(() => typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0));
@@ -24,9 +25,11 @@ function SteerZone({ k, side, label, children }: { k: 'left' | 'right'; side: 'l
   const [down, setDown] = useState(false);
 
   const place = (e: PointerEvent) => {
-    const box = (e.currentTarget as HTMLElement).parentElement!.getBoundingClientRect();
+    // Pointer positions are on screen; when the app is turned, work out where that is inside it.
+    const box = (e.currentTarget as HTMLElement).parentElement!.getBoundingClientRect(), rotated = appRotated();
+    const { width, height } = localSize(box, rotated), at = toLocalPoint(e.clientX, e.clientY, box, rotated);
     const clamp = (v: number, max: number) => Math.max(STEER_R, Math.min(max - STEER_R, v));
-    setPos({ x: clamp(e.clientX - box.left, box.width), y: clamp(e.clientY - box.top, box.height) });
+    setPos({ x: clamp(at.x, width), y: clamp(at.y, height) });
   };
   const release = (e: PointerEvent) => {
     fingers.current.delete(e.pointerId);

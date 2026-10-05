@@ -1,39 +1,26 @@
 import { useEffect, useState } from 'react';
-import { useGame } from '../game/store';
-import { shouldPauseForRotate, shouldPromptRotate } from './rotate';
+import { shouldFakeLandscape } from './rotate';
 
 const COARSE = '(pointer: coarse)';
 const PORTRAIT = '(orientation: portrait)';
 
 function read(): boolean {
-  return shouldPromptRotate(matchMedia(COARSE).matches, matchMedia(PORTRAIT).matches);
+  return shouldFakeLandscape(matchMedia(COARSE).matches, matchMedia(PORTRAIT).matches);
 }
 
-/** Full-screen "turn your phone sideways" overlay for touch devices held upright; pauses a solo race while it shows. */
-export function RotatePrompt() {
-  const [prompting, setPrompting] = useState(read);
-  const screen = useGame(s => s.screen);
-  const online = useGame(s => s.online);
-  const paused = useGame(s => s.paused);
-  const resultsShowing = useGame(s => s.results !== null);
-
+/**
+ * True while a touch device is held upright. The app then turns itself 90° (`.app[data-rotated]`)
+ * so the game plays sideways without the player doing anything, even in in-app browsers that ignore
+ * the orientation lock. Turn the phone for real and this goes false and the app lies flat again.
+ */
+export function useFakeLandscape(): boolean {
+  const [rotated, setRotated] = useState(read);
   useEffect(() => {
     const queries = [matchMedia(COARSE), matchMedia(PORTRAIT)];
-    const update = () => setPrompting(read());
+    const update = () => setRotated(read());
     queries.forEach(q => (q.addEventListener ? q.addEventListener('change', update) : q.addListener(update)));
     update();
     return () => queries.forEach(q => (q.removeEventListener ? q.removeEventListener('change', update) : q.removeListener(update)));
   }, []);
-
-  useEffect(() => {
-    if (shouldPauseForRotate(prompting, screen, online, paused, resultsShowing)) useGame.getState().setPaused(true);
-  }, [prompting, screen, online, paused, resultsShowing]);
-
-  if (!prompting) return null;
-  return (
-    <div className="rotate-prompt" role="alert">
-      <div className="rotate-phone" aria-hidden="true" />
-      <p>Turn your phone sideways to play</p>
-    </div>
-  );
+  return rotated;
 }

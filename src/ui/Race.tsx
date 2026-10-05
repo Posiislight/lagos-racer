@@ -43,6 +43,8 @@ export default function Race() {
     <div className="race">
       <Canvas
         className="race-canvas"
+        // Size from the element's own layout size: its on-screen box has width and height swapped when the app is turned.
+        resize={{ offsetSize: true }}
         shadows={quality !== 'low'}
         dpr={PROFILES[quality].dpr}
         // Antialiasing is fixed when the canvas is created: a level change mid-race can't toggle it, the next race picks it up.

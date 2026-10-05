@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { fx } from '../game/fx';
 import { ITEM_ICON } from '../scene/art/items';
+import { appRotated, toLocalPoint } from './rotate';
 
 const LINES = { low: 16, medium: 28, high: 40 } as const;
 const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -91,13 +92,16 @@ export function ScreenFx() {
 
       // Picked-up items fly from where you grabbed them into the item button.
       const target = document.querySelector('.hud-item')?.getBoundingClientRect();
+      const fxBox = flyers.current?.parentElement?.getBoundingClientRect();
       while (fx.pickups.length && flyers.current) {
         const p = fx.pickups.shift()!;
         if (!target) continue;
         const img = document.createElement('img');
         img.src = ITEM_ICON[p.kind]; img.alt = ''; img.className = 'fx-fly';
         flyers.current.appendChild(img);
-        const tx = target.left + target.width / 2 - p.x, ty = target.top + target.height / 2 - p.y;
+        // The button's rect is on screen; fly in the app's own coordinates (it may be turned).
+        const dest = fxBox ? toLocalPoint(target.left + target.width / 2, target.top + target.height / 2, fxBox, appRotated()) : { x: p.x, y: p.y };
+        const tx = dest.x - p.x, ty = dest.y - p.y;
         img.style.left = `${p.x}px`; img.style.top = `${p.y}px`;
         img.animate(
           [{ transform: 'translate(-50%, -50%) scale(1.4)', opacity: 1 }, { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(.6)`, opacity: 0.9 }],
