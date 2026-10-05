@@ -11,8 +11,8 @@ import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
 // handlers below already keep the process alive; they report to Sentry themselves.
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  environment: process.env.SENTRY_ENVIRONMENT ?? process.env.RAILWAY_ENVIRONMENT_NAME ?? 'production',
-  release: process.env.SENTRY_RELEASE ?? process.env.RAILWAY_GIT_COMMIT_SHA,
+  environment: process.env.SENTRY_ENVIRONMENT ?? 'production',
+  release: process.env.SENTRY_RELEASE ?? process.env.RENDER_GIT_COMMIT,
   tracesSampleRate: 0,
   integrations: (defaults) => defaults.filter((i) => i.name !== 'OnUncaughtException' && i.name !== 'OnUnhandledRejection'),
 });
