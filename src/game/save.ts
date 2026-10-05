@@ -50,7 +50,7 @@ export const SAVE_KEY = 'lagos-racer:v2';
 const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
-  settings: { quality: 'high', autoQuality: true, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
+  settings: { quality: 'high', autoQuality: false, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
   coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
