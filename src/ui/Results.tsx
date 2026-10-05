@@ -3,7 +3,7 @@ import { formatTime } from '../game/race';
 import { vehicleById } from '../config/vehicles';
 import { driverById } from '../config/drivers';
 import { nextRace } from '../game/campaign';
-import { trackOrDefault } from '../config/tracks';
+import { eventName } from '../config/tracks';
 import { useNet } from '../net/store';
 
 const PLACE = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
@@ -29,12 +29,13 @@ export function Results() {
     : CHEER[Math.min(place, CHEER.length - 1)];
   const next = spec && outcome?.passed ? nextRace(spec) : null;
   const unlocked = outcome?.unlocked ? driverById(outcome.unlocked) : null;
-  // A room race is on the room's track, not the solo pick.
+  // The race that was run: its spec's track, else the room's, else the solo pick.
   const roomTrack = online ? useNet.getState().pendingGrid?.trackId : undefined;
+  const event = eventName(spec?.track ?? roomTrack ?? track);
   return (
     <div className="modal results" role="dialog" aria-modal="true" aria-labelledby="results-title">
       <div className="card modal-card wide">
-        <p className="eyebrow">{spec?.title ?? `${trackOrDefault(roomTrack ?? track).name} Grand Prix`}</p>
+        <p className="eyebrow">{spec ? `${event} · ${spec.title}` : event}</p>
         <div className="result-head">
           <h2 id="results-title">{heading}</h2>
           {outcome && <span className={`verdict ${outcome.passed ? 'passed' : 'failed'}`}>{outcome.passed ? 'Passed' : 'Try again'}</span>}

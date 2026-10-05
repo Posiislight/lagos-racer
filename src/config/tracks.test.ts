@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STREET, TRACKS, trackById, trackFor, trackOrDefault } from './tracks';
+import { STREET, TRACKS, eventName, trackById, trackFor, trackOrDefault } from './tracks';
 import { RAISED } from '../scene/scenery';
 import { makeLand, raisedMask } from '../scene/lagoon';
 import { project, sampleAt } from '../game/track';
@@ -14,6 +14,23 @@ describe('every track', () => {
       expect(trackFor(t).length).toBeGreaterThan(0);
       expect(t.laps).toBeGreaterThanOrEqual(1);
     }
+  });
+});
+
+describe('event names', () => {
+  it('every track has one, and no two are the same', () => {
+    const names = TRACKS.map(t => eventName(t));
+    for (const n of names) expect(n.trim().length).toBeGreaterThan(0);
+    expect(new Set(names).size).toBe(TRACKS.length);
+  });
+  it('names each event after its own place', () => {
+    expect(eventName(trackById('ojuelegba'))).toBe('Ojuelegba Grand Prix');
+    expect(eventName(trackById('third-mainland'))).toBe('Third Mainland Bridge Grand Prix');
+    expect(eventName(trackById('ikorodu'))).toBe('Ikorodu Grand Prix');
+  });
+  it('takes a track id too, and falls back for an unknown one', () => {
+    expect(eventName('ikorodu')).toBe('Ikorodu Grand Prix');
+    expect(eventName('nowhere')).toBe('Ojuelegba Grand Prix');
   });
 });
 

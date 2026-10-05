@@ -3,7 +3,7 @@ import {
   Mesh, MeshStandardMaterial, PlaneGeometry, SphereGeometry, Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { SceneryZone, TrackConfig } from '../config/tracks';
+import { eventName, type SceneryZone, type TrackConfig } from '../config/tracks';
 import { axisPoint, roadSpan, roadToS } from '../game/outAndBack';
 import { zoneSign } from './zoneSign';
 import { flyerHoarding, hospitalBlocks, kioskRow, mosque, parkedKeke, redBlock, shopfront, solarLight, tankerTruck, terminalCanopy, yellowBlock } from './ikoroduLandmarks';
@@ -689,8 +689,11 @@ function gantry(track: Track, cfg: TrackConfig, m: MatFn) {
   const banner = canvasTex(1024, 128, (x, cw, ch) => {
     x.fillStyle = '#141210'; x.fillRect(0, 0, cw, ch);
     for (let i = 0; i < 32; i++) for (let j = 0; j < 2; j++) { x.fillStyle = (i + j) % 2 ? '#fff' : '#141210'; x.fillRect(i * 32, j * 16, 32, 16); x.fillRect(i * 32, ch - 32 + j * 16, 32, 16); }
-    const text = cfg.banner ?? `${cfg.name.toUpperCase()} GRAND PRIX`;
-    x.fillStyle = '#ffb21a'; x.font = '400 64px Bungee, Impact, Arial Black'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    const text = eventName(cfg).toUpperCase();
+    x.fillStyle = '#ffb21a'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    // Longest name that fits between the chequered edges: shrink from 64 px until it does.
+    let size = 64;
+    do x.font = `400 ${size}px Bungee, Impact, Arial Black`; while (x.measureText(text).width > cw - 48 && (size -= 2) > 24);
     x.fillText(text, cw / 2, ch / 2 + 4);
   });
   const bm = new MeshStandardMaterial({ map: banner, emissive: new Color(0.25, 0.25, 0.25), emissiveMap: banner });

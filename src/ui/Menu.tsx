@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
-import { TRACKS, trackOrDefault } from '../config/tracks';
+import { TRACKS, eventName, trackOrDefault } from '../config/tracks';
 import { driverById } from '../config/drivers';
 import { formatTime } from '../game/race';
 import { Settings } from './Settings';
@@ -36,7 +36,7 @@ export function Menu() {
       <div className="menu-stripes" aria-hidden="true" />
       <header className="menu-head">
         <div className="board">
-          <small>{t.name} Grand Prix</small>
+          <small>{eventName(t)}</small>
           <h1>LAGOS RACER</h1>
         </div>
         <div className="coins" aria-label={`${coins} coins`}>₦ {coins}</div>
