@@ -3,7 +3,11 @@
 interface ImportMetaEnv {
   /** Room server address, e.g. wss://rooms.example.com. Defaults to port 8787 on whatever host served the page. */
   readonly VITE_ROOM_SERVER?: string;
-  /** AdSense publisher id (ca-pub-…). Turns on rewarded ads, as test ads unless VITE_ADS_LIVE is 1 in a production build. */
+  /** TURN relay for voice chat, comma-separated turn:/turns: urls. Without one, phones on mobile data often cannot hear each other. */
+  readonly VITE_TURN_URL?: string;
+  readonly VITE_TURN_USER?: string;
+  readonly VITE_TURN_CREDENTIAL?: string;
+  /** AdSense publisher id (ca-pub-ï¿½). Turns on rewarded ads, as test ads unless VITE_ADS_LIVE is 1 in a production build. */
   readonly VITE_ADSENSE_CLIENT?: string;
   readonly VITE_ADS_LIVE?: string;
   /** Sentry DSN for browser error reporting. Unset = no reporting. */

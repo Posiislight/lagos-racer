@@ -4,7 +4,16 @@ import type { RtcSignal } from './protocol';
 
 export type MicState = 'off' | 'asking' | 'on' | 'denied' | 'unsupported';
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+// Phones on mobile data (MTN, Glo, Airtel) are usually behind carrier NAT, where STUN alone cannot connect two of them:
+// a TURN relay, set at build time, is what makes those links come up.
+export function iceServers(turnUrl = import.meta.env.VITE_TURN_URL, user = import.meta.env.VITE_TURN_USER, credential = import.meta.env.VITE_TURN_CREDENTIAL): RTCIceServer[] {
+  const servers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+  const urls = (turnUrl ?? '').split(',').map(u => u.trim()).filter(Boolean);
+  if (urls.length) servers.push({ urls, username: user, credential });
+  return servers;
+}
+// A link that has not come up by now is torn down and offered again.
+const STALL_MS = 10000;
 // The room server drops a socket's messages beyond 30 a second: trickle candidates out slower than that.
 const SEND_GAP_MS = 60;
 const RETRY_MS = 3000;
@@ -142,7 +151,7 @@ export class VoiceChat {
   }
 
   private open(slot: number): Peer {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers: iceServers() });
     const audio = document.createElement('audio');
     audio.autoplay = true;
     audio.muted = !this.speakerOn;
@@ -160,10 +169,22 @@ export class VoiceChat {
       void audio.play().catch(() => undefined);
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState !== 'failed' || this.peers.get(slot) !== peer) return;
+      if (this.peers.get(slot) !== peer) return;
+      if (pc.connectionState === 'connected') {
+        // Autoplay can have refused the stream before anyone touched the page: try again now it is live.
+        void audio.play().catch(() => undefined);
+        return;
+      }
+      if (pc.connectionState !== 'failed' && pc.connectionState !== 'closed') return;
       this.drop(slot);
       this.retryLater();
     };
+    // A link stuck "connecting" never reports failed on some phones: give it a deadline.
+    setTimeout(() => {
+      if (this.closed || this.peers.get(slot) !== peer || pc.connectionState === 'connected') return;
+      this.drop(slot);
+      this.retryLater();
+    }, STALL_MS);
     return peer;
   }
 
