@@ -1,6 +1,6 @@
 # Simpler menu, stars and the naira economy
 
-Date: 5 October 2026. Status: draft for review. Follows the multiplayer and vehicle-upgrades merges (`main` at the merge of `worktree-vehicle-upgrades`).
+Date: 5 October 2026. Status: your answers of 5 October are incorporated; awaiting final read-through. Follows the multiplayer and vehicle-upgrades merges (`main` at the merge of `worktree-vehicle-upgrades`).
 
 ## What we're doing and why
 
@@ -15,9 +15,9 @@ The game is nearly feature-complete for its first release but the front door is 
 
 **Assumptions I made (please correct any):**
 
-- 3rd place = ★, 2nd = ★★, 1st = ★★★, 4th or lower = no stars. (You confirmed this.)
+- 3rd place = ★, 2nd = ★★, 1st = ★★★, 4th or lower = no stars and **no money**. (Confirmed.)
 - A race pays the **same every time you replay it** (your choice, option c). There is no first-clear bonus. A star count is a *best*; payout always follows the stars you earn **in that run**.
-- All four campaign races are open from the start (you said "just pick one of the four and play"). The Mama Put duel still unlocks her as a driver the first time you beat it.
+- **Only the first race is open from the start.** Each next race opens when you pass the one before (top 3), and any open race can be replayed. The Mama Put duel unlocks her as a driver the first time you beat it. (Confirmed.)
 - Garage and Settings stay reachable as two small icon buttons, not as menu "entries".
 
 **Success looks like:** a new player opens the game, taps Single player, picks a race and is racing within two taps; every race result shows stars and a naira payout that obviously matches; a phone held upright never shows the game, only the rotate prompt.
@@ -31,14 +31,14 @@ The game is nearly feature-complete for its first release but the front door is 
 - Remove: "OYA, RACE!", the track-picker chips, the `launchRace()` quick path, and the store's use of `track` as a menu selection for single player (campaign races carry their own track; rooms carry theirs).
 - Keep: **Single player** (`setScreen('campaign')`), **Multiplayer** (`setScreen('online')`), small Garage and Settings buttons, the OpenStreetMap credit, the naira balance.
 - `launchRace` stays only as the helper the campaign and room flows call; `goFullscreen()` keeps firing from the tap that starts a race, since browsers require a user gesture.
-- **Dependency:** the Grand Prix naming fix (branch `fix/grand-prix-names`, in progress) also edits `Menu.tsx` and `Results.tsx`. Merge it first so this work builds on it.
+- **Dependency (done):** the Grand Prix naming fix (`fix/grand-prix-names`) is merged into `main`, so this work builds on it.
 
 ## 2. Single player screen
 
 `src/ui/Campaign.tsx`, `src/game/campaign.ts`
 
 - Shows the four races as cards: title, track, mode, **stars earned (0-3 as ★/☆)** and the payout for each star level, so the reward is visible before you race.
-- All four selectable. `campaignStatus` stops gating on the previous race (`locked` state removed); `nextRace` still drives the "Next race" button on the results screen.
+- Race 1 is open; each later race stays `locked` until the one before it is passed, exactly as `campaignStatus` does today (no change to the gating). Locked cards show a padlock and "Pass the previous race". `nextRace` still drives the "Next race" button on the results screen.
 - Mama Put's lock in the Garage is unchanged: she unlocks when `campaign-1-4` is first passed.
 
 ## 3. Stars
@@ -64,9 +64,9 @@ Paid **every time**, by the stars earned in that run:
 | 1st | ★★★ | ₦100,000 |
 | 2nd | ★★ | ₦60,000 |
 | 3rd | ★ | ₦30,000 |
-| 4th or below | none | ₦5,000 ("fuel money") |
+| 4th or below | none | ₦0 |
 
-The ₦5,000 is my addition so a bad race isn't a total waste; remove it if you want no stars to pay nothing. It lives in `src/config/economy.ts` as `PAYOUT_BY_STARS = [5_000, 30_000, 60_000, 100_000]`.
+Zero stars pays nothing (confirmed). It lives in `src/config/economy.ts` as `PAYOUT_BY_STARS = [0, 30_000, 60_000, 100_000]`.
 
 ### 4.2 What things cost (unchanged from the upgrades branch)
 
@@ -97,7 +97,7 @@ Because replays pay in full, the best race can be repeated for steady income. Th
 
 ### 4.5 Multiplayer payouts
 
-Room races pay by place, using the same table (1st ₦100k, 2nd ₦60k, 3rd ₦30k, below ₦5k, DNF ₦5k), but **at 50%** and with a **daily cap of ₦300,000** from rooms. Friends can otherwise take turns winning an empty room for unlimited money, and room results come from our own referee, not a trusted server of record. The cap is client-side until accounts exist (a reset save resets it); that is acceptable because rooms are private and the only thing at risk is a player's own progression.
+Room races pay by place, using the same table (1st ₦100k, 2nd ₦60k, 3rd ₦30k, 4th and below or DNF ₦0), but **at 50%** and with a **daily cap of ₦300,000** from rooms. Friends can otherwise take turns winning an empty room for unlimited money, and room results come from our own referee, not a trusted server of record. The cap is client-side until accounts exist (a reset save resets it); that is acceptable because rooms are private and the only thing at risk is a player's own progression.
 
 ### 4.6 Code changes
 
