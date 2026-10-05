@@ -8,6 +8,7 @@ import { Campaign } from './ui/Campaign';
 import { Online } from './ui/Online';
 import { Lobby } from './ui/Lobby';
 import { RotatePrompt } from './ui/RotatePrompt';
+import { UpdatePrompt } from './ui/UpdatePrompt';
 
 // The race (three.js, physics, models) is loaded on demand so the menu appears fast on mobile data.
 const loadRace = () => import('./ui/Race');
@@ -52,6 +53,7 @@ export function App() {
         </Suspense>
       )}
       <RotatePrompt />
+      <UpdatePrompt />
     </div>
   );
 }
