@@ -23,6 +23,7 @@ export class Roster {
   private names: string[];
   private looks: { vehicle: VehicleId; paint: string }[];
   private appear: number[];
+  private skill: number[];
 
   constructor(random: () => number, startedAt: number) {
     const pool = [...BOT_NAMES];
@@ -36,6 +37,7 @@ export class Roster {
       return { vehicle: v.id, paint: v.paints[Math.floor(random() * v.paints.length)].id };
     });
     this.appear = Array.from({ length: BOT_COUNT }, () => startedAt + APPEAR_MIN + random() * (APPEAR_MAX - APPEAR_MIN));
+    this.skill = Array.from({ length: BOT_COUNT }, () => 0.85 + random() * 0.15);
   }
 
   visible(now: number, humans: HumanLook[]): BotView[] {
@@ -63,5 +65,9 @@ export class Roster {
       }
     }
     return bots;
+  }
+
+  skills(): number[] {
+    return [...this.skill];
   }
 }

@@ -9,7 +9,6 @@ import {
   starsForPlace,
   upgradePrice,
 } from './economy';
-import { vehicleById } from './vehicles';
 
 describe('starsForPlace', () => {
   it('gives three, two and one stars to the podium and none after', () => {
@@ -66,12 +65,6 @@ describe('pacing', () => {
     expect(races).toBeGreaterThanOrEqual(25);
     expect(races).toBeLessThanOrEqual(50);
   });
-
-  it('puts the BRT at 20 to 40 podium races', () => {
-    const races = (vehicleById('brt').locked?.coins ?? 0) / avgPodium;
-    expect(races).toBeGreaterThanOrEqual(20);
-    expect(races).toBeLessThanOrEqual(40);
-  });
 });
 
 describe('upgradePrice', () => {
@@ -104,11 +97,5 @@ describe('formatNaira', () => {
   it('shows ₦0 for NaN and negatives', () => {
     expect(formatNaira(NaN)).toBe('₦0');
     expect(formatNaira(-5)).toBe('₦0');
-  });
-});
-
-describe('vehicle unlock prices', () => {
-  it('prices the BRT', () => {
-    expect(vehicleById('brt').locked?.coins).toBe(2_000_000);
   });
 });

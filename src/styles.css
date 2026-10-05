@@ -63,6 +63,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .btn.primary { background: var(--yellow); }
 .btn.big { font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 24px; padding: 14px 22px; width: 100%; }
 .btn.ghost { background: transparent; box-shadow: none; }
+.coins.premium { background: #3a2a63; color: #ffd86b; }
+.unlock-options { display: grid; gap: 8px; }
 .coins { background: var(--board); color: #7ee08a; font-weight: 900; padding: 8px 14px; border-radius: 999px; font-size: 16px; white-space: nowrap; }
 .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); vertical-align: -1px; }
 
@@ -93,6 +95,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .menu-side > .credit { align-self: flex-start; background: rgba(255, 250, 240, .75); padding: 2px 8px; border-radius: 8px; color: var(--ink); }
 .menu-entries { display: flex; flex-direction: column; gap: 8px; }
 .menu-corner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.coins.gems { border: 0; cursor: pointer; font-family: inherit; }
+.garage-btn { position: relative; }
+.hint-dot { position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; border-radius: 50%; background: #ff4d4d; border: 2px solid var(--ink); }
 .btn.small { padding: 6px 12px; min-height: 36px; font-size: 14px; }
 .menu-caption { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); margin: 0; padding: 4px 14px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); white-space: nowrap; font-family: 'Bungee', system-ui, sans-serif; font-size: 16px; color: var(--ink); pointer-events: none; }
 .entry { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 14px 18px; min-height: 64px; border: 3px solid var(--ink); border-radius: 14px; background: var(--paper); color: var(--ink); cursor: pointer; font: inherit; box-shadow: 0 4px 0 var(--ink); }
@@ -118,14 +123,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   padding: calc(12px + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
   color: var(--paper);
 }
-.garage-head { display: flex; align-items: center; gap: 12px; }
-.garage-head h1 { flex: 1; margin: 0; font-family: Bungee, Impact, sans-serif; font-weight: 400; color: var(--led); font-size: 28px; }
+.garage-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.garage-head .coins { padding: 6px 10px; font-size: 14px; }
+.garage-head h1 { flex: 1 1 auto; min-width: 0; margin: 0; font-family: Bungee, Impact, sans-serif; font-weight: 400; color: var(--led); font-size: 28px; }
 .garage-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr minmax(280px, 360px); gap: 12px; align-items: end; }
 .garage-preview { position: relative; height: 100%; min-height: 160px; }
 .garage-card { color: var(--ink); }
 .stats { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 14px; margin: 10px 0 14px; }
 .paints { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
 .swatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(20, 18, 16, .25); cursor: pointer; padding: 0; }
+.swatch.unowned { font-size: 13px; line-height: 1; display: grid; place-items: center; }
 .swatch.on { border-color: var(--ink); box-shadow: 0 0 0 3px var(--yellow); }
 .paint-name { font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; margin-left: 4px; }
 .stats span { color: var(--muted); }

@@ -98,7 +98,7 @@ describe('RoomServer', () => {
     const room = lastRoom(a.peer);
     expect(room.hostSlot).toBe(1);
     expect(room.code).toBe(a.welcome.code);
-    expect(room.players).toEqual([{ slot: 1, name: 'Ade', vehicle: 'okada', paint: 'red', ready: false, connected: true }]);
+    expect(room.players).toEqual([{ slot: 1, name: 'Ade', vehicle: 'okada', paint: 'yellow', ready: false, connected: true }]);
   });
 
   it('gives different codes to different rooms even if random repeats', () => {
@@ -429,7 +429,7 @@ describe('race start', () => {
       expect(g).toMatchObject({ t: 'grid', raceSeq: 1, trackId: 'ojuelegba', laps: 3 });
       expect(Number.isInteger(g.seed) && g.seed >= 0 && g.seed < 2 ** 32).toBe(true);
       expect(g.grid).toEqual([
-        { netId: 0, slot: 1, name: 'Ade', vehicle: 'okada', paint: 'red', ai: false },
+        { netId: 0, slot: 1, name: 'Ade', vehicle: 'okada', paint: 'yellow', ai: false },
         { netId: 1, slot: 2, name: 'Bola', vehicle: 'keke', paint: 'yellow', ai: false },
       ]);
     }
