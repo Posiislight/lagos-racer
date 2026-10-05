@@ -1415,3 +1415,117 @@ describe('quick room', () => {
     expect(after.filter(p => p.slot >= BOT_SLOT_BASE)).toHaveLength(4);
   });
 });
+
+describe('quick matchmaking', () => {
+  function quick(name = 'Ade') {
+    const c = connect();
+    send(c.conn, { t: 'quick', name, vehicle: 'okada' });
+    return { ...c, welcome: msgs(c.peer, 'welcome')[0] };
+  }
+  const codes = () => [...server.rooms.keys()];
+
+  it('quick creates a room for the first caller and joins the second to it', () => {
+    const a = quick('Ade');
+    const b = quick('Bola');
+    expect(server.rooms.size).toBe(1);
+    expect(b.welcome.code).toBe(a.welcome.code);
+    expect(b.welcome.slot).toBe(2);
+    const room = lastRoom(a.peer);
+    expect(room.quick).toBeDefined();
+    expect(room.players.filter(p => p.connected).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('quick skips a full room and a started room', () => {
+    const first = quick('P1');
+    for (let i = 2; i <= 6; i++) quick('P' + i);
+    // Six humans start the race on the next tick; until then the room is full.
+    const seventh = quick('P7');
+    expect(seventh.welcome.code).not.toBe(first.welcome.code);
+    expect(server.rooms.size).toBe(2);
+    server.tick();
+    expect(server.rooms.get(first.welcome.code)!.phase).toBe('loading');
+    const eighth = quick('P8');
+    expect(eighth.welcome.code).toBe(seventh.welcome.code);
+  });
+
+  it('quick picks the room with least time left', () => {
+    const a = quick('A');
+    const full = [quick('x2'), quick('x3'), quick('x4'), quick('x5'), quick('x6')];
+    expect(full).toHaveLength(5);
+    // A is full now; b opens a second room later, c a third later still.
+    now += 10_000;
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    server.rooms.get(a.welcome.code)!.remove(6);
+    server.rooms.get(a.welcome.code)!.remove(5);
+    now += 5_000;
+    const c = connect();
+    // Room A has 15 s left, room B has 25 s left: A wins.
+    send(c.conn, { t: 'quick', name: 'C', vehicle: 'okada' });
+    expect(msgs(c.peer, 'welcome')[0].code).toBe(a.welcome.code);
+  });
+
+  it('busy at 50 quick rooms', () => {
+    for (let i = 0; i < 50; i++) {
+      // Fill each room so the next caller must open another.
+      const first = quick('F' + i);
+      const room = server.rooms.get(first.welcome.code)!;
+      for (let s = 2; s <= 6; s++) room.add(-1, 'x', 'okada', '', 't');
+    }
+    expect(server.rooms.size).toBe(50);
+    const late = connect();
+    send(late.conn, { t: 'quick', name: 'Late', vehicle: 'okada' });
+    expect(msgs(late.peer, 'error')).toEqual([{ t: 'error', error: 'busy' }]);
+    expect(msgs(late.peer, 'welcome')).toHaveLength(0);
+    expect(server.rooms.size).toBe(50);
+  });
+
+  it('a joiner after loading begins lands in a new room', () => {
+    const a = quick('A');
+    now += QUICK_WAIT_MS;
+    server.tick();
+    expect(server.rooms.get(a.welcome.code)!.phase).toBe('loading');
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+    expect(server.rooms.size).toBe(2);
+  });
+
+  it('a quick room that has raced and returned to the lobby is not offered again', () => {
+    const a = quick('A');
+    const room = server.rooms.get(a.welcome.code)!;
+    room.phase = 'lobby';
+    room.raceSeq = 1;
+    const b = quick('B');
+    expect(b.welcome.code).not.toBe(a.welcome.code);
+  });
+
+  it('bad nickname gives bad-name', () => {
+    const c = connect();
+    send(c.conn, { t: 'quick', name: '   ', vehicle: 'okada' });
+    expect(msgs(c.peer, 'error')).toEqual([{ t: 'error', error: 'bad-name' }]);
+    expect(server.rooms.size).toBe(0);
+  });
+
+  it('vote message updates the tally for everyone', () => {
+    const a = quick('A');
+    const b = quick('B');
+    send(a.conn, { t: 'vote', trackId: 'ikorodu' });
+    for (const p of [a.peer, b.peer]) expect(lastRoom(p).quick!.votes.ikorodu).toBe(1);
+    send(b.conn, { t: 'vote', trackId: 'nowhere' });
+    expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
+    send(b.conn, { t: 'vote', trackId: 'x'.repeat(41) });
+    expect(lastRoom(b.peer).quick!.votes.ikorodu).toBe(1);
+  });
+
+  it('friends rooms never receive quick joiners', () => {
+    const f = create('Host');
+    const q = quick('Q');
+    expect(q.welcome.code).not.toBe(f.welcome.code);
+    expect(server.rooms.size).toBe(2);
+    expect(codes()).toContain(f.welcome.code);
+    expect(lastRoom(f.peer).players).toHaveLength(1);
+    // And a vote in a friends' room is ignored.
+    send(f.conn, { t: 'vote', trackId: 'ikorodu' });
+    expect(lastRoom(f.peer).quick).toBeUndefined();
+  });
+});
