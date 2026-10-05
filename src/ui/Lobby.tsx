@@ -3,6 +3,7 @@ import { TRACKS } from '../config/tracks';
 import { useGame } from '../game/store';
 import { VEHICLES, paintOf, vehicleById } from '../config/vehicles';
 import { ERROR_TEXT, useNet } from '../net/store';
+import { VoiceControls } from './VoiceControls';
 
 async function shareLink(code: string): Promise<'shared' | 'copied' | 'failed'> {
   const url = `${location.origin}/?room=${code}`;
@@ -174,6 +175,8 @@ export function Lobby() {
             );
           })}
         </div>
+        <p className="eyebrow">Voice chat</p>
+        <VoiceControls />
         <button className={`btn${me?.ready ? ' ready' : ' primary'}`} aria-pressed={!!me?.ready} disabled={inRace} onClick={() => setReady(!me?.ready)}>
           Ready
         </button>

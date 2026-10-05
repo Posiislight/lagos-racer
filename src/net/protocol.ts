@@ -56,7 +56,14 @@ export type NetResult = {
   dnf: boolean;
 };
 
+/** WebRTC setup traffic for voice chat, relayed untouched between two players (the audio itself never touches the server). */
+export type RtcSignal =
+  | { kind: 'offer'; sdp: string }
+  | { kind: 'answer'; sdp: string }
+  | { kind: 'ice'; candidate: string; mid: string | null; index: number | null };
+
 export type ClientMessage =
+  | { t: 'rtc'; to: number; signal: RtcSignal }
   | { t: 'create'; name: string; vehicle: VehicleId; paint: string }
   | { t: 'join'; code: string; name: string; vehicle: VehicleId; paint: string }
   | { t: 'quick'; name: string; vehicle: VehicleId; paint: string }
@@ -73,6 +80,7 @@ export type ClientMessage =
   | { t: 'leave' };
 
 export type ServerMessage =
+  | { t: 'rtc'; from: number; signal: RtcSignal }
   | { t: 'welcome'; code: string; slot: number; token: string }
   | { t: 'room'; room: RoomView }
   | { t: 'error'; error: ErrorCode }

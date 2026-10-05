@@ -7,6 +7,7 @@ import { Connection, parseLagSim, type ConnStatus, type NetLink } from './connec
 import { roomServerUrl } from './server';
 import { NetSession } from './session';
 import { toResults } from './results';
+import { VoiceChat, type MicState } from './voice';
 import { cleanNick, normalizeCode, type ClientMessage, type ErrorCode, type GridEntry, type RoomView, type ServerMessage } from './protocol';
 
 export type NetError = ErrorCode | 'unreachable';
@@ -26,6 +27,11 @@ type NetState = {
   cut: boolean;
   nickname: string;
   pendingGrid: PendingGrid | null;
+  /** Voice chat (friends' rooms): our mic, and whether we hear the others. */
+  mic: MicState;
+  speaker: boolean;
+  toggleMic: () => void;
+  toggleSpeaker: () => void;
   create: (name: string, vehicle: VehicleId, paint: string) => void;
   quick: (name: string, vehicle: VehicleId, paint: string) => void;
   vote: (trackId: string) => void;
@@ -90,6 +96,7 @@ let session: NetSession | null = null;
 /** Set by a welcome: the room view that follows says whether the race we were in is still the room's. */
 let resyncPending = false;
 let strandTimer: ReturnType<typeof setTimeout> | null = null;
+let voice: VoiceChat | null = null;
 
 export const getClock = (): ClockSync => clock;
 export const getLink = (): NetLink | null => conn;
@@ -130,12 +137,14 @@ function drop() {
   strandTimer = null;
   resyncPending = false;
   session = null;
+  voice?.close();
+  voice = null;
   const old = conn;
   conn = null;
   old?.close();
 }
 
-const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false };
+const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false, mic: 'off' as MicState, speaker: true };
 
 export const useNet = create<NetState>((set, get) => {
   /** Opens a fresh socket; `first` (create or join) goes out as soon as it is open. */
@@ -199,8 +208,14 @@ export const useNet = create<NetState>((set, get) => {
         if (game.screen === 'online') game.setScreen('lobby');
         break;
       }
-      case 'room':
+      case 'room': {
         set({ room: m.room, roomAt: Date.now() });
+        // Voice is for friends' rooms; everyone connected besides us gets a link.
+        const me = get().mySlot;
+        if (me !== null && m.room.quick === undefined) {
+          voice ??= newVoice();
+          voice.sync(me, m.room.players.filter(p => p.connected && p.slot !== me).map(p => p.slot));
+        }
         if (resyncPending) {
           resyncPending = false;
           // Back from a drop mid-race: catch the room up on what was lost while the socket was down, unless it has
@@ -208,6 +223,10 @@ export const useNet = create<NetState>((set, get) => {
           if (session?.raceSeq === m.room.raceSeq) session.resumed();
         }
         if (session?.stranded(m.room)) watchStranded();
+        break;
+      }
+      case 'rtc':
+        void voice?.onSignal(m.from, m.signal);
         break;
       case 'error':
         // Before we are seated, or when a resume is refused, there is no room to stay in.
@@ -277,7 +296,12 @@ export const useNet = create<NetState>((set, get) => {
     }, STRANDED_MS);
   }
 
-  const sendLobby = (change: { vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }) => {
+  const newVoice = () => new VoiceChat(
+    (to, signal) => conn?.sendJson({ t: 'rtc', to, signal }),
+    () => { if (voice) set({ mic: voice.mic, speaker: voice.speaker }); },
+  );
+
+  const sendLobby =(change: { vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }) => {
     set({ error: null });
     conn?.sendJson({ t: 'lobby', ...change });
   };
@@ -314,6 +338,15 @@ export const useNet = create<NetState>((set, get) => {
     vote: trackId => {
       set({ myVote: trackId, error: null });
       conn?.sendJson({ t: 'vote', trackId });
+    },
+    toggleMic: () => {
+      voice ??= newVoice();
+      if (voice.mic === 'on') voice.disableMic();
+      else void voice.enableMic();
+    },
+    toggleSpeaker: () => {
+      voice ??= newVoice();
+      voice.setSpeaker(!voice.speaker);
     },
     setVehicle: (vehicle, paint) => sendLobby({ vehicle, paint }),
     setReady: ready => sendLobby({ ready }),
