@@ -12,6 +12,8 @@ export function iceServers(turnUrl = import.meta.env.VITE_TURN_URL, user = impor
   if (urls.length) servers.push({ urls, username: user, credential });
   return servers;
 }
+const debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+const log = (...a: unknown[]) => { if (debug) console.info('[voice]', ...a); };
 // A link that has not come up by now is torn down and offered again.
 const STALL_MS = 10000;
 // The room server drops a socket's messages beyond 30 a second: trickle candidates out slower than that.
@@ -50,6 +52,13 @@ export class VoiceChat {
     return this.speakerOn;
   }
 
+  /** How many of the links we want are up, for the "Connected to 2 of 3" note. */
+  get links() {
+    let up = 0;
+    for (const p of this.peers.values()) if (p.pc.connectionState === 'connected') up++;
+    return { up, total: this.others.length };
+  }
+
   async enableMic() {
     if (this.mic === 'unsupported' || this.mic === 'on' || this.mic === 'asking') return;
     this.mic = 'asking';
@@ -62,7 +71,8 @@ export class VoiceChat {
       // The mic dying (unplugged, taken by a call) is the same as switching it off.
       this.track?.addEventListener('ended', () => { if (this.mic === 'on') this.disableMic(); });
       for (const p of this.peers.values()) this.attach(p);
-    } catch {
+    } catch (err) {
+      log('getUserMedia failed', err);
       this.mic = 'denied';
     }
     this.changed();
@@ -97,6 +107,7 @@ export class VoiceChat {
 
   async onSignal(from: number, signal: RtcSignal) {
     if (this.closed || !voiceSupported() || from === this.mySlot) return;
+    log('signal', signal.kind, 'from', from);
     try {
       if (signal.kind === 'offer') {
         // A fresh offer means the other end started over: so do we.
@@ -123,7 +134,8 @@ export class VoiceChat {
         if (peer.remoteSet) await peer.pc.addIceCandidate(init);
         else peer.early.push(init);
       }
-    } catch {
+    } catch (err) {
+      log('signal', signal.kind, 'from', from, 'failed', err);
       // A bad or stale message: this link just does not come up, the rest carry on.
     }
   }
@@ -162,6 +174,7 @@ export class VoiceChat {
     pc.onicecandidate = e => {
       if (!e.candidate) return;
       const c = e.candidate;
+      log('candidate', slot, c.type ?? c.candidate.split(' ')[7]);
       this.queue(() => this.send(slot, { kind: 'ice', candidate: c.candidate, mid: c.sdpMid, index: c.sdpMLineIndex }));
     };
     pc.ontrack = e => {
@@ -170,7 +183,10 @@ export class VoiceChat {
     };
     pc.onconnectionstatechange = () => {
       if (this.peers.get(slot) !== peer) return;
+      log('link', slot, pc.connectionState);
+      this.changed();
       if (pc.connectionState === 'connected') {
+        if (debug) void pc.getStats().then(r => r.forEach(x => { if (x.type === 'candidate-pair' && x.state === 'succeeded' && x.nominated) log('using', slot, r.get(x.localCandidateId)?.candidateType, '->', r.get(x.remoteCandidateId)?.candidateType); }));
         // Autoplay can have refused the stream before anyone touched the page: try again now it is live.
         void audio.play().catch(() => undefined);
         return;
@@ -182,6 +198,7 @@ export class VoiceChat {
     // A link stuck "connecting" never reports failed on some phones: give it a deadline.
     setTimeout(() => {
       if (this.closed || this.peers.get(slot) !== peer || pc.connectionState === 'connected') return;
+      log('link', slot, 'stalled in', pc.connectionState, '- retrying');
       this.drop(slot);
       this.retryLater();
     }, STALL_MS);
@@ -204,6 +221,7 @@ export class VoiceChat {
     peer.pc.close();
     peer.audio.srcObject = null;
     peer.audio.remove();
+    this.changed();
   }
 
   private retryLater() {

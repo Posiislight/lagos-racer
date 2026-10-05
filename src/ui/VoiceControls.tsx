@@ -13,7 +13,7 @@ const MIC_NOTE = {
 
 /** Mic and speaker buttons for a friends' room. Nothing is sent until the mic is switched on. */
 export function VoiceControls({ compact = false }: { compact?: boolean }) {
-  const { mic, speaker, toggleMic, toggleSpeaker } = useNet();
+  const { mic, speaker, voiceLinks, toggleMic, toggleSpeaker } = useNet();
   const quick = useNet(s => s.room?.quick !== undefined);
   if (quick || !voiceSupported()) return null;
   const micOn = mic === 'on';
@@ -34,7 +34,7 @@ export function VoiceControls({ compact = false }: { compact?: boolean }) {
         </svg>
         {!compact && <span>Speaker</span>}
       </button>
-      {!compact && <p className={`net-note${mic === 'denied' ? ' bad' : ''}`} role="status">{MIC_NOTE[mic]}</p>}
+      {!compact && <p className={`net-note${mic === 'denied' ? ' bad' : ''}`} role="status">{MIC_NOTE[mic]}{voiceLinks.total > 0 && ` · Connected to ${voiceLinks.up} of ${voiceLinks.total}`}</p>}
     </div>
   );
 }

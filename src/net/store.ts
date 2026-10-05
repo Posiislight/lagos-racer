@@ -30,6 +30,8 @@ type NetState = {
   /** Voice chat (friends' rooms): our mic, and whether we hear the others. */
   mic: MicState;
   speaker: boolean;
+  /** Voice links that are up, out of the players we want a link to. */
+  voiceLinks: { up: number; total: number };
   toggleMic: () => void;
   toggleSpeaker: () => void;
   create: (name: string, vehicle: VehicleId, paint: string) => void;
@@ -144,7 +146,7 @@ function drop() {
   old?.close();
 }
 
-const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false, mic: 'off' as MicState, speaker: true };
+const idle = { status: 'idle' as const, code: null, mySlot: null, room: null, roomAt: 0, myVote: null, pendingGrid: null, cut: false, mic: 'off' as MicState, speaker: true, voiceLinks: { up: 0, total: 0 } };
 
 export const useNet = create<NetState>((set, get) => {
   /** Opens a fresh socket; `first` (create or join) goes out as soon as it is open. */
@@ -298,7 +300,7 @@ export const useNet = create<NetState>((set, get) => {
 
   const newVoice = () => new VoiceChat(
     (to, signal) => conn?.sendJson({ t: 'rtc', to, signal }),
-    () => { if (voice) set({ mic: voice.mic, speaker: voice.speaker }); },
+    () => { if (voice) set({ mic: voice.mic, speaker: voice.speaker, voiceLinks: voice.links }); },
   );
 
   const sendLobby =(change: { vehicle?: VehicleId; paint?: string; ready?: boolean; fillAI?: boolean }) => {
