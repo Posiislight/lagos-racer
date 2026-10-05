@@ -76,7 +76,7 @@ describe('makeRace: shape of a spec', () => {
 });
 
 describe('makeRace: duel', () => {
-  const duel = { track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.06 } } as const;
+  const duel = { track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.1 } } as const;
 
   for (const vehicle of ['okada', 'brt'] as const) {
     it(`puts Mama Put beside the player in a ${vehicle} of another paint`, () => {
@@ -89,7 +89,7 @@ describe('makeRace: duel', () => {
       expect(her).toMatchObject({ id: 0, isPlayer: false, name: 'Mama Put', driver: 'mamaput' });
       expect(her.vehicle.id).toBe(vehicle);
       expect(her.paint.id).not.toBe(mine.paint);
-      expect(her.ai!.skill).toBe(1.06);
+      expect(her.ai!.skill).toBe(1.1);
       expect(her.ai!.special).toBe(true);
       expect(Math.abs(her.progress.distance - me.progress.distance)).toBeLessThan(0.5);
       expect(me.progress.lateral).toBeGreaterThan(0);

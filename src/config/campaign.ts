@@ -12,7 +12,13 @@ export type ModeSpec =
   | { kind: 'duel'; laps: number; skill: number };
 
 /** Everything `makeRace` needs: where, how, and which drivers are kept off the grid. */
-export type RaceSetup = { track: string; mode: ModeSpec; excludeDrivers?: DriverId[] };
+export type RaceSetup = {
+  track: string;
+  mode: ModeSpec;
+  excludeDrivers?: DriverId[];
+  /** Added to every rival's skill (not the duel's, which sets its own), so later races are harder. Missing means 0. */
+  rivalBoost?: number;
+};
 
 export type RaceSpec = RaceSetup & {
   id: string;
@@ -38,18 +44,18 @@ export const CHAPTER_1: RaceSpec[] = [
   },
   {
     id: 'campaign-1-2', title: 'Third Mainland Dash', track: 'third-mainland', mode: { kind: 'laps', laps: 2 },
-    excludeDrivers: ['mamaput'],
+    excludeDrivers: ['mamaput'], rivalBoost: 0.03,
     story: 'Up the ramp, over the lagoon, home through the water village. Top three again.', rule: 'Top 3 to move on',
     pass: { place: 3 },
   },
   {
-    id: 'campaign-1-3', title: 'LASTMA Is Coming', track: 'ojuelegba', mode: { kind: 'elimination', first: 20, step: 2, floor: 10 },
-    excludeDrivers: ['mamaput'],
-    story: 'Every 20 seconds LASTMA clamps whoever is last. Do not be last.', rule: 'Last place is clamped every 20 s',
+    id: 'campaign-1-3', title: 'LASTMA Is Coming', track: 'ojuelegba', mode: { kind: 'elimination', first: 18, step: 2, floor: 8 },
+    excludeDrivers: ['mamaput'], rivalBoost: 0.06,
+    story: 'Every 18 seconds LASTMA clamps whoever is last. Do not be last.', rule: 'Last place is clamped every 18 s',
     pass: { place: 3 },
   },
   {
-    id: 'campaign-1-4', title: "Mama Put's Challenge", track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.06 },
+    id: 'campaign-1-4', title: "Mama Put's Challenge", track: 'ikorodu', mode: { kind: 'duel', laps: 2, skill: 1.1 },
     story: 'Mama Put has heard you are fast. One road, one pot, no mercy. Beat her and she rides with you.', rule: 'Beat her to win',
     pass: { place: 1 }, stars: [3], reward: { driver: 'mamaput' },
     taunts: { before: 'Oga, you go pay for that jollof.', win: 'Shine your eye, small boy.', lose: 'Next time carry your own pot.' },
