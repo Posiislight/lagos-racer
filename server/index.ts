@@ -7,10 +7,10 @@ import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
 import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
 
-// Error reporting is off unless SENTRY_DSN is set. The uncaught-exception integrations are left out because the
+// Error reporting runs on Render (which sets RENDER) or wherever SENTRY_DSN is set, so local dev sends nothing. The uncaught-exception integrations are left out because the
 // handlers below already keep the process alive; they report to Sentry themselves.
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  dsn: process.env.SENTRY_DSN ?? (process.env.RENDER ? 'https://5de5a0122cb78a2c92bd8347f4ed2f92@o4509816762138624.ingest.us.sentry.io/4512205375602688' : undefined),
   environment: process.env.SENTRY_ENVIRONMENT ?? 'production',
   release: process.env.SENTRY_RELEASE ?? process.env.RENDER_GIT_COMMIT,
   tracesSampleRate: 0,
