@@ -64,7 +64,7 @@ export const VEHICLES: VehicleConfig[] = [
     chassis: { length: 1.7, height: 0.7, width: 0.6, centreY: 0.75 },
     wheels: { frontX: 0.68, rearX: -0.63, frontZ: 0.3, rearZ: 0.3, radius: 0.31 },
     tuning: {
-      mass: 260, topSpeed: 33, accel: 9.5, steer: 0.5, steerAtSpeed: 0.38, grip: 9, driftGrip: 0.45, brake: 9,
+      mass: 260, topSpeed: 33, accel: 9.5, steer: 0.3, steerAtSpeed: 0.36, grip: 9, driftGrip: 0.45, brake: 9,
       suspension: { rest: 0.35, stiffness: 40, compression: 3, relaxation: 3.6 }, yawAssist: 0.8, lean: 0.55, impact: 1,
     },
     camera: { distance: 6.2, height: 2.4, lookAhead: 4 },
@@ -79,7 +79,7 @@ export const VEHICLES: VehicleConfig[] = [
     chassis: { length: 2.2, height: 1.0, width: 1.2, centreY: 0.85 },
     wheels: { frontX: 1.04, rearX: -0.72, frontZ: 0.42, rearZ: 0.655, radius: 0.25 },
     tuning: {
-      mass: 420, topSpeed: 27, accel: 7.2, steer: 0.48, steerAtSpeed: 0.42, grip: 7.5, driftGrip: 0.5, brake: 8,
+      mass: 420, topSpeed: 27, accel: 7.2, steer: 0.34, steerAtSpeed: 0.44, grip: 7.5, driftGrip: 0.5, brake: 8,
       suspension: { rest: 0.32, stiffness: 34, compression: 2.6, relaxation: 3.2 }, yawAssist: 0.6, lean: -0.16, impact: 1,
     },
     camera: { distance: 6.6, height: 2.8, lookAhead: 4 },
