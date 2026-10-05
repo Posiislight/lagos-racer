@@ -221,6 +221,13 @@ export class RoomServer {
     else if (m.t === 'loaded') room.markLoaded(c.slot, this.now());
   }
 
+  /** Where a connection stands, for the close log. */
+  describe(conn: number): string {
+    const c = this.conns.get(conn);
+    if (!c) return 'unknown';
+    return `room=${c.room?.code ?? '-'} phase=${c.room?.phase ?? '-'} seated=${c.seated} silent=${this.now() - c.lastHeard}ms`;
+  }
+
   close(conn: number) {
     const c = this.conns.get(conn);
     if (!c) return;
@@ -238,6 +245,7 @@ export class RoomServer {
       // A phone in the lobby may be off sharing the link; in a race, silence means the link is gone.
       const silence = c.room?.phase === 'lobby' ? LOBBY_SILENCE_MS : SILENCE_MS;
       if (now - c.lastHeard < silence && (c.seated || now - c.openedAt < UNSEATED_MS)) continue;
+      console.log(`socket ${id} dropped for silence: ${this.describe(id)}`);
       c.peer.close(true);
       this.close(id);
     }

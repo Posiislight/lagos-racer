@@ -62,7 +62,7 @@ const http = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server: http, maxPayload: MAX_MESSAGE_BYTES });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   const id = rooms.open({
     send: (data) => ws.send(data),
     close: (dead) => (dead ? ws.terminate() : ws.close()),
@@ -73,7 +73,12 @@ wss.on('connection', (ws) => {
     const buf = raw as Buffer;
     rooms.message(id, buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
   }));
-  ws.on('close', () => guard('close', () => rooms.close(id)));
+  const openedAt = Date.now();
+  console.log(`socket ${id} open origin=${req.headers.origin ?? '-'}`);
+  ws.on('close', (code, reason) => guard('close', () => {
+    console.log(`socket ${id} closed code=${code} reason=${reason.toString() || '-'} after=${Date.now() - openedAt}ms ${rooms.describe(id)}`);
+    rooms.close(id);
+  }));
   // Oversize or malformed frames error before closing; the close handler does the cleanup.
   ws.on('error', (err) => console.warn(`socket ${id} error:`, err.message));
 });
