@@ -167,15 +167,64 @@ describe('buyUpgrade', () => {
     expect(state().upgrades.danfo).toBeUndefined();
   });
 });
+describe('premium currency', () => {
+  beforeEach(() => {
+    useGame.setState({ premium: 0, ownedPaints: [], adViews: {}, unlocked: [], paint: {}, vehicle: 'okada' });
+  });
 
-describe('unlock', () => {
-  it('costs the rescaled price', () => {
-    useGame.setState({ coins: 1_999_999, unlocked: [], upgrades: {} });
+  it('buyPaint pays once and selects the paint', () => {
+    useGame.setState({ premium: 150 });
+    expect(state().buyPaint('okada', 'red')).toBe(true);
+    expect(state().premium).toBe(50);
+    expect(state().ownedPaints).toContain('okada/red');
+    expect(state().paint.okada).toBe('red');
+    expect(state().buyPaint('okada', 'red')).toBe(false);
+    expect(state().premium).toBe(50);
+  });
+
+  it('buyPaint does nothing when short, for the free paint, or for an unknown paint', () => {
+    useGame.setState({ premium: 99 });
+    expect(state().buyPaint('okada', 'red')).toBe(false);
+    expect(state().premium).toBe(99);
+    useGame.setState({ premium: 500 });
+    expect(state().buyPaint('okada', 'yellow')).toBe(false);
+    expect(state().buyPaint('okada', 'nope')).toBe(false);
+    expect(state().premium).toBe(500);
+  });
+
+  it('setPaint refuses a paint that is not owned', () => {
+    state().setPaint('okada', 'red');
+    expect(state().paint.okada).toBeUndefined();
+    useGame.setState({ premium: 100 });
+    state().buyPaint('okada', 'red');
+    state().setPaint('okada', 'yellow');
+    expect(state().paint.okada).toBe('yellow');
+    state().setPaint('okada', 'red');
+    expect(state().paint.okada).toBe('red');
+  });
+
+  it('unlock pays the BRT price in premium currency, once', () => {
+    useGame.setState({ premium: 499 });
     state().unlock('brt');
-    expect(state().unlocked).not.toContain('brt');
-    useGame.setState({ coins: 2_000_000, unlocked: [], upgrades: {} });
+    expect(state().unlocked).toEqual([]);
+    useGame.setState({ premium: 500 });
     state().unlock('brt');
-    expect(state().unlocked).toContain('brt');
-    expect(state().coins).toBe(0);
+    expect(state().unlocked).toEqual(['brt']);
+    expect(state().vehicle).toBe('brt');
+    expect(state().premium).toBe(0);
+    useGame.setState({ premium: 500 });
+    state().unlock('brt');
+    expect(state().premium).toBe(500);
+    state().unlock('okada');
+    expect(state().unlocked).toEqual(['brt']);
+  });
+
+  it('addAdView unlocks the BRT at its ad count and ignores anything else', () => {
+    expect(state().addAdView('okada')).toBe(0);
+    expect(state().addAdView('brt')).toBe(1);
+    expect(state().unlocked).toEqual(['brt']);
+    expect(state().vehicle).toBe('brt');
+    expect(state().addAdView('brt')).toBe(0);
+    expect(state().adViews.brt).toBe(1);
   });
 });

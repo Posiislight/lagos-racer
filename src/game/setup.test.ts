@@ -137,7 +137,7 @@ describe('makeRace: online', () => {
       [3, 'ai', 2, false, 'Oga Landlord', 'okada'],
     ]);
     // Every car wears the paint from the grid; one this build doesn't know falls back to the usual colour.
-    expect(race.racers.map(r => r.paint.id)).toEqual(['green', 'pink', 'red', 'red']);
+    expect(race.racers.map(r => r.paint.id)).toEqual(['green', 'pink', 'red', 'yellow']);
     expect(race.racers[1].ai).toBeNull();
     expect(race.racers[3].ai).not.toBeNull();
     // Grid positions match the offline layout: netId 0 is the front of the left lane.
