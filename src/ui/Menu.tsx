@@ -21,8 +21,8 @@ export function goFullscreen() {
   }
 }
 
-/** Start a race from a button press: fullscreen and tilt need the tap, then the quick race or the campaign race. */
-export function launchRace(spec?: RaceSpec) {
+/** Start a race from a button press: fullscreen and tilt need the tap, then the campaign race. */
+export function launchRace(spec: RaceSpec) {
   goFullscreen();
   if (useGame.getState().settings.steering === 'tilt') void enableTilt();
   useGame.getState().startRace(spec);
@@ -62,7 +62,6 @@ export function Menu() {
         </div>
         <button className="btn primary big" onClick={() => setScreen('campaign')}>CAMPAIGN</button>
         <div className="row menu-row">
-          <button className="btn" onClick={() => launchRace()}>OYA, RACE!</button>
           <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
           <button className="btn" onClick={() => setScreen('online')}>Race with friends</button>

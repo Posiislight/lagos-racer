@@ -56,7 +56,7 @@ export function Results() {
             ))}
           </tbody>
         </table>
-        <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time'}{outcome?.firstClear && spec ? ` (includes ${formatNaira(spec.firstClearCoins)} first-clear bonus)` : ''}</p>
+        <p className="earned">{coinsEarned > 0 ? `+ ${formatNaira(coinsEarned)}` : 'No naira this time'}</p>
         {unlocked && (
           <div className="unlocked">
             <p><b>{unlocked.name} unlocked!</b> Now playable from the Garage.</p>
@@ -87,7 +87,7 @@ export function Results() {
             </>
           ) : (
             <>
-              <button className="btn primary" onClick={() => startRace()}>Race again</button>
+              <button className="btn primary" onClick={() => setScreen('campaign')}>Campaign</button>
               <button className="btn" onClick={() => setScreen('garage')}>Garage</button>
               <button className="btn" onClick={() => setScreen('menu')}>Menu</button>
             </>
