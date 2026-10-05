@@ -37,6 +37,7 @@ function useCountdown(startsInMs: number | undefined, arrivedAt: number): number
 export function Lobby() {
   const unlocked = useGame(s => s.unlocked);
   const paints = useGame(s => s.paint);
+  const myVehicle = useGame(s => s.vehicle);
   const { status, code, mySlot, room, roomAt, myVote, error, vote, setVehicle, setReady, setFillAI, start, leave } = useNet();
   const [copied, setCopied] = useState(false);
   const seconds = useCountdown(room?.quick?.startsInMs, roomAt);
@@ -61,12 +62,18 @@ export function Lobby() {
   const quick = room.quick;
   if (quick) {
     const racing = room.phase !== 'lobby';
+    // A Quick room races once: if its race has started or finished without us (we were away when it began), the
+    // only way on is a new room.
+    const over = room.raceSeq > 0;
+    const raceAgain = () => useNet.getState().raceAgain(myVehicle, paintOf(vehicleById(myVehicle), paints[myVehicle]).id);
     return (
       <div className="lobby">
         <div className="card lobby-room">
           <p className="eyebrow">Quick race</p>
-          <p className="quick-title">{racing ? 'Race don start' : 'Looking for racers…'}</p>
-          {!racing && <p className="quick-count" role="timer" aria-label={`Race starts in ${seconds} seconds`}>{seconds}s</p>}
+          <p className="quick-title">{racing ? 'Race don start' : over ? 'Race don finish' : 'Looking for racers…'}</p>
+          {over
+            ? <button className="btn primary" onClick={raceAgain}>Race again</button>
+            : <p className="quick-count" role="timer" aria-label={`Race starts in ${seconds} seconds`}>{seconds}s</p>}
           <button className="btn ghost" onClick={leave}>Leave</button>
           <table className="table">
             <thead><tr><th>Player</th><th>Ride</th></tr></thead>
@@ -87,7 +94,7 @@ export function Lobby() {
           <p className="eyebrow">Vote for a track</p>
           <div className="quick-votes" role="radiogroup" aria-label="Track vote">
             {TRACKS.map(t => (
-              <button key={t.id} role="radio" aria-checked={myVote === t.id} className={`btn quick-vote${myVote === t.id ? ' on' : ''}`} disabled={racing} onClick={() => vote(t.id)}>
+              <button key={t.id} role="radio" aria-checked={myVote === t.id} className={`btn quick-vote${myVote === t.id ? ' on' : ''}`} disabled={over} onClick={() => vote(t.id)}>
                 <span>{t.name}</span><b>{quick.votes[t.id] ?? 0}</b>
               </button>
             ))}
@@ -97,7 +104,7 @@ export function Lobby() {
             {VEHICLES.filter(v => !v.locked || unlocked.includes(v.id)).map(v => {
               const paint = paintOf(v, paints[v.id]);
               return (
-                <button key={v.id} role="tab" aria-selected={me?.vehicle === v.id} disabled={racing} onClick={() => setVehicle(v.id, paint.id)}>
+                <button key={v.id} role="tab" aria-selected={me?.vehicle === v.id} disabled={over} onClick={() => setVehicle(v.id, paint.id)}>
                   <span className="dot" style={{ background: paint.color }} />{v.name}
                 </button>
               );

@@ -44,7 +44,7 @@ export function Online() {
           <input value={name} maxLength={NICK_MAX} autoComplete="nickname" placeholder="Odogwu Rider" onChange={e => setName(e.target.value)} />
         </label>
         <button className="btn primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>Quick race</button>
-        <p className="muted">Race whoever is online now. Bots fill any empty seats.</p>
+        <p className="muted">Race whoever is online now.</p>
         <button className="btn" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
         <p className="or" aria-hidden="true">or</p>
         <form className="join-row" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
