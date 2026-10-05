@@ -46,16 +46,8 @@ export type Saved = {
 export const SAVE_KEY = 'lagos-racer:v2';
 const OLD_KEY = 'lagos-racer:v1';
 
-function detectQuality(): Quality {
-  if (typeof navigator === 'undefined') return 'medium';
-  const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
-  const cores = navigator.hardwareConcurrency || 4;
-  if (mobile && cores <= 6) return 'low';
-  return mobile ? 'medium' : 'high';
-}
-
 export const defaultSave = (): Saved => ({
-  settings: { quality: detectQuality(), sound: true, steering: 'buttons', invertTilt: false, showFps: false },
+  settings: { quality: 'high', sound: true, steering: 'buttons', invertTilt: false, showFps: false },
   coins: 0, best: {}, races: 0, vehicle: 'okada', unlocked: [], upgrades: {}, accountPromptDismissed: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
