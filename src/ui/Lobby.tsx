@@ -40,6 +40,7 @@ export function Lobby() {
   const myVehicle = useGame(s => s.vehicle);
   const { status, code, mySlot, room, roomAt, myVote, error, vote, setVehicle, setReady, setFillAI, start, leave } = useNet();
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const seconds = useCountdown(room?.quick?.startsInMs, roomAt);
   if (!room || !code) return null;
 
@@ -56,6 +57,16 @@ export function Lobby() {
     if (result === 'copied') {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      // clipboard blocked: the code is still on screen to read out
     }
   };
 
@@ -122,7 +133,14 @@ export function Lobby() {
     <div className="lobby">
       <div className="card lobby-room">
         <p className="eyebrow">Room code</p>
-        <p className="room-code" aria-label={`Room code ${code.split('').join(' ')}`}>{code}</p>
+        <div className="room-code-row">
+          <p className="room-code" aria-label={`Room code ${code.split('').join(' ')}`}>{code}</p>
+          <button className="copy-code" onClick={copyCode} aria-label={codeCopied ? 'Room code copied' : 'Copy room code'} title="Copy room code">
+            {codeCopied
+              ? <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>
+              : <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15" /></svg>}
+          </button>
+        </div>
         <div className="row">
           <button className="btn" onClick={share}>{copied ? 'Link copied' : 'Share'}</button>
           <button className="btn ghost" onClick={leave}>Leave race</button>

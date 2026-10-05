@@ -253,6 +253,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .net-note.bad { color: var(--red); }
 .lobby { grid-template-columns: minmax(0, 420px) minmax(0, 420px); justify-content: center; align-items: start; align-content: center; }
 .lobby .card { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.room-code-row { display: flex; align-items: center; gap: 12px; }
+.copy-code { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 12px; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
+.copy-code:active { transform: translateY(1px); }
 .room-code { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); letter-spacing: .12em; line-height: 1; }
 .lobby .table { margin: 4px 0 0; }
 .tick { color: var(--green); font-weight: 900; font-size: 18px; }
