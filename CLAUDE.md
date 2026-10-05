@@ -102,6 +102,8 @@ Milestones 1–3 are built, and milestone 4 is partly done.
 
 **Single-player campaign** (started on 4 October at the user's request, separate from the multiplayer milestone): Chapter 1 is four races, two per map (Ojuelegba, Ikorodu Garage): a normal race, a normal race, an elimination race (LASTMA clamps whoever is last on a timer), and a hard 1-on-1 duel with Mama Put. Finishing the duel unlocks Mama Put as a playable driver; she stays locked in the Garage until `campaign-1-4` is cleared. Config in `src/config/campaign.ts`, rules in `src/game/campaign.ts`, race modes in `src/game/modes.ts`, race setup in `src/game/setup.ts`. In the campaign only the duel's AI (Mama Put) uses its driver special. Spec `docs/superpowers/specs/2026-10-04-campaign-design.md`, plan `docs/superpowers/plans/2026-10-04-campaign.md`, GitHub issue #4.
 
+**Audio** (5 October): no musical soundtrack; a looping Lagos street ambience plays in races. Every sound is synthesised in `src/game/audio.ts` and can be replaced by a recording in `public/audio/` (names and volumes in `src/config/sounds.ts`, file list in `public/audio/README.md`); a missing file falls back to synth. A juju aimed at the player hums louder as it closes in (`src/game/warnings.ts`). Spec `docs/superpowers/specs/2026-10-05-audio-design.md`.
+
 Do not start a later milestone until the earlier one feels fun.
 
 The room server deploys to Railway (`railway.json`); the Vercel site points at it through `VITE_ROOM_SERVER`.
