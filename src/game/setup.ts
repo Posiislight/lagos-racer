@@ -26,7 +26,7 @@ export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number; qui
 /** Lap limit of a mode: elimination has none. */
 const lapsOf = (mode: RaceSetup['mode']) => (mode.kind === 'elimination' ? Infinity : mode.laps);
 
-const rivalAI = (lane: number, k: number, rand: () => number) => aiState(lane, 0.9 + k * 0.035 + rand() * 0.03, 2);
+const rivalAI = (lane: number, k: number, rand: () => number, boost = 0) => aiState(lane, 0.9 + k * 0.035 + rand() * 0.03 + boost, 2);
 
 /**
  * Everything a race starts from: the track, the grid, the rivals, the pickups and critters, and the
@@ -81,7 +81,7 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       // Only the player's vehicle gets upgrades; the AI always races stock.
       const r = makeRacer(k, isPlayer ? 'You' : duel ? 'Mama Put' : names[k], isPlayer ? applyUpgrades(v, upgrades) : v, paintOf(v, paint), isPlayer, progress, driver);
       if (!isPlayer) {
-        r.ai = setup.mode.kind === 'duel' ? aiState(lane, setup.mode.skill, 2, lane, true) : rivalAI(lane, k, Math.random);
+        r.ai = setup.mode.kind === 'duel' ? aiState(lane, setup.mode.skill, 2, lane, true) : rivalAI(lane, k, Math.random, setup.rivalBoost);
       }
       return r;
     });
