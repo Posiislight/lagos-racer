@@ -1,7 +1,10 @@
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { MAX_MESSAGE_BYTES } from '../src/net/protocol';
+import { verifyToken } from '@clerk/backend';
+import { Pool } from 'pg';
 import { RoomServer } from './rooms';
+import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
 
 const port = Number(process.env.PORT ?? 8787);
 const rooms = new RoomServer();
@@ -19,9 +22,31 @@ function guard(what: string, fn: () => void) {
   }
 }
 
+// Cloud saves need a Postgres database and Clerk's secret key; without them /save answers 503 or 401 and rooms run as before.
+const saveDeps: SaveDeps = {
+  store: null,
+  allowedOrigins: ['http://localhost:5173', 'http://localhost:5174', ...(process.env.ALLOWED_ORIGIN ?? '').split(',').map(o => o.trim()).filter(Boolean)],
+  verify: async (token) => {
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) return null;
+    try { return (await verifyToken(token, { secretKey })).sub; } catch { return null; }
+  },
+};
+if (process.env.DATABASE_URL) {
+  const pg = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false } });
+  const store = new PgSaveStore(pg);
+  store.ensureSchema().then(() => { saveDeps.store = store; console.log('cloud saves ready'); }, (err) => console.error('cloud saves unavailable', err));
+}
+
 const http = createServer((req, res) => {
-  if (req.url === '/health') {
+  const path = (req.url ?? '').split('?')[0];
+  if (path === '/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' }).end('ok');
+  } else if (path === '/save') {
+    handleSaveRequest(req, res, saveDeps).catch((err) => {
+      console.error('save request failed', err);
+      if (!res.headersSent) res.writeHead(500).end();
+    });
   } else {
     res.writeHead(404).end();
   }
