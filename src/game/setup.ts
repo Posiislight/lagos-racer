@@ -4,7 +4,7 @@ import { trackOrDefault, trackFor } from '../config/tracks';
 import { paintOf, vehicleById } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
 import { SnapshotBuffer } from '../net/interpolation';
-import { AI_NAMES } from './ai';
+import { AI_NAMES, botAI } from './ai';
 import { makeCritters } from './critters';
 import { makePickups } from './items';
 import { pickRivals, type Pick } from './lineup';
@@ -60,8 +60,9 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
       r.kind = kind;
       r.owner = g.slot;
       if (kind === 'remote') r.remote = { buffer: new SnapshotBuffer(), dnf: false };
-      // Every phone rolls every AI's skill in grid order, so they all agree whoever drives it.
-      if (g.ai) r.ai = rivalAI(lane, g.netId, rand);
+      // Only the phone driving an AI car gives it a skill. In a friends' room every phone sees the AI flags and rolls
+      // them in grid order, so they agree; a Quick room's bots get a skill in the bot range on their owner's phone.
+      if (g.ai) r.ai = online.quick ? botAI(lane, rand) : rivalAI(lane, g.netId, rand);
       return r;
     });
   } else {

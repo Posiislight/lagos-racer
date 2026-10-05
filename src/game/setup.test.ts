@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHAPTER_1, type RaceSpec } from '../config/campaign';
 import { VEHICLES } from '../config/vehicles';
 import type { GridEntry } from '../net/protocol';
+import { BOT_SKILL } from './ai';
 import { makeRace, type OnlineSetup } from './setup';
 
 const okada = { vehicle: 'okada' as const, paint: VEHICLES.find(v => v.id === 'okada')!.paints[0].id };
@@ -164,5 +165,17 @@ describe('makeRace: online', () => {
     expect(skills(a)).toEqual(skills(b));
     expect(skills(a).slice(2).every(s => s !== null && s >= 0.9)).toBe(true);
     expect(skills(c)).not.toEqual(skills(a));
+  });
+
+  it('a Quick room gives its bots a skill in the bot range; other rooms keep the rival skill', () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const quick = makeRace(laps, okada, 'moshood', null, online(2, seed, true)).race;
+      const bot = quick.racers[3].ai!;
+      expect(bot.skill).toBeGreaterThanOrEqual(BOT_SKILL[0]);
+      expect(bot.skill).toBeLessThanOrEqual(BOT_SKILL[1]);
+      // The rival formula for netId 3 is 0.9 + 3 × 0.035 + up to 0.03, always above the bot range.
+      const friends = room(2, seed).race;
+      expect(friends.racers[3].ai!.skill).toBeGreaterThan(1.0);
+    }
   });
 });

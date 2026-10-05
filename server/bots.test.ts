@@ -86,13 +86,4 @@ describe('bot roster', () => {
       }
     }
   });
-
-  it('skills are within 0.85 and 1.0', () => {
-    const s = new Roster(seeded(9), 0).skills();
-    expect(s).toHaveLength(5);
-    for (const x of s) {
-      expect(x).toBeGreaterThanOrEqual(0.85);
-      expect(x).toBeLessThanOrEqual(1.0);
-    }
-  });
 });

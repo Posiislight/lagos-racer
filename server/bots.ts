@@ -5,7 +5,7 @@ import { BOT_SLOT_BASE, GRID_SIZE } from '../src/net/protocol';
 export const BOT_NAMES: readonly string[] = [
   'Tunde', 'Chidi_K', 'Femi99', 'Ngozi', 'Emeka', 'Bayo', 'Kelechi', 'Ife', 'Segun_X', 'Yinka',
   'Uche', 'Dayo', 'Chuka', 'Tobi', 'Wale', 'Kunle', 'Ada', 'Ibrahim', 'Musa', 'Sade',
-  'Naza', 'Jide', 'Obinna', 'Tola', 'Gbenga', 'Nneka', 'Lekan', 'Zainab', 'Damola', 'Efe',
+  'Nazo', 'Jide', 'Obinna', 'Tola', 'Gbenga', 'Nneka', 'Lekan', 'Zainab', 'Damola', 'Efe',
   'Osas', 'Amaka', 'Seyi', 'Bukky', 'Chinedu', 'Folake', 'Tayo', 'Ikenna', 'Kemi', 'Dele',
   'Abiola', 'Toyin', 'Nonso', 'Rotimi', 'Hauwa', 'Biodun', 'Lagos Boy', 'Wahala', 'No Wahala', 'Omo Ibadan',
   'Sharp Guy', 'Baddest 01', 'Fast Fada', 'Oga Tunde', 'Area Boy 23', 'Small Chops', 'Jollof King', 'Pepe', 'Gbam', 'Eko Baba',
@@ -23,7 +23,6 @@ export class Roster {
   private names: string[];
   private looks: { vehicle: VehicleId; paint: string }[];
   private appear: number[];
-  private skill: number[];
 
   constructor(random: () => number, startedAt: number) {
     const pool = [...BOT_NAMES];
@@ -37,7 +36,6 @@ export class Roster {
       return { vehicle: v.id, paint: v.paints[Math.floor(random() * v.paints.length)].id };
     });
     this.appear = Array.from({ length: BOT_COUNT }, () => startedAt + APPEAR_MIN + random() * (APPEAR_MAX - APPEAR_MIN));
-    this.skill = Array.from({ length: BOT_COUNT }, () => 0.85 + random() * 0.15);
   }
 
   visible(now: number, humans: HumanLook[]): BotView[] {
@@ -65,9 +63,5 @@ export class Roster {
       }
     }
     return bots;
-  }
-
-  skills(): number[] {
-    return [...this.skill];
   }
 }
