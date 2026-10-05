@@ -75,6 +75,8 @@ const LAGOON: Setting = {
 export type TrackConfig = {
   id: string;
   name: string;
+  /** The race meeting's title, shown on the menu, the start banner and the results. Never built from `name`. */
+  event: string;
   blurb: string;
   /** Closed loop of [x, z] points (metres), driven in order from the start line. */
   control: [number, number][];
@@ -91,8 +93,6 @@ export type TrackConfig = {
   shortcuts?: Shortcut[];
   /** Where the road layout comes from, if it is a real road (shown in the menu). Hand-drawn tracks have none. */
   credit?: string;
-  /** Text on the start gantry. Defaults to the track's name. */
-  banner?: string;
   /** What the hills follow: lap distance (default) or world x (out-and-back roads). */
   hillsAxis?: 'lap' | 'x' | 'road';
   /** Road half width, metres. */
@@ -130,6 +130,7 @@ export const TRACKS: TrackConfig[] = [
   {
     id: 'ojuelegba',
     name: 'Ojuelegba',
+    event: 'Ojuelegba Grand Prix',
     blurb: 'The real Ojuelegba Road: Tejuosho market to under the bridge and back. Mind the agberos.',
     // West along the north carriageway, U-turn under the Western Avenue bridge, back east on the south one.
     // U-turns 18 m round the centre line, so a BRT and another vehicle can get round side by side.
@@ -164,12 +165,12 @@ export const TRACKS: TrackConfig[] = [
   {
     id: 'third-mainland',
     name: 'Third Mainland Bridge',
+    event: 'Third Mainland Bridge Grand Prix',
     blurb: 'From the mainland up onto the bridge, across the lagoon, round the island and home through the water village.',
     // A hand-drawn journey (see thirdMainland.ts): about 2.6 km a lap.
     control: THIRD_MAINLAND_CONTROL,
     heights: THIRD_MAINLAND_HEIGHTS,
     setting: LAGOON,
-    banner: '3RD MAINLAND BRIDGE',
     // Wide and forgiving, with solid concrete parapets all the way.
     halfWidth: 7.5,
     laps: 2,
@@ -194,6 +195,7 @@ export const TRACKS: TrackConfig[] = [
   {
     id: 'ikorodu',
     name: 'Ikorodu Garage',
+    event: 'Ikorodu Grand Prix',
     blurb: 'From the General Hospital to the garage roundabout and back. Mind the okadas.',
     // Axis runs hospital to roundabout, so street 'north' is the right-hand (outbound) side going to the roundabout.
     // U-turns 16 m round the centre line (the BRT needs 12 m at the very least, but AI BRTs and kekes got stuck at 13 m).
@@ -236,6 +238,8 @@ export const TRACKS: TrackConfig[] = [
 export const trackById = (id: string) => TRACKS.find(t => t.id === id)!;
 /** The track with this id, or Ojuelegba for an id that no longer exists (an old save). */
 export const trackOrDefault = (id: string) => TRACKS.find(t => t.id === id) ?? TRACKS[0];
+/** The event name of a track (a config or an id; an unknown id gets Ojuelegba's). */
+export const eventName = (track: TrackConfig | string) => (typeof track === 'string' ? trackOrDefault(track) : track).event;
 
 /** The sampled track for a config: its loop, its hills, and what the hills follow. */
 export function trackFor(cfg: TrackConfig): Track {
