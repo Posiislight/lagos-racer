@@ -7,7 +7,7 @@ import {
   SphereGeometry, Vector3,
 } from 'three';
 import { buildVehicleModel } from '../models';
-import { getRace, type Racer, type RemoteCar } from '../game/runtime';
+import { getRace, setBodyDriven, type Racer, type RemoteCar } from '../game/runtime';
 import { bumpShove } from '../game/bump';
 import { sampleAt } from '../game/track';
 import { resyncProgress } from '../game/race';
@@ -47,9 +47,14 @@ function layout(racer: Racer) {
 
 type Spawn = { x: number; y: number; z: number; yaw: number };
 
-export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: Spawn; merge?: boolean }) {
-  // Another phone drives this one: it follows that phone's snapshots instead of our physics.
-  const remote = racer.kind === 'remote';
+export function Vehicle({ racer, spawn, merge = true, quick = false }: { racer: Racer; spawn: Spawn; merge?: boolean; quick?: boolean }) {
+  // Another phone drives this one: it follows that phone's snapshots instead of our physics. In a Quick race a bot
+  // can be handed to this phone mid-race (NetSession.adopt): useFrame notices and re-renders, and the effect below
+  // switches the body over and fits the wheels, keeping the same model.
+  const [remote, setRemote] = useState(racer.kind === 'remote');
+  // The body's type as first built. Later switches go through setBodyDriven, never this prop: changing it would make
+  // @react-three/rapier put the body back where it was last drawn.
+  const [bodyType] = useState(remote ? 'kinematicPosition' as const : 'dynamic' as const);
   const body = useRef<RapierRigidBody>(null);
   const visual = useRef<Group>(null);
   const tilt = useRef<Group>(null);
@@ -77,6 +82,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     if (!b) return;
     racer.body = b;
     racer.visual = visual.current;
+    setBodyDriven(b, remote);
     if (remote) return () => { racer.body = null; racer.visual = null; };
     const t = racer.vehicle.tuning;
     const vc = world.createVehicleController(b);
@@ -311,6 +317,7 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
     s.hornCooldown -= dt;
     if (racer.controls.horn && s.hornCooldown <= 0) { playHorn(racer.vehicle.horn, racer.isPlayer); s.hornCooldown = 0.9; }
     if (racer.remote && racer.remote.dnf !== dropped) setDropped(racer.remote.dnf);
+    if ((racer.kind === 'remote') !== remote) setRemote(racer.kind === 'remote');
   });
 
   return (
@@ -319,11 +326,11 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
       colliders={false}
       position={[spawn.x, spawn.y + lay.originY + 0.15, spawn.z]}
       rotation={[0, spawn.yaw, 0]}
-      type={remote ? 'kinematicPosition' : 'dynamic'}
+      type={bodyType}
       enabledRotations={[false, true, false]}
       linearDamping={0.05}
       angularDamping={1.5}
-      ccd={!remote}
+      ccd={bodyType === 'dynamic'}
       canSleep={false}
       userData={{ racer: racer.id }}
       onCollisionEnter={({ other, manifold }) => {
@@ -366,7 +373,8 @@ export function Vehicle({ racer, spawn, merge = true }: { racer: Racer; spawn: S
           <primitive object={fx.boys} />
           <primitive object={fx.clamp} />
         </group>
-        {remote && !dropped && (
+        {/* Everyone else's name; in a Quick race this phone's bots wear one too, or they would stand out. */}
+        {(remote || (quick && !racer.isPlayer)) && !dropped && (
           <group position={[0, model.size.y - lay.originY + 0.5, 0]}>
             <NameTag name={racer.name} />
           </group>

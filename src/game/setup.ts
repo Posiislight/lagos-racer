@@ -16,8 +16,11 @@ import { sampleAt } from './track';
 
 export type Spawn = { x: number; y: number; z: number; yaw: number };
 
-/** A room race: the server's grid, which slot is this phone, and the seed every phone shares. */
-export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number };
+/**
+ * A room race: the server's grid, which slot is this phone, the seed every phone shares, and whether it is a Quick
+ * room (whose AI cars are disguised bots that drive like people).
+ */
+export type OnlineSetup = { grid: GridEntry[]; mySlot: number; seed: number; quick: boolean };
 
 /** Lap limit of a mode: elimination has none. */
 const lapsOf = (mode: RaceSetup['mode']) => (mode.kind === 'elimination' ? Infinity : mode.laps);
@@ -88,7 +91,7 @@ export function makeRace(setup: RaceSetup, player: Pick, playerDriver: DriverId,
     // Online, each phone numbers its own hazards from its own block so ids never clash.
     nextId: online ? online.mySlot * 100000 : 1000,
     puffs: [], critters: makeCritters({ config, track }, online ? seededRandom(online.seed) : undefined), net: null,
-    mode: createMode(setup.mode), spec,
+    mode: createMode(setup.mode), spec, humanize: online?.quick ?? false,
   };
   return { race, spawns };
 }

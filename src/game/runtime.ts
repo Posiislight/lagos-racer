@@ -37,13 +37,37 @@ export type AIState = {
   specialWait: number;
   /** Whether this AI may use its driver special at all (only Mama Put in the duel does). */
   special: boolean;
+  /** Extra lateral offset (m) on the line it aims at: a Quick race bot's gentle wobble (see `humanize`); 0 otherwise. */
+  offset: number;
+  /** The human-ness layer of a Quick race bot, made on first use; null for every other AI. */
+  human: HumanState | null;
+};
+
+/** What a Quick race bot's human-ness layer remembers between frames (see `humanize` in ai.ts). */
+export type HumanState = {
+  /** Seconds after the green light before it puts its foot down. */
+  startDelay: number;
+  /** Lane wobble: size (m), phase and rate (rad/s) of a slow sway across its lane. */
+  amp: number;
+  phase: number;
+  rate: number;
+  /** Seconds left of the current mistake (0: none), and which kind it is. */
+  mistake: number;
+  mistakeKind: 'lift' | 'wide';
+  /** Race clock time before which no new mistake starts. */
+  nextMistake: number;
+  /** The item it is holding, how long it has held it, how long it means to, and whether the AI already asked to use it. */
+  item: ItemKind | null;
+  held: number;
+  hold: number;
+  wants: boolean;
 };
 
 /** A car driven on another phone, drawn from its snapshot buffer. */
 export type RemoteCar = { buffer: SnapshotBuffer; dnf: boolean };
 
 export const aiState = (lane: number, skill: number, itemDelay = 2, laneTarget = lane, special = false): AIState =>
-  ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0, special });
+  ({ lane, laneTarget, skill, itemDelay, stuck: 0, reverseTime: 0, specialDelay: -1, specialWait: 0, special, offset: 0, human: null });
 
 export type Racer = {
   /** Online this is the netId (grid index). */
@@ -155,6 +179,8 @@ export type RaceRuntime = {
   spec: RaceSpec | null;
   /** Room race hooks; null offline. */
   net: NetHooks | null;
+  /** A Quick room: this phone's AI cars are disguised bots and drive like people (`humanize`). */
+  humanize: boolean;
 };
 
 /** What the race tells the room, and the room's clock. */
@@ -169,6 +195,20 @@ export interface NetHooks {
   use(h: Hazard): void;
   hit(hazardId: number, victim: number): void;
   finish(r: Racer): void;
+}
+
+/** Rapier's RigidBodyType values (as @react-three/rapier maps them), so game code needn't import Rapier itself. */
+const DYNAMIC = 0, KINEMATIC_POSITION = 2;
+
+/**
+ * Who moves this body: our physics (a car this phone drives) or the snapshots of another phone (kinematic). A car
+ * handed to this phone mid-race switches here rather than through the RigidBody's type prop, which would also put
+ * the body back where it was last drawn.
+ */
+export function setBodyDriven(b: RapierRigidBody, remote: boolean) {
+  const type = remote ? KINEMATIC_POSITION : DYNAMIC;
+  if (b.bodyType() !== type) b.setBodyType(type, true);
+  b.enableCcd(!remote);
 }
 
 let current: RaceRuntime | null = null;

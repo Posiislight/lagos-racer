@@ -219,12 +219,18 @@ export const useNet = create<NetState>((set, get) => {
         const mySlot = get().mySlot;
         if (!conn || mySlot === null || session?.raceSeq === m.raceSeq) break;
         set({ pendingGrid: { raceSeq: m.raceSeq, grid: m.grid, seed: m.seed, trackId: m.trackId, laps: m.laps } });
-        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq }, msg => useGame.getState().flash(msg));
+        // A Quick room says so in every room view; its AI cars are disguised bots.
+        const quick = get().room?.quick !== undefined;
+        session = new NetSession(conn, clock, { grid: m.grid, mySlot, seed: m.seed, raceSeq: m.raceSeq, quick }, msg => useGame.getState().flash(msg));
         useGame.getState().startOnlineRace();
         break;
       }
       case 'start':
         if (session?.raceSeq === m.raceSeq) session.setStart(m.at);
+        break;
+      case 'adopt':
+        // Bots handed to this phone. Taken from this message only: a grid re-sent for the same race is ignored.
+        session?.adopt(m.netIds);
         break;
       case 'pickup':
       case 'use':

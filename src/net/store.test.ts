@@ -21,7 +21,7 @@ vi.mock('../game/audio', () => ({ sfx: vi.fn() }));
 vi.stubGlobal('location', { search: '', hostname: 'localhost' });
 vi.stubGlobal('window', {});
 
-const { useNet, ERROR_TEXT } = await import('./store');
+const { useNet, ERROR_TEXT, getSession } = await import('./store');
 const { useGame } = await import('../game/store');
 
 beforeEach(() => {
@@ -71,5 +71,28 @@ describe('quick race entry', () => {
     const before = Date.now();
     mock.handlers!.onMessage({ t: 'room', room: { code: 'ABCD', phase: 'lobby', hostSlot: 0, fillAI: false, raceSeq: 0, players: [], quick: { startsInMs: 20000, votes: {} } } });
     expect(useNet.getState().roomAt).toBeGreaterThanOrEqual(before);
+  });
+
+  /** Seated in a room whose view is `quick` or not, then given a race grid. */
+  function raceIn(quick: boolean) {
+    useNet.getState().quick('Ada', 'okada', 'red');
+    mock.handlers!.onOpen(false);
+    mock.handlers!.onMessage({ t: 'welcome', code: 'ABCD', slot: 1, token: 'tok' });
+    mock.handlers!.onMessage({ t: 'room', room: { code: 'ABCD', phase: 'loading', hostSlot: 1, fillAI: false, raceSeq: 1, players: [], ...(quick ? { quick: { startsInMs: 0, votes: {} } } : {}) } });
+    const grid = [{ netId: 0, slot: 1, name: 'Ada', vehicle: 'okada' as const, paint: 'red', ai: false }, { netId: 1, slot: 2, name: 'Kunle9ja', vehicle: 'keke' as const, paint: 'red', ai: false }];
+    mock.handlers!.onMessage({ t: 'grid', raceSeq: 1, grid, seed: 5, trackId: 'ojuelegba', laps: 3 });
+    return getSession()!;
+  }
+
+  it("a race in a Quick room is set up as quick; one in a friends' room is not", () => {
+    expect(raceIn(true).setup.quick).toBe(true);
+    expect(raceIn(false).setup.quick).toBe(false);
+  });
+
+  it('adopt hands the named bot cars to the race session', () => {
+    const session = raceIn(true);
+    const adopt = vi.spyOn(session, 'adopt');
+    mock.handlers!.onMessage({ t: 'adopt', netIds: [1] });
+    expect(adopt).toHaveBeenCalledExactlyOnceWith([1]);
   });
 });

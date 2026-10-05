@@ -25,7 +25,7 @@ function clockAhead() {
   return clock;
 }
 
-const setup = { grid: [], mySlot: 1, seed: 7, raceSeq: 1 };
+const setup = { grid: [], mySlot: 1, seed: 7, raceSeq: 1, quick: false };
 
 describe('NetSession', () => {
   afterEach(() => {
@@ -80,6 +80,7 @@ describe('NetSession', () => {
       translation: () => ({ x, y: 1, z: 2 }),
       rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }),
       linvel: () => ({ x: 3, y: 0, z: 0 }),
+      bodyType: () => 2, setBodyType: vi.fn(), setTranslation: vi.fn(), setRotation: vi.fn(), setLinvel: vi.fn(), setAngvel: vi.fn(), enableCcd: vi.fn(),
     }) as unknown as Racer['body'];
 
     function racer(id: number, kind: Racer['kind'], owner: number): Racer {
@@ -375,6 +376,90 @@ describe('NetSession', () => {
       expect(s.stranded(view('lobby', 1))).toBe(true);
       s.onResults();
       expect(s.stranded(view('lobby', 1))).toBe(false);
+    });
+
+    describe('adopt (Quick race: a bot whose phone left is handed to this one)', () => {
+      const mocks = (r: Racer) => r.body as unknown as Record<'setBodyType' | 'setTranslation' | 'setRotation' | 'setLinvel' | 'setAngvel', ReturnType<typeof vi.fn>>;
+
+      it('adopt turns a remote car into a locally driven ai car at its last pose', () => {
+        const { s, racers, now } = started(41000);
+        const car = racers[2];
+        s.onSnapshot(snapBuf(2, 1, 40.8, [carFor(2, { x: 5, z: 6, vx: 20, distance: 900, laps: 2 })]));
+        s.onSnapshot(snapBuf(2, 1, 40.9, [carFor(2, { x: 7, z: 6, vx: 20, distance: 902, laps: 2, qy: 0.6, qw: 0.8 })]));
+        now.mockReturnValue(41050);
+        // The pose the car is being drawn at right now: where it carries on from, so it never jumps.
+        const pose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 0 };
+        car.remote!.buffer.sample(car.remote!.buffer.renderTimeAt(s.now()), pose);
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        s.adopt([2]);
+
+        expect(car.kind).toBe('ai');
+        expect(car.remote).toBeNull();
+        expect(car.owner).toBe(1);
+        expect(car.isPlayer).toBe(false);
+        // A fresh skill in the bot range, rolled on this phone.
+        expect(car.ai!.skill).toBeCloseTo(0.925);
+        expect(car.ai!.lane).toBe(car.progress.lateral);
+        const b = mocks(car);
+        // Dynamic (0) from now on: our physics drives it.
+        expect(b.setBodyType).toHaveBeenCalledWith(0, true);
+        expect(b.setTranslation).toHaveBeenCalledWith({ x: pose.x, y: pose.y, z: pose.z }, true);
+        expect(b.setRotation).toHaveBeenCalledWith({ x: pose.qx, y: pose.qy, z: pose.qz, w: pose.qw }, true);
+        expect(b.setLinvel).toHaveBeenCalledWith({ x: pose.vx, y: pose.vy, z: pose.vz }, true);
+        // Distance and laps carry on from the last snapshot, and the laps already done get times that add up to
+        // the clock, so this phone's finish claim has one time per lap and sums to the finish time.
+        expect(car.progress.distance).toBeCloseTo(902);
+        expect(car.progress.lapsDone).toBe(2);
+        expect(car.progress.lapTimes).toHaveLength(2);
+        expect(car.progress.lapTimes[0] + car.progress.lapTimes[1]).toBeCloseTo(41.05);
+        expect(car.progress.lapStart).toBeCloseTo(41.05);
+      });
+
+      it('ignores cars this phone already drives and unknown netIds, and a repeat adopt changes nothing', () => {
+        const { s, racers } = started(1000);
+        const before = racers[1].ai;
+        s.adopt([1, 9]);
+        expect(racers[1].ai).toBe(before);
+        expect(racers[0].kind).toBe('local');
+        s.adopt([2]);
+        const ai = racers[2].ai;
+        mocks(racers[2]).setTranslation.mockClear();
+        s.adopt([2]);
+        expect(racers[2].ai).toBe(ai);
+        expect(mocks(racers[2]).setTranslation).not.toHaveBeenCalled();
+      });
+
+      it('with nothing heard from the car yet, leaves it where it stands', () => {
+        const { s, racers } = started(1000);
+        s.adopt([2]);
+        expect(racers[2].kind).toBe('ai');
+        expect(mocks(racers[2]).setTranslation).not.toHaveBeenCalled();
+        expect(mocks(racers[2]).setBodyType).toHaveBeenCalledWith(0, true);
+      });
+
+      it('adopt before attach applies on attach', () => {
+        const s = new NetSession(fakeLink().link, clockAhead(), setup);
+        s.adopt([2]);
+        const car = racer(2, 'remote', 2);
+        // During loading the car's body is not built yet; the scene switches it when it is.
+        car.body = null;
+        s.attach({ racers: [racer(0, 'local', 1), car], net: null } as unknown as RaceRuntime);
+        expect(car.kind).toBe('ai');
+        expect(car.remote).toBeNull();
+        expect(car.owner).toBe(1);
+        expect(car.ai!.skill).toBeGreaterThanOrEqual(0.85);
+        expect(car.ai!.skill).toBeLessThanOrEqual(1);
+      });
+
+      it("adopted car's snapshots are now sent by this phone", () => {
+        const { s, race, racers, binary } = started(1000);
+        s.adopt([2]);
+        s.update(race);
+        expect(decodeSnapshot(binary[0])!.cars.map(c => c.netId)).toEqual([0, 1, 2]);
+        // The old owner's last snapshots, still in flight, no longer move it.
+        s.onSnapshot(snapBuf(2, 1, 0.95, [carFor(2, { distance: 500 })]));
+        expect(racers[2].progress.distance).toBe(0);
+      });
     });
 
     it('drops snapshots from another raceSeq or from my own slot', () => {

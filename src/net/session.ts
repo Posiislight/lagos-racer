@@ -1,5 +1,7 @@
 // One room race as seen from this phone: the shared clock, the start time and what we tell the room.
-import type { Hazard, NetHooks, RaceRuntime, Racer } from '../game/runtime';
+import { setBodyDriven, type Hazard, type NetHooks, type RaceRuntime, type Racer } from '../game/runtime';
+import { botAI } from '../game/ai';
+import type { Pose } from './interpolation';
 import type { OnlineSetup } from '../game/setup';
 import type { ClockSync } from './clock';
 import type { NetLink } from './connection';
@@ -25,6 +27,8 @@ export class NetSession implements NetHooks {
   private unanswered = new Map<number, FinishClaim>();
   private lastClaim = -Infinity;
   private gotResults = false;
+  /** Bot cars the room handed to this phone (Quick race); kept in case the race isn't attached yet. */
+  private adopted = new Set<number>();
 
   constructor(
     private readonly link: NetLink,
@@ -39,6 +43,7 @@ export class NetSession implements NetHooks {
     race.net = this;
     this.race = race;
     this.applyDnf();
+    this.applyAdopt();
   }
 
   /** The server's start time (its Date.now()). */
@@ -149,6 +154,47 @@ export class NetSession implements NetHooks {
       const r = race.racers.find(x => x.id === m.netId);
       if (r?.kind === 'remote') r.progress.finishTime = m.time;
       else this.unanswered.delete(m.netId);
+    }
+  }
+
+  /**
+   * Quick race: the phone driving these bot cars left, and the room gave them to this one. Each carries on from where
+   * it is drawn now (pose and velocity), keeps its distance and laps, and is driven by our bot AI with a fresh skill.
+   * The room may say it again (after a resume); a car we already drive is left alone.
+   */
+  adopt(netIds: number[]) {
+    for (const id of netIds) this.adopted.add(id);
+    this.applyAdopt();
+  }
+
+  private applyAdopt() {
+    const race = this.race;
+    if (!race || !this.adopted.size) return;
+    for (const r of race.racers) {
+      if (r.kind !== 'remote' || !r.remote || !this.adopted.has(r.id)) continue;
+      const buffer = r.remote.buffer, b = r.body;
+      const t = Math.max(0, this.now());
+      r.kind = 'ai';
+      r.owner = this.setup.mySlot;
+      r.remote = null;
+      r.ai = botAI(r.progress.lateral);
+      Object.assign(r.controls, { throttle: 0, brake: 0, steer: 0, handbrake: false, useItem: false, special: false, horn: false });
+      // Our finish claim needs a time per lap adding up to the finish time: the laps done on the other phone share
+      // the clock so far.
+      const done = r.progress.lapsDone;
+      if (done > 0 && r.progress.finishTime === null) {
+        r.progress.lapTimes = Array.from({ length: done }, () => t / done);
+        r.progress.lapStart = t;
+      }
+      // Not built yet (still loading): the scene switches the body when it is.
+      if (!b) continue;
+      setBodyDriven(b, false);
+      const pose: Pose = { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, vx: 0, vy: 0, vz: 0 };
+      if (buffer.sample(buffer.renderTimeAt(this.now()), pose) === 'empty') continue;
+      b.setTranslation({ x: pose.x, y: pose.y, z: pose.z }, true);
+      b.setRotation({ x: pose.qx, y: pose.qy, z: pose.qz, w: pose.qw }, true);
+      b.setLinvel({ x: pose.vx, y: pose.vy, z: pose.vz }, true);
+      b.setAngvel({ x: 0, y: 0, z: 0 }, true);
     }
   }
 

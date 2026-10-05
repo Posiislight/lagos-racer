@@ -111,7 +111,7 @@ const grid: GridEntry[] = [
   { netId: 2, slot: 1, name: 'Area Fada', vehicle: 'brt', paint: 'red', ai: true },
   { netId: 3, slot: 2, name: 'Oga Landlord', vehicle: 'okada', paint: 'no-such-paint', ai: true },
 ];
-const online = (mySlot: number, seed = 1234): OnlineSetup => ({ grid, mySlot, seed });
+const online = (mySlot: number, seed = 1234, quick = false): OnlineSetup => ({ grid, mySlot, seed, quick });
 const room = (mySlot: number, seed?: number) => makeRace(laps, okada, 'moshood', null, online(mySlot, seed));
 
 describe('makeRace: offline kinds', () => {
@@ -141,6 +141,12 @@ describe('makeRace: online', () => {
     expect(race.racers[3].ai).not.toBeNull();
     // Grid positions match the offline layout: netId 0 is the front of the left lane.
     expect(spawns).toEqual(makeRace(laps, okada, 'moshood').spawns.slice(0, 4));
+  });
+
+  it('only a Quick room makes its bots drive like people', () => {
+    expect(room(1).race.humanize).toBe(false);
+    expect(makeRace(laps, okada, 'moshood', null, online(1, 1234, true)).race.humanize).toBe(true);
+    expect(makeRace(laps, okada, 'moshood').race.humanize).toBe(false);
   });
 
   it('hazard ids start at mySlot × 100000', () => {

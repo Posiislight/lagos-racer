@@ -64,7 +64,7 @@ export function RaceScene() {
       {/* A room race never stops for one phone's menu. */}
       <Physics timeStep={1 / 60} gravity={[0, -18, 0]} paused={paused && !online} interpolate>
         <Track cfg={setup.race.config} track={setup.race.track} density={q.density} animateWater={quality !== 'low'} />
-        {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} />)}
+        {setup.race.racers.map((r, i) => <Vehicle key={`${raceId}-${r.id}`} racer={r} spawn={setup.spawns[i]} quick={setup.race.humanize} />)}
       </Physics>
       <Effects />
       <Critters />
