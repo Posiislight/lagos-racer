@@ -4,6 +4,12 @@ import { TRACKS } from '../config/tracks';
 import { campaignStatus, driverAvailable, evaluatePass, nextRace, sanitizeCleared, sanitizeStars, settle, type CampaignSave } from './campaign';
 
 describe('CHAPTER_1', () => {
+  it('gets harder race by race', () => {
+    expect(CHAPTER_1.slice(0, 3).map(r => r.rivalBoost ?? 0)).toEqual([0, 0.03, 0.06]);
+    const m = CHAPTER_1[2].mode;
+    expect(m.kind === 'elimination' && m.first < 20).toBe(true);
+  });
+
   it('has the four races in order, two per map', () => {
     expect(CHAPTER_1.map(r => r.id)).toEqual(['campaign-1-1', 'campaign-1-2', 'campaign-1-3', 'campaign-1-4']);
     expect(new Set(CHAPTER_1.map(r => r.id)).size).toBe(4);
@@ -27,8 +33,8 @@ describe('CHAPTER_1', () => {
   it('pins the mode numbers', () => {
     expect(CHAPTER_1[0].mode).toEqual({ kind: 'laps', laps: 3 });
     expect(CHAPTER_1[1].mode).toEqual({ kind: 'laps', laps: 2 });
-    expect(CHAPTER_1[2].mode).toEqual({ kind: 'elimination', first: 20, step: 2, floor: 10 });
-    expect(CHAPTER_1[3].mode).toEqual({ kind: 'duel', laps: 2, skill: 1.06 });
+    expect(CHAPTER_1[2].mode).toEqual({ kind: 'elimination', first: 18, step: 2, floor: 8 });
+    expect(CHAPTER_1[3].mode).toEqual({ kind: 'duel', laps: 2, skill: 1.1 });
   });
 
   it('has story and rule text on every race', () => {
