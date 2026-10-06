@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Pool } from 'pg';
-import { gemPackById } from '../src/config/premium';
+import { sellableById } from '../src/config/premium';
 import { readBody, send } from './saves';
 
 /** The part of a Paystack transaction we read (from verify, or from a charge.success webhook). */
@@ -44,13 +44,16 @@ export function createPaystackApi(secretKey: string, doFetch: typeof fetch = fet
   };
 }
 
-export type Purchase = { reference: string; userId: string; packId: string; gems: number; amountKobo: number };
+export type Purchase = { reference: string; userId: string; packId: string; gems: number; coins: number; amountKobo: number };
+
+/** Everything a buyer has ever bought: Gems, and in-game naira ("coins"). */
+export type Totals = { gems: number; coins: number };
 
 export interface PurchaseStore {
   /** Records a paid purchase once per reference. True only for the call that recorded it. */
   credit(p: Purchase): Promise<boolean>;
-  /** Every Gem this user has ever bought. */
-  total(userId: string): Promise<number>;
+  /** Every Gem and every coin this user has ever bought. */
+  totals(userId: string): Promise<Totals>;
 }
 
 export class MemoryPurchaseStore implements PurchaseStore {
@@ -60,9 +63,9 @@ export class MemoryPurchaseStore implements PurchaseStore {
     this.rows.set(p.reference, p);
     return true;
   }
-  async total(userId: string) {
-    let sum = 0;
-    for (const p of this.rows.values()) if (p.userId === userId) sum += p.gems;
+  async totals(userId: string) {
+    const sum = { gems: 0, coins: 0 };
+    for (const p of this.rows.values()) if (p.userId === userId) { sum.gems += p.gems; sum.coins += p.coins; }
     return sum;
   }
 }
@@ -75,18 +78,21 @@ export class PgPurchaseStore implements PurchaseStore {
       reference text primary key, user_id text not null, pack_id text not null, gems integer not null,
       amount_kobo integer not null, created_at timestamptz not null default now())`);
     await this.pool.query('create index if not exists gem_purchases_user on gem_purchases (user_id)');
+    // In-game naira packs share the table: a row adds Gems, coins, or (one day) both.
+    await this.pool.query('alter table gem_purchases add column if not exists coins bigint not null default 0');
   }
 
   async credit(p: Purchase) {
     const r = await this.pool.query(
-      'insert into gem_purchases (reference, user_id, pack_id, gems, amount_kobo) values ($1, $2, $3, $4, $5) on conflict do nothing returning reference',
-      [p.reference, p.userId, p.packId, p.gems, p.amountKobo]);
+      'insert into gem_purchases (reference, user_id, pack_id, gems, coins, amount_kobo) values ($1, $2, $3, $4, $5, $6) on conflict do nothing returning reference',
+      [p.reference, p.userId, p.packId, p.gems, p.coins, p.amountKobo]);
     return r.rows.length > 0;
   }
 
-  async total(userId: string) {
-    const r = await this.pool.query('select coalesce(sum(gems), 0)::int as total from gem_purchases where user_id = $1', [userId]);
-    return r.rows[0].total as number;
+  async totals(userId: string) {
+    const r = await this.pool.query(
+      'select coalesce(sum(gems), 0)::float8 as gems, coalesce(sum(coins), 0)::float8 as coins from gem_purchases where user_id = $1', [userId]);
+    return { gems: r.rows[0].gems as number, coins: r.rows[0].coins as number };
   }
 }
 
@@ -108,12 +114,12 @@ export type Settled = 'credited' | 'already' | 'pending' | 'failed' | 'invalid';
  */
 export async function settle(store: PurchaseStore, txn: PaystackTxn, expectUser?: string): Promise<Settled> {
   if (txn.status !== 'success') return txn.status === 'failed' || txn.status === 'abandoned' || txn.status === 'reversed' ? 'failed' : 'pending';
-  const pack = gemPackById(txn.metadata?.pack);
+  const pack = sellableById(txn.metadata?.pack);
   const userId = txn.metadata?.userId;
   if (!pack || typeof userId !== 'string' || !userId) return 'invalid';
   if (expectUser !== undefined && userId !== expectUser) return 'invalid';
   if (txn.currency !== 'NGN' || txn.amount !== pack.naira * 100) return 'invalid';
-  const fresh = await store.credit({ reference: txn.reference, userId, packId: pack.id, gems: pack.gems, amountKobo: txn.amount });
+  const fresh = await store.credit({ reference: txn.reference, userId, packId: pack.id, gems: pack.gems, coins: pack.coins, amountKobo: txn.amount });
   return fresh ? 'credited' : 'already';
 }
 
@@ -177,7 +183,8 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
 
   if (path === '/pay/total') {
     if (req.method !== 'GET') return send(res, 405);
-    return send(res, 200, { total: await deps.store.total(userId) });
+    const t = await deps.store.totals(userId);
+    return send(res, 200, { total: t.gems, coins: t.coins });
   }
 
   if (path === '/pay/verify') {
@@ -188,7 +195,8 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
     const txn = await deps.paystack.verify(reference);
     if (!txn) return send(res, 404);
     const status = await settle(deps.store, txn, userId);
-    return send(res, 200, { status, total: await deps.store.total(userId) });
+    const t = await deps.store.totals(userId);
+    return send(res, 200, { status, total: t.gems, coins: t.coins });
   }
 
   if (path === '/pay/init') {
@@ -198,7 +206,7 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
     if (text === null) return send(res, 413);
     let body: { pack?: unknown; email?: unknown };
     try { body = JSON.parse(text); } catch { return send(res, 400); }
-    const pack = gemPackById(body?.pack);
+    const pack = sellableById(body?.pack);
     if (!pack) return send(res, 400);
     // Paystack needs an email on every payment; it is where their receipt goes.
     const email = typeof body.email === 'string' ? body.email.trim() : '';

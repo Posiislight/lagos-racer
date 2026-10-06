@@ -113,6 +113,15 @@ describe('/pay/webhook', () => {
     expect(await total(base)).toBe(100);
   });
 
+  it('credits an in-game naira pack as coins, not Gems, and only at its own price', async () => {
+    const { base } = await start();
+    const coins = async () => (await (await fetch(`${base}/pay/total`, { headers: auth('tok-a') })).json()).coins;
+    await webhook(base, event(txn({ reference: 'n-1', amount: 150_000, metadata: { userId: USER_A, pack: 'naira-1m' } })));
+    expect([await total(base), await coins()]).toEqual([0, 1_000_000]);
+    await webhook(base, event(txn({ reference: 'n-2', amount: 50_000, metadata: { userId: USER_A, pack: 'naira-1m' } })));
+    expect(await coins()).toBe(1_000_000);
+  });
+
   it('adds up separate purchases', async () => {
     const { base } = await start();
     await webhook(base, event(txn({ reference: 'ref-1' })));
