@@ -40,7 +40,7 @@ export function Menu() {
   const v = vehicleById(vehicle), p = paintOf(v, paint[v.id]), d = driverById(driver), credit = menuCredit(TRACKS);
   // The Garage button gets a dot when the player can afford a paint or the BRT.
   const brt = vehicleById('brt').locked;
-  const garageHint = premium >= PAINT_PRICE || (!!brt && !unlocked.includes('brt') && premium >= brt.premium);
+  const garageHint = premium >= PAINT_PRICE || (!!brt && !unlocked.includes('brt') && coins >= brt.naira);
   return (
     <div className="menu">
       <div className="menu-stripes" aria-hidden="true" />
@@ -90,7 +90,7 @@ export function Menu() {
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
           <div className="card modal-card">
             <h2 id="shop-title">Get {PREMIUM_LABEL}</h2>
-            <p className="muted">{PREMIUM_LABEL} buy new paints and unlock the BRT in the Garage. Gem packs are coming soon.</p>
+            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. The BRT costs naira. Gem packs are coming soon.</p>
             <button className="btn" onClick={() => { setShop(false); setScreen('garage'); }}>Go to Garage</button>
             <button className="btn primary" onClick={() => setShop(false)}>Close</button>
           </div>

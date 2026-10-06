@@ -18,8 +18,8 @@ export type VehicleConfig = {
   paints: Paint[];
   stats: { speed: number; handling: number; toughness: number };
   blurb: string;
-  /** Locked until the player watches `ads` rewarded ads or pays `premium` premium currency. */
-  locked?: { premium: number; ads: number };
+  /** Locked until the player watches `ads` rewarded ads or pays `naira`. */
+  locked?: { naira: number; ads: number };
   scale: number;
   /** Chassis box (model units): length, height, width, and the box centre height. */
   chassis: { length: number; height: number; width: number; centreY: number };
@@ -105,7 +105,7 @@ export const VEHICLES: VehicleConfig[] = [
     paints: paints(['Blue', '#0f86cf'], ['Red', '#d4141c'], ['Green', '#1f9d55'], ['Yellow', '#f5b400'], ['Purple', '#7b2cbf'], ['Black', '#1b1b1b']),
     stats: { speed: 4, handling: 3, toughness: 10 },
     blurb: 'The boss bus on gold alloys with a roof wing and quad pipes. Has its own lane. Will use yours too.',
-    locked: { premium: 500, ads: 1 },
+    locked: { naira: 1_000_000, ads: 1 },
     scale: 0.72,
     chassis: { length: 11.4, height: 2.4, width: 2.5, centreY: 1.75 },
     wheels: { frontX: 3.3, rearX: -3.3, frontZ: 1.1, rearZ: 1.1, radius: 0.6 },

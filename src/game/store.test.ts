@@ -203,18 +203,18 @@ describe('premium currency', () => {
     expect(state().paint.okada).toBe('red');
   });
 
-  it('unlock pays the BRT price in premium currency, once', () => {
-    useGame.setState({ premium: 499 });
+  it('unlock pays the BRT price in naira, once', () => {
+    useGame.setState({ coins: 999_999 });
     state().unlock('brt');
     expect(state().unlocked).toEqual([]);
-    useGame.setState({ premium: 500 });
+    useGame.setState({ coins: 1_000_000 });
     state().unlock('brt');
     expect(state().unlocked).toEqual(['brt']);
     expect(state().vehicle).toBe('brt');
-    expect(state().premium).toBe(0);
-    useGame.setState({ premium: 500 });
+    expect(state().coins).toBe(0);
+    useGame.setState({ coins: 1_000_000 });
     state().unlock('brt');
-    expect(state().premium).toBe(500);
+    expect(state().coins).toBe(1_000_000);
     state().unlock('okada');
     expect(state().unlocked).toEqual(['brt']);
   });
