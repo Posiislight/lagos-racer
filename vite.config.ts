@@ -1,10 +1,23 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/** Real, paying ads only in a production build with VITE_ADS_LIVE=1; everywhere else the AdSense tag asks for placeholder ads. */
+const adsenseTestMode = (): Plugin => {
+  let live = false;
+  return {
+    name: 'adsense-test-mode',
+    configResolved(config) {
+      live = config.command === 'build' && config.mode === 'production' && loadEnv(config.mode, process.cwd(), 'VITE_').VITE_ADS_LIVE === '1';
+    },
+    transformIndexHtml: html => live ? html : html.replace('data-lagos-ads="1"', 'data-lagos-ads="1" data-adbreak-test="on"'),
+  };
+};
 
 export default defineConfig({
   plugins: [
     react(),
+    adsenseTestMode(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],

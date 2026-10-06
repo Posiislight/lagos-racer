@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { VEHICLES, ownsPaint, paintKey, paintPrice, vehicleById, type VehicleId } from '../config/vehicles';
 import { driverAvailable, settle } from './campaign';
 import { CHAPTER_1, type RaceSpec } from '../config/campaign';
+import { AD_GEMS } from '../config/premium';
 import { roomPayout, upgradePrice, type Stars } from '../config/economy';
 import type { DriverId } from '../config/drivers';
 import type { ItemKind } from './runtime';
@@ -86,6 +87,8 @@ export type State = Saved & {
   buyPaint: (v: VehicleId, paint: string) => boolean;
   /** One rewarded ad finished for a locked vehicle: unlocks it at its ad count. Returns the new count, or 0 if nothing counted. */
   addAdView: (v: VehicleId) => number;
+  /** One rewarded ad finished from the Get Gems shop: adds AD_GEMS to the balance and returns the amount. */
+  awardAdGems: () => number;
   setDriver: (d: DriverId) => void;
   /** The first-race how-to card was seen or skipped. */
   finishOnboarding: () => void;
@@ -156,6 +159,11 @@ export const useGame = create<State>((set, get) => ({
     set({ adViews: { ...s.adViews, [v]: views }, ...(views >= rule.ads ? { unlocked: [...s.unlocked, v], vehicle: v } : {}) });
     save();
     return views;
+  },
+  awardAdGems: () => {
+    set(s => ({ premium: s.premium + AD_GEMS }));
+    save();
+    return AD_GEMS;
   },
   setDriver: driver => {
     if (!driverAvailable(driver, get().campaign.cleared)) return;

@@ -7,3 +7,6 @@ export const PREMIUM_LABEL = 'Gems';
 
 /** What every non-default paint costs, in premium currency. */
 export const PAINT_PRICE = 100;
+
+/** Gems a player gets for watching one rewarded ad to the end. */
+export const AD_GEMS = 5;

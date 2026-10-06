@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CHAPTER_1 } from '../config/campaign';
+import { AD_GEMS } from '../config/premium';
 import { todayKey } from './save';
 import { useGame } from './store';
 
@@ -180,6 +181,12 @@ describe('premium currency', () => {
     expect(state().paint.okada).toBe('red');
     expect(state().buyPaint('okada', 'red')).toBe(false);
     expect(state().premium).toBe(50);
+  });
+
+  it('awardAdGems adds the ad reward to the balance', () => {
+    useGame.setState({ premium: 3 });
+    expect(state().awardAdGems()).toBe(AD_GEMS);
+    expect(state().premium).toBe(3 + AD_GEMS);
   });
 
   it('buyPaint does nothing when short, for the free paint, or for an unknown paint', () => {
