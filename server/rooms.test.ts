@@ -19,6 +19,7 @@ import {
   START_LEAD_MS,
   encodeSnapshot,
   type CarState,
+  type NetResult,
   type ServerMessage,
   type Snapshot,
 } from '../src/net/protocol';
@@ -1910,5 +1911,75 @@ describe('voice signalling', () => {
     send(b.conn, { t: 'quick', name: 'Bola', vehicle: 'okada' });
     send(a.conn, { t: 'rtc', to: msgs(b.peer, 'welcome')[0].slot, signal: offer });
     expect(msgs(b.peer, 'rtc')).toEqual([]);
+  });
+});
+
+describe('results hook', () => {
+  /** A started race in a room built with `onResults`; `quick` rooms get a human on slot 1, friends' rooms two. */
+  function raceRoom(quick: boolean, onResults: (trackId: string, results: NetResult[]) => void, sent: ServerMessage[] = []) {
+    const room = new Room('HOOK', TRACKS[0].id, (_conn, msg) => sent.push(msg), now, { quick, clock: () => now, onResults });
+    room.add(1, 'Ade', 'okada', 'red', 'token-1');
+    if (quick) {
+      now += QUICK_WAIT_MS;
+      room.tick(now);
+      room.markLoaded(1, now);
+    } else {
+      room.add(2, 'Bola', 'okada', 'red', 'token-2');
+      room.lobby(1, { ready: true });
+      room.lobby(2, { ready: true });
+      expect(room.startRace(1, now, Math.random)).toBeNull();
+      room.markLoaded(1, now);
+      room.markLoaded(2, now);
+    }
+    now += START_LEAD_MS;
+    room.tick(now);
+    expect(room.phase).toBe('racing');
+    return room;
+  }
+
+  it('a Quick race reports its results once, the same ones the racers get', () => {
+    const calls: { trackId: string; results: NetResult[] }[] = [];
+    const sent: ServerMessage[] = [];
+    const room = raceRoom(true, (trackId, results) => calls.push({ trackId, results }), sent);
+    (room as any).endRace(now, true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].trackId).toBe(room.trackId);
+    expect(calls[0].results.length).toBe(6);
+    const sentResults = sent.find((m): m is Extract<ServerMessage, { t: 'results' }> => m.t === 'results')!;
+    expect(calls[0].results).toEqual(sentResults.results);
+  });
+
+  it("a friends' room never reports", () => {
+    const calls: unknown[] = [];
+    const room = raceRoom(false, () => calls.push(1));
+    (room as any).endRace(now, true);
+    expect(calls).toEqual([]);
+  });
+
+  it('a race ended without results reports nothing', () => {
+    const calls: unknown[] = [];
+    const room = raceRoom(true, () => calls.push(1));
+    (room as any).endRace(now, false);
+    expect(calls).toEqual([]);
+  });
+
+  it('a throwing hook does not stop the results reaching the racers', () => {
+    const sent: ServerMessage[] = [];
+    const room = raceRoom(true, () => { throw new Error('postgres is down'); }, sent);
+    (room as any).endRace(now, true);
+    expect(sent.some(m => m.t === 'results')).toBe(true);
+    expect(room.phase).toBe('lobby');
+  });
+
+  it('the server hands its callback to Quick rooms only', () => {
+    const calls: string[] = [];
+    server = new RoomServer({ now: () => now, onQuickResults: (trackId) => calls.push(trackId) });
+    const a = connect();
+    send(a.conn, { t: 'quick', name: 'Ade', vehicle: 'okada', paint: 'red' });
+    const friends = connect();
+    send(friends.conn, { t: 'create', name: 'Bola', vehicle: 'okada', paint: 'red' });
+    const rooms = [...server.rooms.values()];
+    expect((rooms.find(r => r.quick) as any).onResults).toBeTypeOf('function');
+    expect((rooms.find(r => !r.quick) as any).onResults).toBeUndefined();
   });
 });

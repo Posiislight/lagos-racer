@@ -12,6 +12,7 @@ import {
   type PlayerInfo,
   type RoomPhase,
   type RoomView,
+  type NetResult,
   type ServerMessage,
   type Snapshot,
 } from '../src/net/protocol';
@@ -49,6 +50,8 @@ export type RoomOptions = {
   random?: () => number;
   /** Server time, for what the room shows between ticks (the countdown and the bots that have appeared). */
   clock?: () => number;
+  /** Quick rooms: told the final results once a race ends with them, so they can be recorded (the leaderboard). */
+  onResults?: (trackId: string, results: NetResult[]) => void;
 };
 
 /** Every track's vote count (0 included), from each human's latest vote. */
@@ -94,6 +97,7 @@ export class Room {
   readonly quick: boolean;
   private random: () => number;
   private clock: () => number;
+  private onResults?: (trackId: string, results: NetResult[]) => void;
   /** Quick rooms: when the race starts, set when the first human is seated. */
   private startsAt: number | null = null;
   private roster: Roster | null = null;
@@ -116,6 +120,8 @@ export class Room {
     this.quick = options.quick ?? false;
     this.random = options.random ?? Math.random;
     this.clock = options.clock ?? Date.now;
+    // Only a Quick room reports: friends' rooms never reach a leaderboard.
+    if (this.quick) this.onResults = options.onResults;
   }
 
   get size() {
@@ -511,6 +517,8 @@ export class Room {
         const msg = this.resultsFor(s);
         if (conn !== null && msg) this.send(conn, msg);
       }
+      // After the racers have theirs; a recording fault must never touch a race.
+      try { this.onResults?.(this.trackId, this.resultsMsg.results); } catch (err) { console.error('results hook failed', err); }
     }
     this.phase = 'lobby';
     this.referee = null;

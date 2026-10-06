@@ -3,6 +3,7 @@ import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { ERROR_TEXT, useNet } from '../net/store';
 import { CODE_ALPHABET, NICK_MAX, normalizeCode } from '../net/protocol';
+import { Leaderboard } from './Leaderboard';
 
 /** A room code from a ?room= link, or '' if the link has none or a junk one. */
 function codeFromUrl(): string {
@@ -35,6 +36,7 @@ export function Online() {
   const [code, setCode] = useState(codeFromUrl);
   // A ?room= link goes straight to the friends form; otherwise first choose how to play.
   const [friends, setFriends] = useState(() => codeFromUrl() !== '');
+  const [board, setBoard] = useState(false);
   const busy = status === 'connecting' || status === 'reconnecting';
   const nickField = (
     <label className="field">
@@ -73,6 +75,11 @@ export function Online() {
         </div>
       ) : (
         <div className="card online-card">
+          <button className="lb-btn" onClick={() => setBoard(true)} aria-label="Leaderboard" title="Leaderboard">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
+              <path d="M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" /><path d="M12 14v4M8 20h8" />
+            </svg>
+          </button>
           <h2>Multiplayer</h2>
           <div className="online-cols">
             <div className="online-col">{nickField}</div>
@@ -91,6 +98,7 @@ export function Online() {
           <button className="btn" onClick={leave}>← Back</button>
         </div>
       )}
+      {board && <Leaderboard onClose={() => setBoard(false)} />}
       {cut && <ConnectionCut />}
     </div>
   );

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "server": "tsx server/index.ts",
+    "seed:leaderboard": "tsx scripts/seed-leaderboard.ts",
     "start": "tsx server/index.ts",
     "typecheck": "tsc -p . && tsc -p server"
   },

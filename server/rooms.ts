@@ -13,6 +13,7 @@ import {
   normalizeCode,
   type ClientMessage,
   type ErrorCode,
+  type NetResult,
   type RtcSignal,
   type ServerMessage,
 } from '../src/net/protocol';
@@ -186,9 +187,11 @@ export class RoomServer {
   private random: () => number;
   private trackId: string;
   private liveness: boolean;
+  private onQuickResults?: (trackId: string, results: NetResult[]) => void;
 
   /** liveness is only turned off by tests that jump the clock without pinging. */
-  constructor(opts: { now?: () => number; random?: () => number; trackId?: string; liveness?: boolean } = {}) {
+  constructor(opts: { now?: () => number; random?: () => number; trackId?: string; liveness?: boolean; onQuickResults?: (trackId: string, results: NetResult[]) => void } = {}) {
+    this.onQuickResults = opts.onQuickResults;
     this.now = opts.now ?? Date.now;
     this.random = opts.random ?? Math.random;
     this.trackId = opts.trackId ?? TRACKS[0].id;
@@ -350,7 +353,7 @@ export class RoomServer {
         n = Math.floor(n / CODE_ALPHABET.length);
       }
       if (!this.rooms.has(code)) {
-        const room = new Room(code, this.trackId, (to, msg) => this.send(to, msg), this.now(), quick ? { quick: true, random: this.random, clock: this.now } : {});
+        const room = new Room(code, this.trackId, (to, msg) => this.send(to, msg), this.now(), quick ? { quick: true, random: this.random, clock: this.now, onResults: this.onQuickResults } : {});
         this.rooms.set(code, room);
         return room;
       }
