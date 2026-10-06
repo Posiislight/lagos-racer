@@ -143,7 +143,7 @@ export function Lobby() {
           </button>
         </div>
         <div className="row">
-          <button className="btn" onClick={share}>{copied ? 'Link copied' : 'Share'}</button>
+          <button className="btn" onClick={share}>{copied ? 'Link copied' : 'Send link to friends'}</button>
           <button className="btn ghost" onClick={leave}>Leave race</button>
         </div>
         <table className="table">

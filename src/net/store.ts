@@ -57,12 +57,12 @@ const STRANDED_MS = 3000;
 const STRANDED_FLASH_MS = 1500;
 
 export const ERROR_TEXT: Record<NetError, string> = {
-  'not-found': 'Room not found',
+  'not-found': 'No room with that code. Check the letters.',
   full: 'Room full',
   started: 'Race don start already',
   unreachable: 'Connection don cut',
   'bad-name': 'Enter a nickname (up to 16 letters)',
-  'bad-code': 'Room codes are 4 letters',
+  'bad-code': 'Type all 4 letters of the code',
   expired: 'Room don close, start a new one',
   'not-host': 'Only the host can start the race',
   'not-ready': 'Everybody must be ready first',

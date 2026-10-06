@@ -25,6 +25,9 @@ export function ConnectionCut() {
   );
 }
 
+const NICKS = ['Odogwu Rider', 'Danfo Boss', 'Lagos Pikin', 'Shine Your Eye', 'Naija Zoom', 'Agbero Boy'];
+const randomNick = () => NICKS[Math.floor(Math.random() * NICKS.length)];
+
 const onlyCodeLetters = (raw: string) => normalizeCode(raw).split('').filter(c => CODE_ALPHABET.includes(c)).join('').slice(0, 4);
 
 export function Online() {
@@ -32,10 +35,10 @@ export function Online() {
   // Your ride goes to the room in the paint you picked for it in the garage.
   const paint = useGame(s => paintOf(vehicleById(s.vehicle), s.paint[s.vehicle]).id);
   const { status, error, cut, nickname, create, quick, join, leave } = useNet();
-  const [name, setName] = useState(nickname);
+  const [name, setName] = useState(() => nickname || randomNick());
   const [code, setCode] = useState(codeFromUrl);
-  // A ?room= link goes straight to the friends form; otherwise first choose how to play.
-  const [friends, setFriends] = useState(() => codeFromUrl() !== '');
+  // A ?room= link goes straight to the join step with the code filled in; otherwise first choose how to play.
+  const [view, setView] = useState<'home' | 'friends' | 'join'>(() => (codeFromUrl() !== '' ? 'join' : 'home'));
   const [board, setBoard] = useState(false);
   const busy = status === 'connecting' || status === 'reconnecting';
   const nickField = (
@@ -49,29 +52,39 @@ export function Online() {
       {error ? ERROR_TEXT[error] : busy ? 'Connecting…' : ''}
     </p>
   );
+  const joinNow = () => join(code, name || randomNick(), vehicle, paint);
+  const startRoom = () => create(name || randomNick(), vehicle, paint);
   return (
     <div className="online">
-      {friends ? (
+      {view === 'join' ? (
+        <div className="card online-card">
+          <h2>Join with code</h2>
+          <p className="muted">Type the 4 letters your friend sent you.</p>
+          {nickField}
+          <form className="join-row" onSubmit={e => { e.preventDefault(); if (code.length === 4) joinNow(); }}>
+            <label className="field">
+              <span>Room code</span>
+              <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
+                autoFocus placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
+            </label>
+            <button className="btn primary" type="submit" disabled={busy || code.length !== 4}>Join</button>
+          </form>
+          {note}
+          <button className="btn" onClick={() => setView('friends')}>← Back</button>
+        </div>
+      ) : view === 'friends' ? (
         <div className="card online-card">
           <h2>Play with friends</h2>
-          <p className="muted">Make a room and send the code, or type the code your friend sent.</p>
-          <div className="online-cols">
-            <div className="online-col">
-              {nickField}
-              <button className="btn primary" disabled={busy} onClick={() => create(name, vehicle, paint)}>Create room</button>
-            </div>
-            <p className="or" aria-hidden="true">or</p>
-            <form className="join-row online-col" onSubmit={e => { e.preventDefault(); join(code, name, vehicle, paint); }}>
-              <label className="field">
-                <span>Room code</span>
-                <input className="code-input" value={code} maxLength={4} inputMode="text" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false}
-                  placeholder="ABCD" onChange={e => setCode(onlyCodeLetters(e.target.value))} />
-              </label>
-              <button className="btn primary" type="submit" disabled={busy}>Join room</button>
-            </form>
-          </div>
+          <button className="entry primary" disabled={busy} onClick={startRoom}>
+            <b>START A ROOM</b>
+            <span>You get a 4-letter code to send to your friends.</span>
+          </button>
+          <button className="entry" disabled={busy} onClick={() => setView('join')}>
+            <b>I HAVE A CODE</b>
+            <span>Type the 4 letters your friend sent you.</span>
+          </button>
           {note}
-          <button className="btn" onClick={() => setFriends(false)}>← Back</button>
+          <button className="btn" onClick={() => setView('home')}>← Back</button>
         </div>
       ) : (
         <div className="card online-card">
@@ -84,13 +97,13 @@ export function Online() {
           <div className="online-cols">
             <div className="online-col">{nickField}</div>
             <div className="online-col">
-              <button className="entry primary" disabled={busy} onClick={() => quick(name, vehicle, paint)}>
+              <button className="entry primary" disabled={busy} onClick={() => quick(name || randomNick(), vehicle, paint)}>
                 <b>QUICK PLAY</b>
-                <span>Jump in and race whoever is online now.</span>
+                <span>Jump in and race whoever is online now. No code needed.</span>
               </button>
-              <button className="entry" disabled={busy} onClick={() => setFriends(true)}>
+              <button className="entry" disabled={busy} onClick={() => setView('friends')}>
                 <b>PLAY WITH FRIENDS</b>
-                <span>Make a room and share the code.</span>
+                <span>Start a room or join one with a code.</span>
               </button>
             </div>
           </div>
