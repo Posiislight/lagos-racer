@@ -91,7 +91,7 @@ export type State = Saved & {
   finishOnboarding: () => void;
   /** One more pickup has shown its how-to hint. */
   countItemHint: () => void;
-  /** Unlocks a locked vehicle for its premium price. */
+  /** Unlocks a locked vehicle for its naira price. */
   unlock: (v: VehicleId) => void;
   /** Buy the next level of one upgrade. True if it was bought. */
   buyUpgrade: (v: VehicleId, kind: UpgradeKind) => boolean;
@@ -166,8 +166,8 @@ export const useGame = create<State>((set, get) => ({
   countItemHint: () => { set(s => ({ itemHints: s.itemHints + 1 })); save(); },
   unlock: v => {
     const s = get(), rule = vehicleById(v).locked;
-    if (!rule || s.unlocked.includes(v) || s.premium < rule.premium) return;
-    set({ premium: s.premium - rule.premium, unlocked: [...s.unlocked, v], vehicle: v });
+    if (!rule || s.unlocked.includes(v) || s.coins < rule.naira) return;
+    set({ coins: s.coins - rule.naira, unlocked: [...s.unlocked, v], vehicle: v });
     save();
   },
   buyUpgrade: (v, kind) => {

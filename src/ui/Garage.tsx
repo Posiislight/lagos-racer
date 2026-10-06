@@ -122,8 +122,8 @@ export function Garage() {
                   <small className="muted">The ad is optional and uses mobile data.</small>
                 </>
               )}
-              <button className="btn primary" disabled={premium < v.locked!.premium} onClick={() => unlock(v.id)}>
-                {premium < v.locked!.premium ? `Need ${v.locked!.premium - premium} more ${PREMIUM_LABEL} to unlock` : `Unlock for ${v.locked!.premium} ${PREMIUM_LABEL}`}
+              <button className="btn primary" disabled={coins < v.locked!.naira} onClick={() => unlock(v.id)}>
+                {coins < v.locked!.naira ? `Need ${formatNaira(v.locked!.naira - coins)} more to unlock` : `Unlock for ${formatNaira(v.locked!.naira)}`}
               </button>
             </div>
           ) : (

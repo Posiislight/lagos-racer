@@ -27,7 +27,7 @@ describe('paints', () => {
 
 describe('BRT lock', () => {
   it('unlocks by ads or premium, not naira', () => {
-    expect(vehicleById('brt').locked).toEqual({ premium: 500, ads: 1 });
+    expect(vehicleById('brt').locked).toEqual({ naira: 1_000_000, ads: 1 });
     for (const id of ['okada', 'keke', 'danfo'] as const) expect(vehicleById(id).locked).toBeUndefined();
   });
 });

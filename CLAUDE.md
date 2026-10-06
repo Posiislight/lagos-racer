@@ -44,7 +44,7 @@ Most players will be on budget Android phones (Tecno, Infinix) on mobile data.
 | Danfo | 6 | 5 | 7 | Conductor fires the power-ups |
 | BRT | 4 | 3 | 10 | Slow tank, unlockable "boss" vehicle |
 
-Colours are paint options, not separate vehicles: each vehicle has six paints in the garage (see `src/config/vehicles.ts`). The default paint is yellow on every vehicle except the BRT (white-and-blue); every other paint costs premium currency, bought with real money later (placeholder values in `src/config/premium.ts`). The BRT unlocks by watching a rewarded ad or paying premium currency (`locked` in `vehicles.ts`; ads go through `src/game/ads.ts`). Spec `docs/superpowers/specs/2026-10-05-premium-currency-design.md`.
+Colours are paint options, not separate vehicles: each vehicle has six paints in the garage (see `src/config/vehicles.ts`). The default paint is yellow on every vehicle except the BRT (white-and-blue); every other paint costs premium currency, bought with real money later (placeholder values in `src/config/premium.ts`). The BRT unlocks by watching a rewarded ad or paying ₦1,000,000 of naira (`locked` in `vehicles.ts`; ads go through `src/game/ads.ts`). Spec `docs/superpowers/specs/2026-10-05-premium-currency-design.md`.
 
 Danfo and BRT have conductors hanging out of the door; on those vehicles the conductor throws the power-ups.
 
