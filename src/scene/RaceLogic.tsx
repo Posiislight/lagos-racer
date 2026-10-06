@@ -11,6 +11,7 @@ import { driverById } from '../config/drivers';
 import { updateCritters } from '../game/critters';
 import { useGame } from '../game/store';
 import { buildResults } from '../game/results';
+import { startRadio, stopRadio } from '../game/radio';
 import { beep, Engine, sfx, startAmbience, stopAmbience } from '../game/audio';
 import { resetWarnings, updateWarnings } from '../game/warnings';
 import { itemHint } from '../game/hints';
@@ -51,7 +52,8 @@ export function RaceLogic() {
     engine.current = new Engine(player?.vehicle.id === 'okada' ? 70 : player?.vehicle.id === 'keke' ? 60 : 42);
     engine.current.start();
     startAmbience();
-    return () => { engine.current?.stop(); stopAmbience(); resetWarnings(); resetSpecialsAudio(); };
+    if (useGame.getState().settings.radio) startRadio();
+    return () => { engine.current?.stop(); stopAmbience(); stopRadio(); resetWarnings(); resetSpecialsAudio(); };
   }, []);
 
   useFrame((_, dtRaw) => {

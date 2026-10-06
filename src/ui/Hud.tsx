@@ -1,10 +1,11 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type CSSProperties } from 'react';
 import { useGame, type Hud as HudState } from '../game/store';
 import { useNet } from '../net/store';
 import { formatTime } from '../game/race';
 import { getRace } from '../game/runtime';
 import { queueItem, queueSpecial } from '../game/input';
 import { useIsTouch } from './TouchControls';
+import { onRadioStatus, radioName, radioStatus, startRadio, stopRadio } from '../game/radio';
 import { ITEM_ICON } from '../scene/art/items';
 
 const suffix = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th');
@@ -38,6 +39,7 @@ export function Hud({ onPause }: { onPause: () => void }) {
         {!isTouch && <kbd>Q</kbd>}
       </button>
       <button className="hud-pause" onClick={onPause} aria-label="Pause">II</button>
+      <RadioButton />
       <div className="hud-speed"><b>{Math.round(hud.speed)}</b> km/h</div>
       {hud.countdown && <div className={`hud-count${hud.countdown === 'OYA GO!' ? ' go' : hud.countdown.length > 1 ? ' wait' : ''}`} key={`count-${hud.countdown}`}>{hud.countdown}</div>}
       {hud.message && <Message text={hud.message} key={`msg-${hud.messageKey}`} />}
@@ -104,5 +106,25 @@ function ProgressLine({ lap, laps, elimination }: { lap: number; laps: number; e
         ))}
       </div>
     </div>
+  );
+}
+
+/** Turns the race radio on or off. Tapping it is a user gesture, so it also starts the stream if autoplay was refused. */
+function RadioButton() {
+  const status = useSyncExternalStore(onRadioStatus, radioStatus);
+  const setSetting = useGame(s => s.setSetting);
+  const on = status === 'playing' || status === 'loading';
+  const toggle = () => {
+    if (on) { stopRadio(); setSetting('radio', false); } else { startRadio(); setSetting('radio', true); }
+  };
+  return (
+    <button className={`hud-radio${on ? ' on' : ''}${status === 'failed' ? ' failed' : ''}`} onClick={toggle}
+      aria-pressed={on} aria-label={on ? `Turn off ${radioName()}` : `Play ${radioName()}`}
+      title={status === 'failed' ? `${radioName()} won't connect` : radioName()}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="8" width="18" height="12" rx="2.5" /><path d="M7 8l9-5M8 14h5M16.5 14h.01M16.5 17h.01" />
+        {!on && <path d="M3 3l18 18" />}
+      </svg>
+    </button>
   );
 }

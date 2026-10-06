@@ -375,6 +375,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   pointer-events: auto; top: calc(10px + var(--safe-t)); right: calc(12px + var(--safe-r)); width: 44px; height: 44px;
   border-radius: 50%; border: 2px solid var(--ink); background: var(--chip); color: var(--ink); font-family: Archivo, sans-serif; font-weight: 900; cursor: pointer;
 }
+.hud-radio {
+  pointer-events: auto; top: calc(10px + var(--safe-t)); right: calc(64px + var(--safe-r)); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 2px solid var(--ink); background: var(--chip); color: var(--ink); cursor: pointer;
+}
+.hud-radio.on { background: #bfe8c9; }
+.hud-radio.failed { background: #f3c3bd; }
 .hud-item {
   pointer-events: auto; top: 50%; right: calc(14px + var(--safe-r)); transform: translateY(-50%);
   width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--ink); background: rgba(255, 250, 240, .85);

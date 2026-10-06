@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { useGame } from './game/store';
 import { setSoundEnabled, unlockAudio } from './game/audio';
+import { setRadioMuted } from './game/radio';
 import { startKeyboard } from './game/input';
 import { Menu } from './ui/Menu';
 import { Garage } from './ui/Garage';
@@ -32,7 +33,7 @@ export function App() {
   useEffect(() => { prefetchRace(); }, []);
   // A friend's invite link (?room=CODE) lands straight on the join screen.
   useEffect(() => { if (new URLSearchParams(location.search).has('room')) useGame.getState().setScreen('online'); }, []);
-  useEffect(() => { setSoundEnabled(sound); }, [sound]);
+  useEffect(() => { setSoundEnabled(sound); setRadioMuted(!sound); }, [sound]);
   useEffect(() => {
     // Browsers only allow audio after a user gesture.
     const unlock = () => unlockAudio();

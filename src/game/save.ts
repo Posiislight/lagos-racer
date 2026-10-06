@@ -12,7 +12,7 @@ import { sanitizeUpgrades, type UpgradeMap } from './upgrades';
  */
 export type Quality = 'low' | 'medium' | 'high';
 /** quality is the level in use; with autoQuality on, the race lowers it when the device can't keep up. */
-export type Settings = { quality: Quality; autoQuality: boolean; sound: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
+export type Settings = { quality: Quality; autoQuality: boolean; sound: boolean; radio: boolean; steering: 'buttons' | 'tilt'; invertTilt: boolean; showFps: boolean };
 
 export type Saved = {
   settings: Settings;
@@ -54,7 +54,7 @@ export const SAVE_KEY = 'lagos-racer:v2';
 const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
-  settings: { quality: 'high', autoQuality: false, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
+  settings: { quality: 'high', autoQuality: false, sound: true, radio: true, steering: 'buttons', invertTilt: false, showFps: false },
   coins: 0, best: {}, races: 0, vehicle: 'danfo', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, gemsClaimed: 0, coinsClaimed: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 

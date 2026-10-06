@@ -1,4 +1,5 @@
 import { SOUNDS, type SoundName } from '../config/sounds';
+import { AMBIENCE_UNDER_RADIO } from '../config/radio';
 import { createSampleStore } from './audioLogic';
 
 /**
@@ -14,7 +15,8 @@ let engineBus: GainNode | null = null;
 let enabled = true;
 const store = createSampleStore();
 
-const AMBIENCE_LEVEL = 0.35;
+const AMBIENCE_FULL = 0.35;
+let ambienceLevel = AMBIENCE_FULL;
 
 export function setSoundEnabled(on: boolean) {
   enabled = on;
@@ -29,7 +31,7 @@ export function unlockAudio() {
   master = ctx.createGain();
   master.gain.value = enabled ? 0.7 : 0;
   master.connect(ctx.destination);
-  ambienceBus = ctx.createGain(); ambienceBus.gain.value = AMBIENCE_LEVEL; ambienceBus.connect(master);
+  ambienceBus = ctx.createGain(); ambienceBus.gain.value = ambienceLevel; ambienceBus.connect(master);
   sfxBus = ctx.createGain(); sfxBus.connect(master);
   engineBus = ctx.createGain(); engineBus.connect(master);
   loadSounds();
@@ -156,13 +158,19 @@ function bleat(start: number) {
   o.start(start); lfo.start(start); o.stop(start + 0.75); lfo.stop(start + 0.75);
 }
 
+/** Keep the street bed quieter while the radio is on, like hearing it from a passing danfo. */
+export function setAmbienceUnderRadio(on: boolean) {
+  ambienceLevel = on ? AMBIENCE_UNDER_RADIO : AMBIENCE_FULL;
+  if (ctx && ambienceBus) ambienceBus.gain.setTargetAtTime(ambienceLevel, ctx.currentTime, 0.3);
+}
+
 /** Lower the street ambience for a moment so a big sound reads clearly. */
 export function duck(seconds: number) {
   if (!ctx || !ambienceBus) return;
   const t = ctx.currentTime, g = ambienceBus.gain;
   g.cancelScheduledValues(t);
-  g.setTargetAtTime(AMBIENCE_LEVEL * 0.55, t, 0.05);
-  g.setTargetAtTime(AMBIENCE_LEVEL, t + seconds, 0.3);
+  g.setTargetAtTime(ambienceLevel * 0.55, t, 0.05);
+  g.setTargetAtTime(ambienceLevel, t + seconds, 0.3);
 }
 
 /** The Lagos street bed: a recording if there is one, else murmur plus the odd distant horn ping. Idempotent. */

@@ -1,3 +1,4 @@
+import { radioName } from '../game/radio';
 import { useGame } from '../game/store';
 import { enableTilt } from '../game/input';
 import { useIsTouch } from './TouchControls';
@@ -52,6 +53,10 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <label className="toggle">
           <input type="checkbox" checked={settings.sound} onChange={e => setSetting('sound', e.target.checked)} />
           <span>Sound</span>
+        </label>
+        <label className="toggle">
+          <input type="checkbox" checked={settings.radio} onChange={e => setSetting('radio', e.target.checked)} />
+          <span>Radio in races ({radioName()}, uses mobile data)</span>
         </label>
         <button className="btn primary" onClick={onClose}>Done</button>
       </div>
