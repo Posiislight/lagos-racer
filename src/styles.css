@@ -314,8 +314,16 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .lobby .btn.quick-vote { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
 .lobby .btn.quick-vote.on { background: #bfe8c9; border-color: var(--green); }
 @container (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
+/* Upright/narrow: rows size to their content so the page scrolls instead of clipping the player list. */
+.lobby { grid-auto-rows: max-content; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.lobby .card { flex-shrink: 0; }
 @container (max-height: 480px) {
   .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
+  /* Landscape phone: players on one side, ride + voice + ready on the other, each column scrolling on its own. */
+  .lobby { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-auto-rows: auto; overflow: hidden; gap: 10px; }
+  .lobby .card { min-height: 0; max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 10px 14px; gap: 6px; }
+  .lobby .eyebrow { margin-top: 6px; }
+  .lobby .btn { min-height: 40px; padding-top: 6px; padding-bottom: 6px; }
   .online-card .muted { display: none; }
   /* Landscape phone: two columns so nickname, choices and Back fit without scrolling. */
   .online-card { width: min(720px, 100%); gap: 6px; padding: 10px 14px; }
