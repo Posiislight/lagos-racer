@@ -30,6 +30,8 @@ export type Saved = {
   premium: number;
   /** How many of the Gems this phone bought with real money (the server's lifetime total for its buyer id) have been added to `premium` already. Not synced. */
   gemsClaimed: number;
+  /** The same for in-game naira bought with real money (added to `coins`). Not synced. */
+  coinsClaimed: number;
   /** Bought paints as `vehicle/paint` keys (the usual paint of each vehicle is always owned). */
   ownedPaints: string[];
   /** Rewarded ads watched toward unlocking a locked vehicle. */
@@ -53,7 +55,7 @@ const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
   settings: { quality: 'high', autoQuality: false, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'danfo', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, gemsClaimed: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
+  coins: 0, best: {}, races: 0, vehicle: 'danfo', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, gemsClaimed: 0, coinsClaimed: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -127,6 +129,7 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     ownedPaints,
     premium: Math.max(0, Math.floor(num(raw.premium, 0))),
     gemsClaimed: Math.max(0, Math.floor(num(raw.gemsClaimed, 0))),
+    coinsClaimed: Math.max(0, Math.floor(num(raw.coinsClaimed, 0))),
     adViews: sanitizeAdViews(raw.adViews),
     itemHints: num(raw.itemHints, 0),
     // A driver the campaign has not unlocked yet falls back to the default.

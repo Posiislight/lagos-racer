@@ -21,8 +21,10 @@ describe('payments client', () => {
   });
 
   it('reads the verified status and the lifetime total', async () => {
-    expect(await make(reply(200, { status: 'credited', total: 100 })).verify('ref-1')).toEqual({ status: 'credited', total: 100 });
-    expect(await make(reply(200, { total: 300 })).total()).toBe(300);
+    expect(await make(reply(200, { status: 'credited', total: 100, coins: 250_000 })).verify('ref-1')).toEqual({ status: 'credited', total: 100, coins: 250_000 });
+    expect(await make(reply(200, { status: 'credited', total: 100 })).verify('ref-1')).toEqual({ status: 'credited', total: 100, coins: 0 });
+    expect(await make(reply(200, { total: 300, coins: 1_000_000 })).total()).toEqual({ gems: 300, coins: 1_000_000 });
+    expect(await make(reply(200, { total: 300 })).total()).toEqual({ gems: 300, coins: 0 });
     expect(await make(reply(200, { total: 'x' })).total()).toBeNull();
   });
 });

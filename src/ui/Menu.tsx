@@ -10,8 +10,8 @@ import { Settings } from './Settings';
 import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
 import { SyncChip } from './SyncManager';
-import { BuyGems } from './BuyGems';
-import { GemIcon } from './GemIcon';
+import { BuyPacks } from './BuyPacks';
+import { GemIcon, NairaIcon } from './GemIcon';
 import { claimPurchases, usePayNote } from './purchases';
 import { referenceFromSearch } from '../game/payments';
 import { MENU_TAGLINE, menuCredit } from './menuText';
@@ -41,7 +41,7 @@ export function Menu() {
   const { vehicle, coins, premium, awardAdGems, unlocked, setScreen, paint, driver, onboarded, races, campaign, finishOnboarding } = useGame();
   const [howTo, setHowTo] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [shop, setShop] = useState(false);
+  const [shop, setShop] = useState<'gems' | 'naira' | null>(null);
   const payNote = usePayNote(s => s.note);
   // Coming back from Paystack's checkout: confirm the payment and add the Gems.
   useEffect(() => { if (referenceFromSearch(location.search)) void claimPurchases(); }, []);
@@ -63,8 +63,8 @@ export function Menu() {
           <h1>LAGOS RACER</h1>
         </div>
         <div className="menu-corner">
-          <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
-          <button className="coins premium gems" aria-label={`Get ${PREMIUM_LABEL}, you have ${premium}`} onClick={() => setShop(true)}><GemIcon /> {premium} +</button>
+          <button className="coins gems" aria-label={`Get naira, you have ${coins}`} onClick={() => setShop('naira')}>{formatNaira(coins)} +</button>
+          <button className="coins premium gems" aria-label={`Get ${PREMIUM_LABEL}, you have ${premium}`} onClick={() => setShop('gems')}><GemIcon /> {premium} +</button>
           <button className="btn small garage-btn" onClick={() => setScreen('garage')}>
             Garage{garageHint && <i className="hint-dot" role="img" aria-label="something you can afford" />}
           </button>
@@ -104,13 +104,15 @@ export function Menu() {
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
           <div className="card modal-card">
             <div className="shop-head">
-              <h2 id="shop-title"><GemIcon size="1.1em" /> {premium}<span className="sr-only"> {PREMIUM_LABEL}</span></h2>
-              <button className="icon-btn" aria-label="Close" onClick={() => setShop(false)}>
+              {shop === 'gems'
+                ? <h2 id="shop-title"><GemIcon size="1.1em" /> {premium}<span className="sr-only"> {PREMIUM_LABEL}</span></h2>
+                : <h2 id="shop-title"><NairaIcon size="1.1em" /> {formatNaira(coins)}<span className="sr-only"> naira</span></h2>}
+              <button className="icon-btn" aria-label="Close" onClick={() => setShop(null)}>
                 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
               </button>
             </div>
-            <BuyGems />
-            {adsAvailable() && (
+            <BuyPacks kind={shop} />
+            {shop === 'gems' && adsAvailable() && (
               <button className="gem-ad" disabled={adRunning} onClick={watchForGems} aria-label={`Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}>
                 <span className="gem-ad-row">
                   <svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="15" rx="3" fill="#fff" stroke="currentColor" strokeWidth="2" /><path d="M10.5 5.5l6 3.5-6 3.5z" fill="currentColor" /><path d="M8 20h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>

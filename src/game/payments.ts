@@ -26,19 +26,20 @@ export function createPayments(deps: PaymentsDeps) {
   }
 
   return {
-    /** Starts a Paystack checkout for a Gem pack: the page to send the player to, or null if it could not start. */
+    /** Starts a Paystack checkout for a Gem or naira pack: the page to send the player to, or null if it could not start. */
     async checkout(pack: string, email: string): Promise<string | null> {
       const r = await call<{ url?: string }>('/pay/init', { method: 'POST', body: JSON.stringify({ pack, email }) });
       return typeof r?.url === 'string' ? r.url : null;
     },
     /** Asks the server to confirm a payment the player has just made. */
-    async verify(reference: string): Promise<{ status: VerifyStatus; total: number } | null> {
-      return call(`/pay/verify?reference=${encodeURIComponent(reference)}`);
+    async verify(reference: string): Promise<{ status: VerifyStatus; total: number; coins: number } | null> {
+      const r = await call<{ status: VerifyStatus; total: number; coins?: number }>(`/pay/verify?reference=${encodeURIComponent(reference)}`);
+      return r && { status: r.status, total: r.total, coins: typeof r.coins === 'number' ? r.coins : 0 };
     },
-    /** Every Gem this phone has ever bought, or null when it could not be fetched. */
-    async total(): Promise<number | null> {
-      const r = await call<{ total?: number }>('/pay/total');
-      return typeof r?.total === 'number' ? r.total : null;
+    /** Every Gem and every in-game naira this phone has ever bought, or null when it could not be fetched. */
+    async total(): Promise<{ gems: number; coins: number } | null> {
+      const r = await call<{ total?: number; coins?: number }>('/pay/total');
+      return typeof r?.total === 'number' ? { gems: r.total, coins: typeof r.coins === 'number' ? r.coins : 0 } : null;
     },
   };
 }

@@ -189,6 +189,14 @@ describe('premium currency', () => {
     expect(state().premium).toBe(3 + AD_GEMS);
   });
 
+  it('claimPurchasedNaira adds bought naira to coins once', () => {
+    useGame.setState({ coins: 5, coinsClaimed: 0 });
+    expect(state().claimPurchasedNaira(250_000)).toBe(250_000);
+    expect([state().coins, state().coinsClaimed]).toEqual([250_005, 250_000]);
+    expect(state().claimPurchasedNaira(250_000)).toBe(0);
+    expect(state().claimPurchasedNaira(1_250_000)).toBe(1_000_000);
+  });
+
   it('claimPurchasedGems adds only what has not been claimed, so a repeat or a stale total adds nothing', () => {
     useGame.setState({ premium: 10, gemsClaimed: 0 });
     expect(state().claimPurchasedGems(100)).toBe(100);

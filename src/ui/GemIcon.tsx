@@ -8,3 +8,14 @@ export function GemIcon({ size = '1.1em' }: { size?: string }) {
     </svg>
   );
 }
+
+/** The in-game naira symbol: a gold coin with a naira sign. */
+export function NairaIcon({ size = '1.1em' }: { size?: string }) {
+  return (
+    <svg className="gem-icon" width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <circle cx="16" cy="16" r="13" fill="#f5b400" stroke="#2a2118" strokeWidth="2" />
+      <circle cx="16" cy="16" r="9.5" fill="none" stroke="#2a2118" strokeWidth="1" opacity=".35" />
+      <path d="M11 22V10l10 12V10M9 14h14M9 18h14" fill="none" stroke="#2a2118" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
