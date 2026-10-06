@@ -10,6 +10,8 @@ import { Settings } from './Settings';
 import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
 import { SyncChip } from './SyncManager';
+import { BuyGems } from './BuyGems';
+import { usePayNote } from './purchases';
 import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
@@ -38,6 +40,7 @@ export function Menu() {
   const [howTo, setHowTo] = useState(false);
   const [settings, setSettings] = useState(false);
   const [shop, setShop] = useState(false);
+  const payNote = usePayNote(s => s.note);
   const [adRunning, setAdRunning] = useState(false);
   const watchForGems = async () => {
     setAdRunning(true);
@@ -68,6 +71,7 @@ export function Menu() {
             </svg>
           </button>
           <SyncChip />
+          {payNote && <span className="sync-chip" role="status">{payNote}</span>}
           <button className="btn small" onClick={() => setHowTo(true)} aria-label="How to play">?</button>
         </div>
       </header>
@@ -97,6 +101,7 @@ export function Menu() {
           <div className="card modal-card">
             <h2 id="shop-title">Get {PREMIUM_LABEL}</h2>
             <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. The BRT costs naira.</p>
+            <BuyGems />
             {adsAvailable() && (
               <button className="btn primary" disabled={adRunning} onClick={watchForGems}>
                 {adRunning ? 'Playing ad…' : `Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}

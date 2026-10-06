@@ -89,6 +89,8 @@ export type State = Saved & {
   addAdView: (v: VehicleId) => number;
   /** One rewarded ad finished from the Get Gems shop: adds AD_GEMS to the balance and returns the amount. */
   awardAdGems: () => number;
+  /** Adds the Gems bought with real money that this phone has not had yet (the server's lifetime `total` minus what was claimed). Returns how many were added. */
+  claimPurchasedGems: (total: number) => number;
   setDriver: (d: DriverId) => void;
   /** The first-race how-to card was seen or skipped. */
   finishOnboarding: () => void;
@@ -164,6 +166,13 @@ export const useGame = create<State>((set, get) => ({
     set(s => ({ premium: s.premium + AD_GEMS }));
     save();
     return AD_GEMS;
+  },
+  claimPurchasedGems: total => {
+    const s = get(), fresh = Math.floor(total) - s.gemsClaimed;
+    if (!(fresh > 0)) return 0;
+    set({ premium: s.premium + fresh, gemsClaimed: s.gemsClaimed + fresh });
+    save();
+    return fresh;
   },
   setDriver: driver => {
     if (!driverAvailable(driver, get().campaign.cleared)) return;
@@ -244,7 +253,7 @@ export function snapshot(): Saved {
   const s = useGame.getState();
   return {
     settings: s.settings, coins: s.coins, best: s.best, races: s.races, vehicle: s.vehicle, unlocked: s.unlocked, upgrades: s.upgrades,
-    accountPromptDismissed: s.accountPromptDismissed, onboarded: s.onboarded, paint: s.paint, premium: s.premium, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
+    accountPromptDismissed: s.accountPromptDismissed, onboarded: s.onboarded, paint: s.paint, premium: s.premium, gemsClaimed: s.gemsClaimed, ownedPaints: s.ownedPaints, adViews: s.adViews, itemHints: s.itemHints, driver: s.driver, track: s.track,
     campaign: s.campaign, roomEarned: s.roomEarned,
   };
 }

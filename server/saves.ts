@@ -54,13 +54,13 @@ export type SaveDeps = {
 
 const MAX_BODY = 64 * 1024;
 
-function send(res: ServerResponse, status: number, body?: unknown) {
+export function send(res: ServerResponse, status: number, body?: unknown) {
   if (body === undefined) return void res.writeHead(status).end();
   res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
 }
 
 /** The request body as text, or null once it passes the cap. */
-function readBody(req: IncomingMessage): Promise<string | null> {
+export function readBody(req: IncomingMessage): Promise<string | null> {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks: Buffer[] = [];

@@ -4,7 +4,7 @@ import { defaultSave, normaliseSave, type Saved } from './save';
 export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'onboarded' | 'itemHints'>;
 
 export const SYNCED_KEYS = [
-  'coins', 'best', 'races', 'vehicle', 'unlocked', 'upgrades', 'paint', 'premium', 'ownedPaints',
+  'coins', 'best', 'races', 'vehicle', 'unlocked', 'upgrades', 'paint', 'premium', 'gemsClaimed', 'ownedPaints',
   'adViews', 'driver', 'track', 'campaign', 'roomEarned',
 ] as const satisfies readonly (keyof SyncedSave)[];
 

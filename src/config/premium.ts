@@ -10,3 +10,8 @@ export const PAINT_PRICE = 100;
 
 /** Gems a player gets for watching one rewarded ad to the end. */
 export const AD_GEMS = 5;
+
+/** A Gem pack bought with real naira through Paystack. The server prices from this table, never from the request. */
+export type GemPack = { id: string; gems: number; naira: number };
+export const GEM_PACKS: GemPack[] = [{ id: 'gems-100', gems: 100, naira: 500 }];
+export const gemPackById = (id: unknown): GemPack | undefined => GEM_PACKS.find(p => p.id === id);

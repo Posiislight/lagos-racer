@@ -10,7 +10,7 @@ const adsenseTestMode = (): Plugin => {
     configResolved(config) {
       live = config.command === 'build' && config.mode === 'production' && loadEnv(config.mode, process.cwd(), 'VITE_').VITE_ADS_LIVE === '1';
     },
-    transformIndexHtml: html => live ? html : html.replace('data-lagos-ads="1"', 'data-lagos-ads="1" data-adbreak-test="on"'),
+    transformIndexHtml: html => live ? html : html.replace('crossorigin="anonymous"', 'crossorigin="anonymous" data-adbreak-test="on"'),
   };
 };
 

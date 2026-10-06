@@ -1,11 +1,12 @@
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { MAX_MESSAGE_BYTES } from '../src/net/protocol';
-import { verifyToken } from '@clerk/backend';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Pool } from 'pg';
 import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
 import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
+import { PgPurchaseStore, createPaystackApi, handlePayRequest, type PayDeps } from './paystack';
 
 // Error reporting runs on Render (which sets RENDER) or wherever SENTRY_DSN is set, so local dev sends nothing. The uncaught-exception integrations are left out because the
 // handlers below already keep the process alive; they report to Sentry themselves.
@@ -44,6 +45,23 @@ const saveDeps: SaveDeps = {
     try { return (await verifyToken(token, { secretKey })).sub; } catch { return null; }
   },
 };
+// Gem purchases (Paystack) share the database and Clerk. Without PAYSTACK_SECRET_KEY the /pay routes answer 503 and nothing can be bought.
+const payDeps: PayDeps = {
+  store: null,
+  paystack: process.env.PAYSTACK_SECRET_KEY ? createPaystackApi(process.env.PAYSTACK_SECRET_KEY) : null,
+  secretKey: process.env.PAYSTACK_SECRET_KEY ?? null,
+  verify: saveDeps.verify,
+  allowedOrigins: saveDeps.allowedOrigins,
+  emailFor: async (userId) => {
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) return null;
+    try {
+      const user = await createClerkClient({ secretKey }).users.getUser(userId);
+      return (user.emailAddresses.find(e => e.id === user.primaryEmailAddressId) ?? user.emailAddresses[0])?.emailAddress ?? null;
+    } catch { return null; }
+  },
+};
+if (process.env.PAYSTACK_SECRET_KEY && !process.env.DATABASE_URL) console.warn('PAYSTACK_SECRET_KEY is set but DATABASE_URL is not: every /pay request will be refused');
 if (process.env.DATABASE_URL && !process.env.CLERK_SECRET_KEY) console.warn('DATABASE_URL is set but CLERK_SECRET_KEY is not: every /save request will be refused');
 if (process.env.DATABASE_URL) {
   const pg = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false } });
@@ -51,8 +69,9 @@ if (process.env.DATABASE_URL) {
   pg.on('error', (err) => console.error('pg pool error', err));
   const store = new PgSaveStore(pg);
   // Postgres may come up after this service does: keep trying until the table is ready (saves answer 503 meanwhile).
-  const init = () => store.ensureSchema().then(
-    () => { saveDeps.store = store; console.log('cloud saves ready'); },
+  const purchases = new PgPurchaseStore(pg);
+  const init = () => Promise.all([store.ensureSchema(), purchases.ensureSchema()]).then(
+    () => { saveDeps.store = store; payDeps.store = purchases; console.log('cloud saves ready'); },
     (err) => { console.error('cloud saves unavailable, retrying in 10s', err.message); setTimeout(init, 10_000); },
   );
   void init();
@@ -66,6 +85,12 @@ const http = createServer((req, res) => {
     handleSaveRequest(req, res, saveDeps).catch((err) => {
       console.error('save request failed', err);
       Sentry.captureException(err, { tags: { where: 'save' } });
+      if (!res.headersSent) res.writeHead(500).end();
+    });
+  } else if (path.startsWith('/pay/')) {
+    handlePayRequest(req, res, payDeps).catch((err) => {
+      console.error('pay request failed', err);
+      Sentry.captureException(err, { tags: { where: 'pay' } });
       if (!res.headersSent) res.writeHead(500).end();
     });
   } else {

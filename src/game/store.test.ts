@@ -189,6 +189,16 @@ describe('premium currency', () => {
     expect(state().premium).toBe(3 + AD_GEMS);
   });
 
+  it('claimPurchasedGems adds only what has not been claimed, so a repeat or a stale total adds nothing', () => {
+    useGame.setState({ premium: 10, gemsClaimed: 0 });
+    expect(state().claimPurchasedGems(100)).toBe(100);
+    expect([state().premium, state().gemsClaimed]).toEqual([110, 100]);
+    expect(state().claimPurchasedGems(100)).toBe(0);
+    expect(state().claimPurchasedGems(40)).toBe(0);
+    expect(state().claimPurchasedGems(200)).toBe(100);
+    expect([state().premium, state().gemsClaimed]).toEqual([210, 200]);
+  });
+
   it('buyPaint does nothing when short, for the free paint, or for an unknown paint', () => {
     useGame.setState({ premium: 99 });
     expect(state().buyPaint('okada', 'red')).toBe(false);
