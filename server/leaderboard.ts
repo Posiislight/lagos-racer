@@ -1,6 +1,10 @@
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Pool } from 'pg';
 import type { VehicleId } from '../src/config/vehicles';
-import { weekStart, type Entry, type Row } from '../src/game/leaderboard';
+import { TRACKS } from '../src/config/tracks';
+import { BOARD_SIZE, CACHE_MS } from '../src/config/leaderboard';
+import { mergeBoard, playerKey, weekStart, type Entry, type Row } from '../src/game/leaderboard';
+import { send } from './saves';
 
 /** A fake player's line: one time on one track and the points for one week. */
 export type SeedRow = { key: string; name: string; vehicle: VehicleId; trackId: string; timeMs: number; week: string; points: number };
@@ -107,7 +111,7 @@ export class PgLeaderboardStore implements LeaderboardStore {
   }
 
   async weekly(week: string): Promise<Row[]> {
-    const r = await this.pool.query('select player_key, name, points, is_seed from weekly_points where week_start = $1', [week]);
+    const r = await this.pool.query('select player_key, name, points, is_seed from weekly_points where week_start = $1 order by updated_at', [week]);
     return r.rows.map(x => ({ key: x.player_key, name: x.name, value: x.points, seed: x.is_seed }));
   }
 
@@ -133,4 +137,67 @@ export class PgLeaderboardStore implements LeaderboardStore {
     await this.pool.query('delete from best_times where is_seed');
     await this.pool.query('delete from weekly_points where is_seed');
   }
+}
+
+export type LeaderboardDeps = { store: LeaderboardStore | null; allowedOrigins: string[]; now?: () => number };
+
+type Ranked = { rank: number; row: Row };
+type Cached = { at: number; rows: Row[] };
+
+// One cache per set of deps: a board is reused for CACHE_MS so a busy menu does not hammer Postgres.
+const caches = new WeakMap<LeaderboardDeps, Map<string, Cached>>();
+
+async function board(deps: LeaderboardDeps, id: string, load: () => Promise<Row[]>, order: 'asc' | 'desc'): Promise<Row[]> {
+  const cache = caches.get(deps) ?? caches.set(deps, new Map()).get(deps)!;
+  const now = (deps.now ?? Date.now)();
+  const hit = cache.get(id);
+  if (hit && now - hit.at < CACHE_MS) return hit.rows;
+  const rows = mergeBoard(await load(), order, Infinity);
+  cache.set(id, { at: now, rows });
+  return rows;
+}
+
+/** Where the named player stands in the whole board, not just its top rows. */
+function standing(rows: Row[], name: string | null): Ranked | null {
+  const key = name ? playerKey(name) : '';
+  if (!key) return null;
+  const i = rows.findIndex(r => r.key === key);
+  return i < 0 ? null : { rank: i + 1, row: rows[i] };
+}
+
+/** `GET /leaderboard/weekly?name=` and `GET /leaderboard/times?track=&name=`: public, read-only, and cached for 30 s. */
+export async function handleLeaderboardRequest(req: IncomingMessage, res: ServerResponse, deps: LeaderboardDeps): Promise<void> {
+  const origin = req.headers.origin;
+  if (origin && deps.allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') return send(res, 204);
+  if (req.method !== 'GET') return send(res, 405);
+  const url = new URL(req.url ?? '', 'http://x');
+  const name = url.searchParams.get('name');
+  const store = deps.store;
+  try {
+    if (url.pathname === '/leaderboard/weekly') {
+      if (!store) return send(res, 503);
+      const now = (deps.now ?? Date.now)();
+      const week = weekStart(now);
+      const rows = await board(deps, `weekly:${week}`, () => store.weekly(week), 'desc');
+      const lastWeek = weekStart(now - 7 * 24 * 60 * 60 * 1000);
+      const last = await board(deps, `weekly:${lastWeek}`, () => store.weekly(lastWeek), 'desc');
+      return send(res, 200, { week, rows: rows.slice(0, BOARD_SIZE), me: standing(rows, name), lastWinner: last[0]?.name ?? null });
+    }
+    if (url.pathname === '/leaderboard/times') {
+      if (!store) return send(res, 503);
+      const track = url.searchParams.get('track') ?? '';
+      if (!TRACKS.some(t => t.id === track)) return send(res, 200, { track, rows: [], me: null });
+      const rows = await board(deps, `times:${track}`, () => store.times(track), 'asc');
+      return send(res, 200, { track, rows: rows.slice(0, BOARD_SIZE), me: standing(rows, name) });
+    }
+  } catch (err) {
+    console.error('leaderboard read failed', err);
+    return send(res, 503);
+  }
+  return send(res, 404);
 }

@@ -7,7 +7,7 @@ import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
 import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
 import { PgPurchaseStore, createPaystackApi, handlePayRequest, type PayDeps } from './paystack';
-import { PgLeaderboardStore, type LeaderboardStore } from './leaderboard';
+import { PgLeaderboardStore, handleLeaderboardRequest, type LeaderboardDeps, type LeaderboardStore } from './leaderboard';
 import { entriesFromResults } from '../src/game/leaderboard';
 
 // Error reporting runs on Render (which sets RENDER) or wherever SENTRY_DSN is set, so local dev sends nothing. The uncaught-exception integrations are left out because the
@@ -65,6 +65,8 @@ const payDeps: PayDeps = {
   secretKey: process.env.PAYSTACK_SECRET_KEY ?? null,
   allowedOrigins: saveDeps.allowedOrigins,
 };
+// The boards are public reads; without a database /leaderboard answers 503.
+const leaderboardDeps: LeaderboardDeps = { store: null, allowedOrigins: saveDeps.allowedOrigins };
 if (process.env.PAYSTACK_SECRET_KEY && !process.env.DATABASE_URL) console.warn('PAYSTACK_SECRET_KEY is set but DATABASE_URL is not: every /pay request will be refused');
 if (process.env.DATABASE_URL && !process.env.CLERK_SECRET_KEY) console.warn('DATABASE_URL is set but CLERK_SECRET_KEY is not: every /save request will be refused');
 if (process.env.DATABASE_URL) {
@@ -76,7 +78,7 @@ if (process.env.DATABASE_URL) {
   const purchases = new PgPurchaseStore(pg);
   const board = new PgLeaderboardStore(pg);
   const init = () => Promise.all([store.ensureSchema(), purchases.ensureSchema(), board.ensureSchema()]).then(
-    () => { saveDeps.store = store; payDeps.store = purchases; leaderboard = board; console.log('cloud saves and leaderboard ready'); },
+    () => { saveDeps.store = store; payDeps.store = purchases; leaderboard = board; leaderboardDeps.store = board; console.log('cloud saves and leaderboard ready'); },
     (err) => { console.error('cloud saves unavailable, retrying in 10s', err.message); setTimeout(init, 10_000); },
   );
   void init();
@@ -96,6 +98,12 @@ const http = createServer((req, res) => {
     handlePayRequest(req, res, payDeps).catch((err) => {
       console.error('pay request failed', err);
       Sentry.captureException(err, { tags: { where: 'pay' } });
+      if (!res.headersSent) res.writeHead(500).end();
+    });
+  } else if (path.startsWith('/leaderboard/')) {
+    handleLeaderboardRequest(req, res, leaderboardDeps).catch((err) => {
+      console.error('leaderboard request failed', err);
+      Sentry.captureException(err, { tags: { where: 'leaderboard' } });
       if (!res.headersSent) res.writeHead(500).end();
     });
   } else {
