@@ -30,12 +30,12 @@ export interface GoogleAdOptions {
 /** Adds the AdSense script once, on first use, so it costs nothing until a player asks for an ad. */
 export function loadAdsScript(client: string, testMode: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (document.querySelector('script[data-lagos-ads]')) return resolve();
+    // The tag may already be in index.html (AdSense wants it there), or added by an earlier call.
+    if (document.querySelector(`script[src^="${SCRIPT}"]`)) return resolve();
     const s = document.createElement('script');
     s.async = true;
     s.crossOrigin = 'anonymous';
     s.src = `${SCRIPT}?client=${encodeURIComponent(client)}`;
-    s.dataset.lagosAds = '1';
     s.setAttribute('data-ad-client', client);
     if (testMode) s.setAttribute('data-adbreak-test', 'on');
     s.onload = () => resolve();

@@ -28,6 +28,8 @@ export type Saved = {
   paint: Partial<Record<VehicleId, string>>;
   /** Premium currency balance. */
   premium: number;
+  /** How many of the Gems bought with real money (the server's lifetime total) have been added to `premium` already. */
+  gemsClaimed: number;
   /** Bought paints as `vehicle/paint` keys (the usual paint of each vehicle is always owned). */
   ownedPaints: string[];
   /** Rewarded ads watched toward unlocking a locked vehicle. */
@@ -51,7 +53,7 @@ const OLD_KEY = 'lagos-racer:v1';
 
 export const defaultSave = (): Saved => ({
   settings: { quality: 'high', autoQuality: false, sound: true, steering: 'buttons', invertTilt: false, showFps: false },
-  coins: 0, best: {}, races: 0, vehicle: 'danfo', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
+  coins: 0, best: {}, races: 0, vehicle: 'danfo', unlocked: [], upgrades: {}, accountPromptDismissed: false, onboarded: false, paint: {}, premium: 0, gemsClaimed: 0, ownedPaints: [], adViews: {}, itemHints: 0, driver: DEFAULT_DRIVER, track: 'ojuelegba', campaign: { cleared: [], stars: {} }, roomEarned: { day: '', naira: 0 },
 });
 
 const IDS = new Set<string>(VEHICLES.map(v => v.id));
@@ -124,6 +126,7 @@ export function normaliseSave(raw: Record<string, unknown>): Saved {
     paint,
     ownedPaints,
     premium: Math.max(0, Math.floor(num(raw.premium, 0))),
+    gemsClaimed: Math.max(0, Math.floor(num(raw.gemsClaimed, 0))),
     adViews: sanitizeAdViews(raw.adViews),
     itemHints: num(raw.itemHints, 0),
     // A driver the campaign has not unlocked yet falls back to the default.

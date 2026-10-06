@@ -4,11 +4,14 @@ import { paintOf, vehicleById } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
 import { driverById } from '../config/drivers';
 import { formatNaira } from '../config/economy';
-import { PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
+import { AD_GEMS, PAINT_PRICE, PREMIUM_LABEL } from '../config/premium';
+import { adsAvailable, showRewardedAd } from '../game/ads';
 import { Settings } from './Settings';
 import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
 import { SyncChip } from './SyncManager';
+import { BuyGems } from './BuyGems';
+import { usePayNote } from './purchases';
 import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
@@ -33,10 +36,16 @@ export function launchRace(spec: RaceSpec) {
 }
 
 export function Menu() {
-  const { vehicle, coins, premium, unlocked, setScreen, paint, driver, onboarded, races, campaign, finishOnboarding } = useGame();
+  const { vehicle, coins, premium, awardAdGems, unlocked, setScreen, paint, driver, onboarded, races, campaign, finishOnboarding } = useGame();
   const [howTo, setHowTo] = useState(false);
   const [settings, setSettings] = useState(false);
   const [shop, setShop] = useState(false);
+  const payNote = usePayNote(s => s.note);
+  const [adRunning, setAdRunning] = useState(false);
+  const watchForGems = async () => {
+    setAdRunning(true);
+    try { if (await showRewardedAd()) awardAdGems(); } finally { setAdRunning(false); }
+  };
   const v = vehicleById(vehicle), p = paintOf(v, paint[v.id]), d = driverById(driver), credit = menuCredit(TRACKS);
   // The Garage button gets a dot when the player can afford a paint or the BRT.
   const brt = vehicleById('brt').locked;
@@ -62,6 +71,7 @@ export function Menu() {
             </svg>
           </button>
           <SyncChip />
+          {payNote && <span className="sync-chip" role="status">{payNote}</span>}
           <button className="btn small" onClick={() => setHowTo(true)} aria-label="How to play">?</button>
         </div>
       </header>
@@ -90,7 +100,13 @@ export function Menu() {
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
           <div className="card modal-card">
             <h2 id="shop-title">Get {PREMIUM_LABEL}</h2>
-            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. The BRT costs naira. Gem packs are coming soon.</p>
+            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. The BRT costs naira.</p>
+            <BuyGems />
+            {adsAvailable() && (
+              <button className="btn primary" disabled={adRunning} onClick={watchForGems}>
+                {adRunning ? 'Playing ad…' : `Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}
+              </button>
+            )}
             <button className="btn" onClick={() => { setShop(false); setScreen('garage'); }}>Go to Garage</button>
             <button className="btn primary" onClick={() => setShop(false)}>Close</button>
           </div>

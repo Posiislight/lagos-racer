@@ -1,0 +1,205 @@
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Pool } from 'pg';
+import { gemPackById } from '../src/config/premium';
+import { readBody, send } from './saves';
+
+/** The part of a Paystack transaction we read (from verify, or from a charge.success webhook). */
+export type PaystackTxn = {
+  status: string;
+  reference: string;
+  /** In kobo. */
+  amount: number;
+  currency: string;
+  metadata?: { userId?: unknown; pack?: unknown } | null;
+};
+
+export interface PaystackApi {
+  initialize(p: { email: string; amountKobo: number; reference: string; callbackUrl: string; metadata: { userId: string; pack: string } }): Promise<{ authorization_url: string; reference: string }>;
+  /** The transaction for a reference, or null if Paystack does not know it. */
+  verify(reference: string): Promise<PaystackTxn | null>;
+}
+
+const API = 'https://api.paystack.co';
+
+export function createPaystackApi(secretKey: string, doFetch: typeof fetch = fetch): PaystackApi {
+  const headers = { Authorization: `Bearer ${secretKey}`, 'Content-Type': 'application/json' };
+  return {
+    async initialize({ email, amountKobo, reference, callbackUrl, metadata }) {
+      const res = await doFetch(`${API}/transaction/initialize`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ email, amount: amountKobo, currency: 'NGN', reference, callback_url: callbackUrl, metadata }),
+      });
+      const body = await res.json().catch(() => null) as { status?: boolean; data?: { authorization_url?: string; reference?: string } } | null;
+      if (!res.ok || !body?.status || !body.data?.authorization_url) throw new Error(`paystack initialize failed (${res.status})`);
+      return { authorization_url: body.data.authorization_url, reference: body.data.reference ?? reference };
+    },
+    async verify(reference) {
+      const res = await doFetch(`${API}/transaction/verify/${encodeURIComponent(reference)}`, { headers });
+      if (res.status === 404) return null;
+      const body = await res.json().catch(() => null) as { status?: boolean; data?: PaystackTxn } | null;
+      if (!res.ok) throw new Error(`paystack verify failed (${res.status})`);
+      return body?.status && body.data ? body.data : null;
+    },
+  };
+}
+
+export type Purchase = { reference: string; userId: string; packId: string; gems: number; amountKobo: number };
+
+export interface PurchaseStore {
+  /** Records a paid purchase once per reference. True only for the call that recorded it. */
+  credit(p: Purchase): Promise<boolean>;
+  /** Every Gem this user has ever bought. */
+  total(userId: string): Promise<number>;
+}
+
+export class MemoryPurchaseStore implements PurchaseStore {
+  private rows = new Map<string, Purchase>();
+  async credit(p: Purchase) {
+    if (this.rows.has(p.reference)) return false;
+    this.rows.set(p.reference, p);
+    return true;
+  }
+  async total(userId: string) {
+    let sum = 0;
+    for (const p of this.rows.values()) if (p.userId === userId) sum += p.gems;
+    return sum;
+  }
+}
+
+export class PgPurchaseStore implements PurchaseStore {
+  constructor(private pool: Pool) {}
+
+  async ensureSchema() {
+    await this.pool.query(`create table if not exists gem_purchases (
+      reference text primary key, user_id text not null, pack_id text not null, gems integer not null,
+      amount_kobo integer not null, created_at timestamptz not null default now())`);
+    await this.pool.query('create index if not exists gem_purchases_user on gem_purchases (user_id)');
+  }
+
+  async credit(p: Purchase) {
+    const r = await this.pool.query(
+      'insert into gem_purchases (reference, user_id, pack_id, gems, amount_kobo) values ($1, $2, $3, $4, $5) on conflict do nothing returning reference',
+      [p.reference, p.userId, p.packId, p.gems, p.amountKobo]);
+    return r.rows.length > 0;
+  }
+
+  async total(userId: string) {
+    const r = await this.pool.query('select coalesce(sum(gems), 0)::int as total from gem_purchases where user_id = $1', [userId]);
+    return r.rows[0].total as number;
+  }
+}
+
+export type PayDeps = {
+  store: PurchaseStore | null;
+  /** Null until PAYSTACK_SECRET_KEY is set. */
+  paystack: PaystackApi | null;
+  /** The webhook's HMAC key (the same secret key); null refuses every webhook. */
+  secretKey: string | null;
+  verify: (token: string) => Promise<string | null>;
+  /** The player's email, which Paystack needs on every transaction. */
+  emailFor: (userId: string) => Promise<string | null>;
+  allowedOrigins: string[];
+};
+
+export type Settled = 'credited' | 'already' | 'pending' | 'failed' | 'invalid';
+
+/**
+ * Credits a Paystack transaction to the player named in its metadata, once. The price and the Gems
+ * come from our own pack table, so a payment only counts if it matches that pack exactly.
+ * With `expectUser`, a transaction that belongs to someone else is refused.
+ */
+export async function settle(store: PurchaseStore, txn: PaystackTxn, expectUser?: string): Promise<Settled> {
+  if (txn.status !== 'success') return txn.status === 'failed' || txn.status === 'abandoned' || txn.status === 'reversed' ? 'failed' : 'pending';
+  const pack = gemPackById(txn.metadata?.pack);
+  const userId = txn.metadata?.userId;
+  if (!pack || typeof userId !== 'string' || !userId) return 'invalid';
+  if (expectUser !== undefined && userId !== expectUser) return 'invalid';
+  if (txn.currency !== 'NGN' || txn.amount !== pack.naira * 100) return 'invalid';
+  const fresh = await store.credit({ reference: txn.reference, userId, packId: pack.id, gems: pack.gems, amountKobo: txn.amount });
+  return fresh ? 'credited' : 'already';
+}
+
+const validSignature = (secret: string, raw: string, header: string | string[] | undefined) => {
+  if (typeof header !== 'string') return false;
+  const want = Buffer.from(createHmac('sha512', secret).update(raw).digest('hex'));
+  const got = Buffer.from(header);
+  return got.length === want.length && timingSafeEqual(got, want);
+};
+
+/** Where Paystack sends the player back to: the page that asked, if it is one of ours, else our first origin. */
+const callbackFor = (req: IncomingMessage, allowed: string[]) => {
+  const origin = req.headers.origin;
+  const site = origin && allowed.includes(origin) ? origin : allowed.find(o => o.startsWith('https://')) ?? allowed[0];
+  return `${site}/`;
+};
+
+export async function handlePayRequest(req: IncomingMessage, res: ServerResponse, deps: PayDeps): Promise<void> {
+  const url = new URL(req.url ?? '/', 'http://x');
+  const path = url.pathname;
+  const origin = req.headers.origin;
+  if (origin && deps.allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') return send(res, 204);
+  if (!deps.store) return send(res, 503);
+
+  if (path === '/pay/webhook') {
+    if (req.method !== 'POST') return send(res, 405);
+    if (!deps.secretKey) return send(res, 503);
+    const raw = await readBody(req);
+    if (raw === null) return send(res, 413);
+    // Anyone can post here, so nothing is read until the signature proves it came from Paystack.
+    if (!validSignature(deps.secretKey, raw, req.headers['x-paystack-signature'])) return send(res, 401);
+    let event: { event?: unknown; data?: PaystackTxn };
+    try { event = JSON.parse(raw); } catch { return send(res, 400); }
+    if (event.event === 'charge.success' && event.data) {
+      const outcome = await settle(deps.store, event.data);
+      if (outcome === 'invalid') console.warn(`paystack webhook ${event.data.reference}: does not match a pack, not credited`);
+    }
+    return send(res, 200);
+  }
+
+  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
+  const userId = token ? await deps.verify(token) : null;
+  if (!userId) return send(res, 401);
+
+  if (path === '/pay/total') {
+    if (req.method !== 'GET') return send(res, 405);
+    return send(res, 200, { total: await deps.store.total(userId) });
+  }
+
+  if (path === '/pay/verify') {
+    if (req.method !== 'GET') return send(res, 405);
+    if (!deps.paystack) return send(res, 503);
+    const reference = url.searchParams.get('reference');
+    if (!reference || reference.length > 100) return send(res, 400);
+    const txn = await deps.paystack.verify(reference);
+    if (!txn) return send(res, 404);
+    const status = await settle(deps.store, txn, userId);
+    return send(res, 200, { status, total: await deps.store.total(userId) });
+  }
+
+  if (path === '/pay/init') {
+    if (req.method !== 'POST') return send(res, 405);
+    if (!deps.paystack) return send(res, 503);
+    const text = await readBody(req);
+    if (text === null) return send(res, 413);
+    let body: { pack?: unknown };
+    try { body = JSON.parse(text); } catch { return send(res, 400); }
+    const pack = gemPackById(body?.pack);
+    if (!pack) return send(res, 400);
+    const email = await deps.emailFor(userId);
+    if (!email) return send(res, 422, { error: 'no-email' });
+    const reference = `lr_${randomUUID().replace(/-/g, '')}`;
+    const started = await deps.paystack.initialize({
+      email, amountKobo: pack.naira * 100, reference, callbackUrl: callbackFor(req, deps.allowedOrigins), metadata: { userId, pack: pack.id },
+    });
+    return send(res, 200, { url: started.authorization_url, reference: started.reference });
+  }
+
+  return send(res, 404);
+}

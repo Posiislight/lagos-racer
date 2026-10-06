@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CHAPTER_1 } from '../config/campaign';
+import { AD_GEMS } from '../config/premium';
 import { todayKey } from './save';
 import { useGame } from './store';
 
@@ -180,6 +181,22 @@ describe('premium currency', () => {
     expect(state().paint.okada).toBe('red');
     expect(state().buyPaint('okada', 'red')).toBe(false);
     expect(state().premium).toBe(50);
+  });
+
+  it('awardAdGems adds the ad reward to the balance', () => {
+    useGame.setState({ premium: 3 });
+    expect(state().awardAdGems()).toBe(AD_GEMS);
+    expect(state().premium).toBe(3 + AD_GEMS);
+  });
+
+  it('claimPurchasedGems adds only what has not been claimed, so a repeat or a stale total adds nothing', () => {
+    useGame.setState({ premium: 10, gemsClaimed: 0 });
+    expect(state().claimPurchasedGems(100)).toBe(100);
+    expect([state().premium, state().gemsClaimed]).toEqual([110, 100]);
+    expect(state().claimPurchasedGems(100)).toBe(0);
+    expect(state().claimPurchasedGems(40)).toBe(0);
+    expect(state().claimPurchasedGems(200)).toBe(100);
+    expect([state().premium, state().gemsClaimed]).toEqual([210, 200]);
   });
 
   it('buyPaint does nothing when short, for the free paint, or for an unknown paint', () => {
