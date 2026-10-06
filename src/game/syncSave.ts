@@ -1,10 +1,10 @@
 import { defaultSave, normaliseSave, type Saved } from './save';
 
-/** What follows the account. Settings, the dismissed prompt, the how-to card and the hint counter stay on each phone. */
-export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'onboarded' | 'itemHints'>;
+/** What follows the account. Settings, the dismissed prompt, the how-to card, the hint counter and the count of bought Gems already claimed (purchases belong to the phone that made them) stay on each phone. */
+export type SyncedSave = Omit<Saved, 'settings' | 'accountPromptDismissed' | 'onboarded' | 'itemHints' | 'gemsClaimed'>;
 
 export const SYNCED_KEYS = [
-  'coins', 'best', 'races', 'vehicle', 'unlocked', 'upgrades', 'paint', 'premium', 'gemsClaimed', 'ownedPaints',
+  'coins', 'best', 'races', 'vehicle', 'unlocked', 'upgrades', 'paint', 'premium', 'ownedPaints',
   'adViews', 'driver', 'track', 'campaign', 'roomEarned',
 ] as const satisfies readonly (keyof SyncedSave)[];
 

@@ -7,12 +7,12 @@ import { PREMIUM_LABEL } from '../config/premium';
 export const usePayNote = create<{ note: string; set: (note: string) => void }>(set => ({ note: '', set: note => set({ note }) }));
 
 /**
- * Brings this phone up to date with the Gems the player has bought: confirms a payment they just came
- * back from (the reference in the address), then adds whatever the server says they have bought that
- * this phone has not had yet. Safe to call as often as you like. Returns the Gems added.
+ * Brings this phone up to date with the Gems it has bought: confirms a payment the player just came back
+ * from (the reference in the address), then adds whatever the server says this phone has bought that it
+ * has not had yet. Safe to call as often as you like. Returns the Gems added.
  */
-export async function claimPurchases(getToken: () => Promise<string | null>): Promise<number> {
-  const pay = createPayments({ getToken, fetch: (...a) => fetch(...a) });
+export async function claimPurchases(): Promise<number> {
+  const pay = createPayments({ fetch: (...a) => fetch(...a) });
   const reference = referenceFromSearch(location.search);
   const outcome = reference ? await pay.verify(reference) : null;
   // Only drop the reference once the server has seen it, so an offline return can try again.

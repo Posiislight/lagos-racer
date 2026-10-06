@@ -96,9 +96,6 @@ export type PayDeps = {
   paystack: PaystackApi | null;
   /** The webhook's HMAC key (the same secret key); null refuses every webhook. */
   secretKey: string | null;
-  verify: (token: string) => Promise<string | null>;
-  /** The player's email, which Paystack needs on every transaction. */
-  emailFor: (userId: string) => Promise<string | null>;
   allowedOrigins: string[];
 };
 
@@ -120,6 +117,18 @@ export async function settle(store: PurchaseStore, txn: PaystackTxn, expectUser?
   return fresh ? 'credited' : 'already';
 }
 
+const DEVICE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Who is buying. There are no accounts yet, so a purchase belongs to the random id the phone made for itself
+ * (sent as X-Device-Id). Only that phone knows it; once accounts exist, purchases can be moved to one.
+ */
+const buyerOf = (req: IncomingMessage): string | null => {
+  const id = req.headers['x-device-id'];
+  return typeof id === 'string' && DEVICE_ID.test(id) ? `device:${id.toLowerCase()}` : null;
+};
+
 const validSignature = (secret: string, raw: string, header: string | string[] | undefined) => {
   if (typeof header !== 'string') return false;
   const want = Buffer.from(createHmac('sha512', secret).update(raw).digest('hex'));
@@ -140,7 +149,7 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
   const origin = req.headers.origin;
   if (origin && deps.allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Device-Id, Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Vary', 'Origin');
   }
@@ -163,8 +172,7 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
     return send(res, 200);
   }
 
-  const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
-  const userId = token ? await deps.verify(token) : null;
+  const userId = buyerOf(req);
   if (!userId) return send(res, 401);
 
   if (path === '/pay/total') {
@@ -188,12 +196,13 @@ export async function handlePayRequest(req: IncomingMessage, res: ServerResponse
     if (!deps.paystack) return send(res, 503);
     const text = await readBody(req);
     if (text === null) return send(res, 413);
-    let body: { pack?: unknown };
+    let body: { pack?: unknown; email?: unknown };
     try { body = JSON.parse(text); } catch { return send(res, 400); }
     const pack = gemPackById(body?.pack);
     if (!pack) return send(res, 400);
-    const email = await deps.emailFor(userId);
-    if (!email) return send(res, 422, { error: 'no-email' });
+    // Paystack needs an email on every payment; it is where their receipt goes.
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    if (email.length > 120 || !EMAIL.test(email)) return send(res, 400, { error: 'email' });
     const reference = `lr_${randomUUID().replace(/-/g, '')}`;
     const started = await deps.paystack.initialize({
       email, amountKobo: pack.naira * 100, reference, callbackUrl: callbackFor(req, deps.allowedOrigins), metadata: { userId, pack: pack.id },

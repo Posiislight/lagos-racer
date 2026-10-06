@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useGame } from '../game/store';
 import { paintOf, vehicleById } from '../config/vehicles';
 import { TRACKS } from '../config/tracks';
@@ -11,7 +11,8 @@ import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
 import { SyncChip } from './SyncManager';
 import { BuyGems } from './BuyGems';
-import { usePayNote } from './purchases';
+import { claimPurchases, usePayNote } from './purchases';
+import { referenceFromSearch } from '../game/payments';
 import { MENU_TAGLINE, menuCredit } from './menuText';
 import { enableTilt } from '../game/input';
 import type { RaceSpec } from '../config/campaign';
@@ -41,6 +42,8 @@ export function Menu() {
   const [settings, setSettings] = useState(false);
   const [shop, setShop] = useState(false);
   const payNote = usePayNote(s => s.note);
+  // Coming back from Paystack's checkout: confirm the payment and add the Gems.
+  useEffect(() => { if (referenceFromSearch(location.search)) void claimPurchases(); }, []);
   const [adRunning, setAdRunning] = useState(false);
   const watchForGems = async () => {
     setAdRunning(true);
