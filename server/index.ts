@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { MAX_MESSAGE_BYTES } from '../src/net/protocol';
-import { createClerkClient, verifyToken } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { Pool } from 'pg';
 import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
@@ -45,21 +45,12 @@ const saveDeps: SaveDeps = {
     try { return (await verifyToken(token, { secretKey })).sub; } catch { return null; }
   },
 };
-// Gem purchases (Paystack) share the database and Clerk. Without PAYSTACK_SECRET_KEY the /pay routes answer 503 and nothing can be bought.
+// Gem purchases (Paystack) share the database. They need no account: a purchase belongs to the phone that made it. Without PAYSTACK_SECRET_KEY the /pay routes answer 503 and nothing can be bought.
 const payDeps: PayDeps = {
   store: null,
   paystack: process.env.PAYSTACK_SECRET_KEY ? createPaystackApi(process.env.PAYSTACK_SECRET_KEY) : null,
   secretKey: process.env.PAYSTACK_SECRET_KEY ?? null,
-  verify: saveDeps.verify,
   allowedOrigins: saveDeps.allowedOrigins,
-  emailFor: async (userId) => {
-    const secretKey = process.env.CLERK_SECRET_KEY;
-    if (!secretKey) return null;
-    try {
-      const user = await createClerkClient({ secretKey }).users.getUser(userId);
-      return (user.emailAddresses.find(e => e.id === user.primaryEmailAddressId) ?? user.emailAddresses[0])?.emailAddress ?? null;
-    } catch { return null; }
-  },
 };
 if (process.env.PAYSTACK_SECRET_KEY && !process.env.DATABASE_URL) console.warn('PAYSTACK_SECRET_KEY is set but DATABASE_URL is not: every /pay request will be refused');
 if (process.env.DATABASE_URL && !process.env.CLERK_SECRET_KEY) console.warn('DATABASE_URL is set but CLERK_SECRET_KEY is not: every /save request will be refused');

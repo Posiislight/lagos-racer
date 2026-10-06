@@ -2,22 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { createPayments, referenceFromSearch, withoutPaystackParams } from './payments';
 
 const reply = (status: number, body: unknown): typeof fetch => (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
-const make = (f: typeof fetch, token: string | null = 'tok') => createPayments({ baseUrl: 'https://srv.test', getToken: async () => token, fetch: f });
+const make = (f: typeof fetch) => createPayments({ baseUrl: 'https://srv.test', buyer: () => 'device-1', fetch: f });
 
 describe('payments client', () => {
-  it('posts the pack with the session token and returns the checkout url', async () => {
+  it('posts the pack and email with this phone buyer id and returns the checkout url', async () => {
     let seen: { url: string; init: RequestInit } | null = null;
     const p = make((async (url: string, init: RequestInit) => { seen = { url, init }; return new Response(JSON.stringify({ url: 'https://pay.test/x' })); }) as unknown as typeof fetch);
-    expect(await p.checkout('gems-100')).toBe('https://pay.test/x');
+    expect(await p.checkout('gems-100', 'a@b.co')).toBe('https://pay.test/x');
     expect(seen!.url).toBe('https://srv.test/pay/init');
     expect(seen!.init.method).toBe('POST');
-    expect(seen!.init.body).toBe(JSON.stringify({ pack: 'gems-100' }));
-    expect((seen!.init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    expect(seen!.init.body).toBe(JSON.stringify({ pack: 'gems-100', email: 'a@b.co' }));
+    expect((seen!.init.headers as Record<string, string>)['X-Device-Id']).toBe('device-1');
   });
 
-  it('returns null when signed out, on a server error, or when offline', async () => {
-    expect(await make(reply(200, { url: 'u' }), null).checkout('gems-100')).toBeNull();
-    expect(await make(reply(503, {})).checkout('gems-100')).toBeNull();
+  it('returns null on a server error or when offline', async () => {
+    expect(await make(reply(503, {})).checkout('gems-100', 'a@b.co')).toBeNull();
     expect(await make((async () => { throw new Error('offline'); }) as typeof fetch).total()).toBeNull();
   });
 

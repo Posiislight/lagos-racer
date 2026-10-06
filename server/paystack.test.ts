@@ -19,7 +19,7 @@ function fakePaystack(txns: Record<string, PaystackTxn> = {}) {
 }
 
 const txn = (over: Partial<PaystackTxn> = {}): PaystackTxn => ({
-  status: 'success', reference: 'ref-1', amount: 50_000, currency: 'NGN', metadata: { userId: 'user-a', pack: 'gems-100' }, ...over,
+  status: 'success', reference: 'ref-1', amount: 50_000, currency: 'NGN', metadata: { userId: USER_A, pack: 'gems-100' }, ...over,
 });
 
 async function start(over: Partial<PayDeps> = {}) {
@@ -27,8 +27,6 @@ async function start(over: Partial<PayDeps> = {}) {
     store: new MemoryPurchaseStore(),
     paystack: fakePaystack().api,
     secretKey: SECRET,
-    verify: async t => ({ 'tok-a': 'user-a', 'tok-b': 'user-b' } as Record<string, string>)[t] ?? null,
-    emailFor: async () => 'player@example.com',
     allowedOrigins: ['https://game.example'],
     ...over,
   };
@@ -37,7 +35,11 @@ async function start(over: Partial<PayDeps> = {}) {
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, deps };
 }
 
-const auth = (t: string) => ({ Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' });
+// 'tok-a' and 'tok-b' stand for two phones; anything else is not a device id.
+const DEVICES: Record<string, string> = { 'tok-a': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'tok-b': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
+const USER_A = `device:${DEVICES['tok-a']}`;
+const auth = (t: string) => ({ 'X-Device-Id': DEVICES[t] ?? t, 'Content-Type': 'application/json' });
+const EMAIL = 'player@example.com';
 const sign = (body: string) => createHmac('sha512', SECRET).update(body).digest('hex');
 const webhook = (base: string, event: unknown, signature?: string) => {
   const body = JSON.stringify(event);
@@ -46,39 +48,49 @@ const webhook = (base: string, event: unknown, signature?: string) => {
 const total = async (base: string, t = 'tok-a') => (await (await fetch(`${base}/pay/total`, { headers: auth(t) })).json()).total;
 
 describe('/pay/init', () => {
-  it('needs a signed-in player', async () => {
+  it('needs a device id', async () => {
     const { base } = await start();
-    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('nope'), body: JSON.stringify({ pack: 'gems-100' }) });
+    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('nope'), body: JSON.stringify({ pack: 'gems-100', email: EMAIL }) });
     expect(r.status).toBe(401);
   });
 
   it('starts a Paystack checkout priced from the pack table, tied to the player', async () => {
     const ps = fakePaystack();
     const { base } = await start({ paystack: ps.api });
-    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: { ...auth('tok-a'), Origin: 'https://game.example' }, body: JSON.stringify({ pack: 'gems-100', amount: 1 }) });
+    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: { ...auth('tok-a'), Origin: 'https://game.example' }, body: JSON.stringify({ pack: 'gems-100', email: EMAIL, amount: 1 }) });
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(body.url).toBe(`https://checkout.paystack.test/${body.reference}`);
     expect(ps.inits).toHaveLength(1);
-    expect(ps.inits[0]).toMatchObject({ email: 'player@example.com', amountKobo: 50_000, callbackUrl: 'https://game.example/', metadata: { userId: 'user-a', pack: 'gems-100' } });
+    expect(ps.inits[0]).toMatchObject({ email: EMAIL, amountKobo: 50_000, callbackUrl: 'https://game.example/', metadata: { userId: USER_A, pack: 'gems-100' } });
+  });
+
+  it('rejects a missing or malformed email', async () => {
+    const ps = fakePaystack();
+    const { base } = await start({ paystack: ps.api });
+    for (const email of [undefined, '', 'nope', 'a@b', 42]) {
+      const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('tok-a'), body: JSON.stringify({ pack: 'gems-100', email }) });
+      expect(r.status).toBe(400);
+    }
+    expect(ps.inits).toHaveLength(0);
   });
 
   it('rejects an unknown pack', async () => {
     const { base } = await start();
-    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('tok-a'), body: JSON.stringify({ pack: 'gems-free' }) });
+    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('tok-a'), body: JSON.stringify({ pack: 'gems-free', email: EMAIL }) });
     expect(r.status).toBe(400);
   });
 
   it('answers 503 when Paystack is not configured', async () => {
     const { base } = await start({ paystack: null });
-    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('tok-a'), body: JSON.stringify({ pack: 'gems-100' }) });
+    const r = await fetch(`${base}/pay/init`, { method: 'POST', headers: auth('tok-a'), body: JSON.stringify({ pack: 'gems-100', email: EMAIL }) });
     expect(r.status).toBe(503);
   });
 
   it('refuses a callback origin that is not allowed', async () => {
     const ps = fakePaystack();
     const { base } = await start({ paystack: ps.api });
-    await fetch(`${base}/pay/init`, { method: 'POST', headers: { ...auth('tok-a'), Origin: 'https://evil.example' }, body: JSON.stringify({ pack: 'gems-100' }) });
+    await fetch(`${base}/pay/init`, { method: 'POST', headers: { ...auth('tok-a'), Origin: 'https://evil.example' }, body: JSON.stringify({ pack: 'gems-100', email: EMAIL }) });
     expect(ps.inits[0].callbackUrl).toBe('https://game.example/');
   });
 });
@@ -117,7 +129,7 @@ describe('/pay/webhook', () => {
 
   it('ignores unknown packs, missing users and other events', async () => {
     const { base } = await start();
-    await webhook(base, event(txn({ reference: 'a', metadata: { userId: 'user-a', pack: 'gems-9999' } })));
+    await webhook(base, event(txn({ reference: 'a', metadata: { userId: USER_A, pack: 'gems-9999' } })));
     await webhook(base, event(txn({ reference: 'b', metadata: null })));
     expect((await webhook(base, { event: 'charge.failed', data: txn({ reference: 'c' }) })).status).toBe(200);
     expect(await total(base)).toBe(0);
@@ -154,7 +166,7 @@ describe('/pay/verify', () => {
     expect((await fetch(`${base}/pay/verify?reference=nope`, { headers: auth('tok-a') })).status).toBe(404);
   });
 
-  it('needs a signed-in player', async () => {
+  it('needs a device id', async () => {
     const { base } = await start();
     expect((await fetch(`${base}/pay/verify?reference=ref-1`)).status).toBe(401);
   });

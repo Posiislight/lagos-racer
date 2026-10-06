@@ -4,7 +4,6 @@ import { create } from 'zustand';
 import { snapshot, onSaved, useGame } from '../game/store';
 import { createSync, syncBaseUrl, type SyncStatus } from '../game/sync';
 import { AUTH_ENABLED } from './AuthControls';
-import { claimPurchases } from './purchases';
 
 const useSyncStatus = create<{ status: SyncStatus; set: (s: SyncStatus) => void }>(set => ({ status: 'idle', set: status => set({ status }) }));
 
@@ -33,8 +32,7 @@ function Engine() {
     // Closing the tab inside the debounce window must not lose the last change.
     const onHide = () => { if (document.hidden) void sync.flush(); };
     document.addEventListener('visibilitychange', onHide);
-    // Once the account's save is in, add Gems bought on any device, and confirm a payment the player just came back from.
-    void sync.start().then(async () => { if (await claimPurchases(() => tokenRef.current())) await sync.flush(); });
+    void sync.start();
     return () => { document.removeEventListener('visibilitychange', onHide); offSaved(); offResults(); sync.stop(); };
   }, [isSignedIn, userId]);
   return null;

@@ -28,7 +28,7 @@ export type Saved = {
   paint: Partial<Record<VehicleId, string>>;
   /** Premium currency balance. */
   premium: number;
-  /** How many of the Gems bought with real money (the server's lifetime total) have been added to `premium` already. */
+  /** How many of the Gems this phone bought with real money (the server's lifetime total for its buyer id) have been added to `premium` already. Not synced. */
   gemsClaimed: number;
   /** Bought paints as `vehicle/paint` keys (the usual paint of each vehicle is always owned). */
   ownedPaints: string[];

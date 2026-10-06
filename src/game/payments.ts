@@ -1,25 +1,25 @@
+import { deviceId } from './deviceId';
 import { syncBaseUrl } from './sync';
 
 export type PaymentsDeps = {
   baseUrl?: string;
-  /** A fresh session token each call, or null when signed out. */
-  getToken: () => Promise<string | null>;
+  /** The id this phone buys under. */
+  buyer?: () => string;
   fetch: typeof fetch;
 };
 
 export type VerifyStatus = 'credited' | 'already' | 'pending' | 'failed' | 'invalid';
 
-/** Talks to the room server's /pay routes. Failures come back as null; nothing here throws. */
+/** Talks to the room server's /pay routes as this phone's buyer id. Failures come back as null; nothing here throws. */
 export function createPayments(deps: PaymentsDeps) {
   const base = deps.baseUrl ?? syncBaseUrl();
+  const buyer = deps.buyer ?? (() => deviceId());
 
   async function call<T>(path: string, init: RequestInit = {}): Promise<T | null> {
     try {
-      const token = await deps.getToken();
-      if (!token) return null;
       const res = await deps.fetch(`${base}${path}`, {
         ...init,
-        headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
+        headers: { 'X-Device-Id': buyer(), ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
       });
       return res.ok ? await res.json() as T : null;
     } catch { return null; }
@@ -27,15 +27,15 @@ export function createPayments(deps: PaymentsDeps) {
 
   return {
     /** Starts a Paystack checkout for a Gem pack: the page to send the player to, or null if it could not start. */
-    async checkout(pack: string): Promise<string | null> {
-      const r = await call<{ url?: string }>('/pay/init', { method: 'POST', body: JSON.stringify({ pack }) });
+    async checkout(pack: string, email: string): Promise<string | null> {
+      const r = await call<{ url?: string }>('/pay/init', { method: 'POST', body: JSON.stringify({ pack, email }) });
       return typeof r?.url === 'string' ? r.url : null;
     },
     /** Asks the server to confirm a payment the player has just made. */
     async verify(reference: string): Promise<{ status: VerifyStatus; total: number } | null> {
       return call(`/pay/verify?reference=${encodeURIComponent(reference)}`);
     },
-    /** Every Gem the player has ever bought, or null when it could not be fetched. */
+    /** Every Gem this phone has ever bought, or null when it could not be fetched. */
     async total(): Promise<number | null> {
       const r = await call<{ total?: number }>('/pay/total');
       return typeof r?.total === 'number' ? r.total : null;
