@@ -11,6 +11,7 @@ import { HowToRace } from './HowToRace';
 import { shouldShowHowTo } from '../game/onboarding';
 import { SyncChip } from './SyncManager';
 import { BuyGems } from './BuyGems';
+import { GemIcon } from './GemIcon';
 import { claimPurchases, usePayNote } from './purchases';
 import { referenceFromSearch } from '../game/payments';
 import { MENU_TAGLINE, menuCredit } from './menuText';
@@ -63,7 +64,7 @@ export function Menu() {
         </div>
         <div className="menu-corner">
           <div className="coins" aria-label={`${coins} naira`}>{formatNaira(coins)}</div>
-          <button className="coins premium gems" aria-label={`Get ${PREMIUM_LABEL}, you have ${premium}`} onClick={() => setShop(true)}>{PREMIUM_LABEL} {premium} +</button>
+          <button className="coins premium gems" aria-label={`Get ${PREMIUM_LABEL}, you have ${premium}`} onClick={() => setShop(true)}><GemIcon /> {premium} +</button>
           <button className="btn small garage-btn" onClick={() => setScreen('garage')}>
             Garage{garageHint && <i className="hint-dot" role="img" aria-label="something you can afford" />}
           </button>
@@ -102,8 +103,8 @@ export function Menu() {
       {shop && (
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
           <div className="card modal-card">
-            <h2 id="shop-title">Get {PREMIUM_LABEL}</h2>
-            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. The BRT costs naira.</p>
+            <h2 id="shop-title"><GemIcon size="1.1em" /> {PREMIUM_LABEL}</h2>
+            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. You have {premium}.</p>
             <BuyGems />
             {adsAvailable() && (
               <button className="btn primary" disabled={adRunning} onClick={watchForGems}>
