@@ -110,7 +110,9 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .shop-head h2 { margin: 0; }
 .icon-btn { display: grid; place-items: center; width: 40px; height: 40px; border: 3px solid var(--ink); border-radius: 50%; background: var(--yellow); color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
 .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
-.gem-ad { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; padding: 8px 12px; border: 3px solid var(--ink); border-radius: 14px; background: var(--yellow); color: var(--ink); font: inherit; font-size: 18px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+.gem-ad-row { display: flex; align-items: center; gap: 8px; }
+.gem-ad small { font-size: 11px; font-weight: 700; line-height: 1; }
+.gem-ad { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; margin-top: 10px; padding: 8px 12px; border: 3px solid var(--ink); border-radius: 14px; background: var(--yellow); color: var(--ink); font: inherit; font-size: 18px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
 .gem-ad:disabled { opacity: .6; cursor: default; }
 .gem-ad:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 .gem-packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

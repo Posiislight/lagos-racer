@@ -112,9 +112,12 @@ export function Menu() {
             <BuyGems />
             {adsAvailable() && (
               <button className="gem-ad" disabled={adRunning} onClick={watchForGems} aria-label={`Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}>
-                <svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="15" rx="3" fill="#fff" stroke="currentColor" strokeWidth="2" /><path d="M10.5 5.5l6 3.5-6 3.5z" fill="currentColor" /><path d="M8 20h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                <b>+{AD_GEMS}</b>
-                <GemIcon />
+                <span className="gem-ad-row">
+                  <svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="15" rx="3" fill="#fff" stroke="currentColor" strokeWidth="2" /><path d="M10.5 5.5l6 3.5-6 3.5z" fill="currentColor" /><path d="M8 20h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                  <b>+{AD_GEMS}</b>
+                  <GemIcon />
+                </span>
+                <small>Watch an ad</small>
               </button>
             )}
           </div>
