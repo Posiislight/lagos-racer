@@ -264,7 +264,23 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   background: linear-gradient(180deg, #8fd0f2 0%, #f7e3b5 80%);
   padding: calc(14px + var(--safe-t)) calc(16px + var(--safe-r)) calc(14px + var(--safe-b)) calc(16px + var(--safe-l));
 }
-.online-card { width: min(440px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.online-card { position: relative; width: min(440px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.lb-btn {
+  position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; padding: 0; display: grid; place-items: center;
+  border: 2px solid var(--ink); border-radius: 10px; background: var(--chip); color: var(--ink); cursor: pointer; box-shadow: 0 2px 0 var(--ink);
+}
+.lb-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--ink); }
+@media (pointer: coarse) { .lb-btn { width: 44px; height: 44px; } }
+.lb-card .seg { margin-top: 0; }
+.lb-track { font: inherit; font-weight: 700; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 10px; background: var(--chip); }
+/* Sized from the modal, not vh, so it fits whether the app is upright or turned sideways. */
+.lb-modal { grid-template-rows: minmax(0, 1fr); }
+.lb-card { max-height: 100%; display: flex; flex-direction: column; gap: 8px; }
+.lb-card h2 { margin: 0; }
+.lb-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.lb-card .table { margin: 0; }
+.lb-card .table td:first-child { width: 2.2em; color: var(--muted); }
+.lb-card .table td:last-child { text-align: right; white-space: nowrap; }
 .online-card h2 { margin-bottom: 0; }
 .online-card .muted { margin: 0; }
 .online-cols, .online-col { display: flex; flex-direction: column; gap: 10px; }
