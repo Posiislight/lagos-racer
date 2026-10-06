@@ -28,7 +28,8 @@ body {
 }
 button { font: inherit; color: inherit; }
 button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
-.app { position: fixed; inset: 0; }
+.app { position: fixed; inset: 0; container-type: size; }
+/* Layout rules ask the app how big it is (@container, cqw), not the window: a turned app is wider than the window is. */
 /* A touch device held upright: turn the whole app 90° clockwise so it plays sideways. The app is as wide as the screen is tall. */
 .app[data-rotated] {
   inset: auto; top: 0; left: 0; width: 100vh; height: 100vw; width: 100dvh; height: 100dvw;
@@ -46,7 +47,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .board small { display: block; font-size: 12px; color: #c9b99a; letter-spacing: .04em; margin-bottom: 2px; }
 .board h1 {
   margin: 0; font-family: Bungee, Impact, 'Arial Black', sans-serif; font-weight: 400; line-height: 1;
-  font-size: clamp(28px, 7vw, 56px); color: var(--led); text-shadow: 0 0 14px rgba(255, 170, 0, .5);
+  font-size: clamp(28px, 7cqw, 56px); color: var(--led); text-shadow: 0 0 14px rgba(255, 170, 0, .5);
 }
 .card {
   background: var(--paper); border-radius: 14px; padding: 16px 18px; position: relative; overflow: hidden;
@@ -116,7 +117,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .entry.primary { background: var(--yellow); }
 .entry:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--ink); }
 .entry:disabled { opacity: .6; cursor: default; }
-@media (max-height: 480px) {
+@container (max-height: 480px) {
   .board h1 { font-size: 28px; }
   .menu-side { gap: 6px; justify-content: center; }
   .menu-entries { gap: 6px; }
@@ -145,7 +146,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .garage-side .garage-card { flex: 0 0 auto; }
 .garage-side .drivers { flex-direction: column; overflow: visible; flex: 0 0 auto; padding: 0 2px 4px; }
 .garage-side .drivers button { flex: 0 0 auto; }
-@media (max-width: 640px) {
+@container (max-width: 640px) {
   .garage { overflow-y: auto; }
   .garage-body { grid-template-columns: 1fr; flex: 0 0 auto; }
   .garage-preview { flex: none; height: 220px; }
@@ -174,7 +175,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .stat-row .bar { grid-area: bar; }
 .pips { grid-area: pips; display: flex; gap: 2px; }
 /* Narrow phones: the level pips go under the bar so the price button is never clipped. */
-@media (max-width: 400px) {
+@container (max-width: 400px) {
   .stat-row:not(.locked) { grid-template-columns: 78px minmax(40px, 1fr) auto; grid-template-areas: 'name bar buy' 'name pips buy'; row-gap: 4px; }
 }
 .pips i { box-sizing: border-box; flex: 0 0 11px; height: 11px; border-radius: 3px; border: 2px solid var(--ink); background: rgba(35, 31, 27, .12); }
@@ -192,7 +193,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .drivers { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; scroll-snap-type: x proximity; }
 .drivers::-webkit-scrollbar { display: none; }
 .drivers button {
-  flex: 1 0 min(300px, 78vw); scroll-snap-align: start; text-align: left; color: var(--ink); background: var(--chip);
+  flex: 1 0 min(300px, 78cqw); scroll-snap-align: start; text-align: left; color: var(--ink); background: var(--chip);
   border: 2px solid var(--ink); border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 2px; row-gap: 1px;
 }
 .drivers button[aria-selected='true'] { background: var(--yellow); box-shadow: 0 3px 0 var(--ink); }
@@ -201,8 +202,8 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .drivers .special { flex-basis: 100%; font-family: Archivo, sans-serif; font-weight: 900; font-size: 13px; }
 .drivers small { flex-basis: 100%; font-size: 12px; line-height: 1.25; opacity: .8; }
 .driver-line { margin: 0 0 4px; font-size: 14px; }
-@media (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
-@media (max-height: 480px) {
+@container (max-height: 480px) { .drivers small { display: none; } .drivers button { padding: 6px 10px; } }
+@container (max-height: 480px) {
   .garage { gap: 6px; padding-top: calc(6px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
   .garage-head h1 { font-size: 22px; }
   .garage-head .btn { min-height: 38px; padding: 4px 12px; }
@@ -236,7 +237,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .earned { font-weight: 900; color: var(--green); font-size: 18px; margin: 4px 0 12px; }
 .account { background: #eef7f0; border: 2px dashed var(--green); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
 .account p { margin: 0 0 8px; }
-@media (max-height: 480px) { .table td, .table th { padding: 3px 6px; } .modal-card h2 { font-size: 20px; } }
+@container (max-height: 480px) { .table td, .table th { padding: 3px 6px; } .modal-card h2 { font-size: 20px; } }
 
 /* ---------- online + lobby ---------- */
 .online, .lobby {
@@ -264,7 +265,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .room-code-row { display: flex; align-items: center; gap: 12px; }
 .copy-code { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 12px; border: 2px solid currentColor; background: transparent; color: inherit; cursor: pointer; }
 .copy-code:active { transform: translateY(1px); }
-.room-code { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); letter-spacing: .12em; line-height: 1; }
+.room-code { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12cqw, 64px); letter-spacing: .12em; line-height: 1; }
 .lobby .table { margin: 4px 0 0; }
 .tick { color: var(--green); font-weight: 900; font-size: 18px; }
 .lobby-picks { flex-wrap: wrap; overflow: visible; }
@@ -272,13 +273,13 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .lobby .btn.ready { background: #bfe8c9; }
 .lobby .btn.ready::after { content: ' ✓'; }
 .lobby .btn { white-space: nowrap; }
-.quick-title { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(20px, 6vw, 28px); line-height: 1.1; }
-.quick-count { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12vw, 64px); line-height: 1; color: var(--green); }
+.quick-title { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(20px, 6cqw, 28px); line-height: 1.1; }
+.quick-count { margin: 0; font-family: Bungee, Impact, sans-serif; font-size: clamp(40px, 12cqw, 64px); line-height: 1; color: var(--green); }
 .quick-votes { display: flex; flex-direction: column; gap: 6px; }
 .lobby .btn.quick-vote { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
 .lobby .btn.quick-vote.on { background: #bfe8c9; border-color: var(--green); }
-@media (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
-@media (max-height: 480px) {
+@container (max-width: 720px) { .lobby { grid-template-columns: minmax(0, 1fr); align-content: start; } }
+@container (max-height: 480px) {
   .online, .lobby { align-content: start; padding-top: calc(8px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
   .online-card .muted { display: none; }
   /* Landscape phone: two columns so nickname, choices and Back fit without scrolling. */
@@ -321,7 +322,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
   display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
 /* The lap as a straight line across the top middle, a dot per racer. */
-.hud-progress { top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); width: min(46vw, 420px); display: flex; align-items: center; gap: 10px; }
+.hud-progress { top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); width: min(46cqw, 420px); display: flex; align-items: center; gap: 10px; }
 .hud-progress .lap { background: var(--yellow); color: var(--ink); border-radius: 8px; padding: 3px 10px; font-size: 16px; white-space: nowrap; }
 .hud-progress .lap b { font-weight: 400; font-size: 20px; }
 .hud-progress .line { position: relative; flex: 1; height: 8px; border-radius: 4px; background: rgba(243, 239, 228, .92); box-shadow: 0 0 0 3px rgba(20, 18, 16, .75); }
@@ -376,20 +377,20 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 }
 .hud-speed b { font-family: Bungee, sans-serif; font-weight: 400; font-size: 28px; }
 .hud-count {
-  top: 32%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(64px, 16vw, 150px); color: var(--yellow);
+  top: 32%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(64px, 16cqw, 150px); color: var(--yellow);
   -webkit-text-stroke: 4px var(--ink); text-shadow: 0 8px 0 var(--ink); animation: pop .5s ease-out;
 }
-.hud-count.go { color: #7ee08a; font-size: clamp(48px, 11vw, 110px); }
-.hud-count.wait { color: #fff; white-space: nowrap; font-size: clamp(24px, 5vw, 44px); -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); }
+.hud-count.go { color: #7ee08a; font-size: clamp(48px, 11cqw, 110px); }
+.hud-count.wait { color: #fff; white-space: nowrap; font-size: clamp(24px, 5cqw, 44px); -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); }
 .hud-msg {
-  top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6vw, 52px); color: #fff;
+  top: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: clamp(26px, 6cqw, 52px); color: #fff;
   -webkit-text-stroke: 2px var(--ink); text-shadow: 0 4px 0 var(--ink); animation: msg 1.8s ease-out forwards;
 }
 /* A long one-liner (a knocked-out racer's name and "clamped by LASTMA!") wraps and shrinks instead of running off the screen. */
-.hud-msg.wrap { white-space: normal; width: min(86vw, 640px); text-align: center; font-size: clamp(20px, 4.4vw, 40px); }
-.hud-msg.long { white-space: normal; width: min(82vw, 640px); text-align: center; animation-duration: 3.2s; }
+.hud-msg.wrap { white-space: normal; width: min(86cqw, 640px); text-align: center; font-size: clamp(20px, 4.4cqw, 40px); }
+.hud-msg.long { white-space: normal; width: min(82cqw, 640px); text-align: center; animation-duration: 3.2s; }
 .hud-msg.long b { display: block; font-weight: 400; }
-.hud-msg.long small { display: block; font-size: clamp(14px, 2.6vw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }
+.hud-msg.long small { display: block; font-size: clamp(14px, 2.6cqw, 22px); -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink); margin-top: 4px; }
 .net-badge {
   position: absolute; z-index: 11; pointer-events: none; top: calc(76px + var(--safe-t)); left: calc(12px + var(--safe-l));
   background: var(--red); color: #fff; border-radius: 999px; padding: 3px 10px; font: 800 12px Archivo, sans-serif;
@@ -446,7 +447,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .pad.mini { width: 72px; height: 44px; font-size: 12px; border-radius: 12px; }
 .pad.item-pad { background: rgba(245, 180, 0, .85); }
 .pad.item-pad.empty { opacity: .45; }
-@media (max-height: 420px) {
+@container (max-height: 420px) {
   .pad.steer { width: 74px; height: 74px; }
   .pad.gas { width: 84px; height: 96px; }
   .pad.brake { width: 72px; height: 72px; }
@@ -456,12 +457,12 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 }
 /* Short landscape screens (a phone with the browser bars showing is about 300px tall): shrink the HUD,
    park the power-up buttons under the pause button and lift the horn clear of them. */
-@media (max-height: 340px) {
+@container (max-height: 340px) {
   .hud-pos { top: calc(6px + var(--safe-t)); padding: 2px 10px 4px; border-radius: 8px; }
   .hud-pos b { font-size: 28px; }
   .hud-pos sup { font-size: 12px; }
   .hud-pos span { font-size: 14px; }
-  .hud-progress { top: calc(8px + var(--safe-t)); width: min(40vw, 360px); gap: 8px; }
+  .hud-progress { top: calc(8px + var(--safe-t)); width: min(40cqw, 360px); gap: 8px; }
   .hud-progress .lap { font-size: 13px; padding: 2px 8px; }
   .hud-progress .lap b { font-size: 16px; }
   .hud-pause { top: calc(6px + var(--safe-t)); width: 38px; height: 38px; }
@@ -517,7 +518,7 @@ button:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 .unlocked p { margin: 0; }
 .drivers button.locked { opacity: .65; cursor: default; }
 .drivers button.locked small { display: block; font-weight: 800; opacity: 1; }
-@media (max-height: 480px) {
+@container (max-height: 480px) {
   .stop { min-height: 64px; padding: 6px 12px; }
   .stop .what b { font-size: 15px; }
   .menu-row .btn { padding: 8px 12px; min-height: 44px; font-size: 15px; }
