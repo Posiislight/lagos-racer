@@ -103,16 +103,20 @@ export function Menu() {
       {shop && (
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="shop-title">
           <div className="card modal-card">
-            <h2 id="shop-title"><GemIcon size="1.1em" /> {PREMIUM_LABEL}</h2>
-            <p className="muted">{PREMIUM_LABEL} buy new paints in the Garage. You have {premium}.</p>
+            <div className="shop-head">
+              <h2 id="shop-title"><GemIcon size="1.1em" /> {premium}<span className="sr-only"> {PREMIUM_LABEL}</span></h2>
+              <button className="icon-btn" aria-label="Close" onClick={() => setShop(false)}>
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+              </button>
+            </div>
             <BuyGems />
             {adsAvailable() && (
-              <button className="btn primary" disabled={adRunning} onClick={watchForGems}>
-                {adRunning ? 'Playing ad…' : `Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}
+              <button className="gem-ad" disabled={adRunning} onClick={watchForGems} aria-label={`Watch an ad for ${AD_GEMS} ${PREMIUM_LABEL}`}>
+                <svg width="26" height="22" viewBox="0 0 26 22" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="15" rx="3" fill="#fff" stroke="currentColor" strokeWidth="2" /><path d="M10.5 5.5l6 3.5-6 3.5z" fill="currentColor" /><path d="M8 20h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                <b>+{AD_GEMS}</b>
+                <GemIcon />
               </button>
             )}
-            <button className="btn" onClick={() => { setShop(false); setScreen('garage'); }}>Go to Garage</button>
-            <button className="btn primary" onClick={() => setShop(false)}>Close</button>
           </div>
         </div>
       )}
