@@ -2,7 +2,6 @@ import { Suspense, lazy, useState } from 'react';
 import { useGame } from '../game/store';
 import { VEHICLES, ownsPaint, paintOf, paintPrice, type VehicleId } from '../config/vehicles';
 import { PREMIUM_LABEL } from '../config/premium';
-import { adsAvailable, showRewardedAd } from '../game/ads';
 import { DRIVERS } from '../config/drivers';
 import { driverAvailable } from '../game/campaign';
 import { MAX_UPGRADE_LEVEL, formatNaira, upgradePrice } from '../config/economy';
@@ -24,11 +23,10 @@ function Bar({ label, base, bonus }: { label: string; base: number; bonus: numbe
 }
 
 export function Garage() {
-  const { vehicle, setVehicle, setScreen, coins, premium, ownedPaints, adViews, unlocked, unlock, addAdView, buyPaint, paint, setPaint, driver, setDriver, campaign, upgrades, buyUpgrade } = useGame();
+  const { vehicle, setVehicle, setScreen, coins, premium, ownedPaints, unlocked, unlock, buyPaint, paint, setPaint, driver, setDriver, campaign, upgrades, buyUpgrade } = useGame();
   const [looking, setLooking] = useState<VehicleId>(vehicle);
   // A paint being looked at without owning it yet (null: showing the chosen one).
   const [peek, setPeek] = useState<string | null>(null);
-  const [adRunning, setAdRunning] = useState(false);
   const v = VEHICLES.find(x => x.id === looking)!;
   const isLocked = !!v.locked && !unlocked.includes(v.id);
   const current = paintOf(v, paint[v.id]);
@@ -38,10 +36,6 @@ export function Garage() {
   const shown = peeked ?? current;
   const peekPrice = peeked ? paintPrice(v, peeked.id) : 0;
   const lookAt = (id: VehicleId) => { setLooking(id); setPeek(null); };
-  const watchAd = async () => {
-    setAdRunning(true);
-    try { if (await showRewardedAd()) addAdView(v.id); } finally { setAdRunning(false); }
-  };
   return (
     <div className="garage">
       <header className="garage-head">
@@ -114,14 +108,6 @@ export function Garage() {
             </button>
           ) : isLocked ? (
             <div className="unlock-options">
-              {adsAvailable() && (
-                <>
-                  <button className="btn primary" disabled={adRunning} onClick={watchAd}>
-                    {adRunning ? 'Playing ad…' : `Watch an ad to unlock (${adViews[v.id] ?? 0}/${v.locked!.ads})`}
-                  </button>
-                  <small className="muted">The ad is optional and uses mobile data.</small>
-                </>
-              )}
               <button className="btn primary" disabled={coins < v.locked!.naira} onClick={() => unlock(v.id)}>
                 {coins < v.locked!.naira ? `Need ${formatNaira(v.locked!.naira - coins)} more to unlock` : `Unlock for ${formatNaira(v.locked!.naira)}`}
               </button>
