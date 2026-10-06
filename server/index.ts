@@ -7,6 +7,8 @@ import * as Sentry from '@sentry/node';
 import { RoomServer } from './rooms';
 import { PgSaveStore, handleSaveRequest, type SaveDeps } from './saves';
 import { PgPurchaseStore, createPaystackApi, handlePayRequest, type PayDeps } from './paystack';
+import { PgLeaderboardStore, type LeaderboardStore } from './leaderboard';
+import { entriesFromResults } from '../src/game/leaderboard';
 
 // Error reporting runs on Render (which sets RENDER) or wherever SENTRY_DSN is set, so local dev sends nothing. The uncaught-exception integrations are left out because the
 // handlers below already keep the process alive; they report to Sentry themselves.
@@ -19,7 +21,18 @@ Sentry.init({
 });
 
 const port = Number(process.env.PORT ?? 8787);
-const rooms = new RoomServer();
+// Null until Postgres is ready; a finished Quick race is then recorded for the leaderboard. A fault there is logged, never raised into the race.
+let leaderboard: LeaderboardStore | null = null;
+const rooms = new RoomServer({
+  onQuickResults: (trackId, results) => {
+    const store = leaderboard;
+    if (!store) return;
+    store.record(trackId, entriesFromResults(results), Date.now()).catch((err) => {
+      console.error('leaderboard record failed', err);
+      Sentry.captureException(err, { tags: { where: 'leaderboard' } });
+    });
+  },
+});
 
 // One bad message or room must not take every other race down with it: log, and keep serving.
 process.on('uncaughtException', (err) => { console.error('uncaught exception', err); Sentry.captureException(err); });
@@ -61,8 +74,9 @@ if (process.env.DATABASE_URL) {
   const store = new PgSaveStore(pg);
   // Postgres may come up after this service does: keep trying until the table is ready (saves answer 503 meanwhile).
   const purchases = new PgPurchaseStore(pg);
-  const init = () => Promise.all([store.ensureSchema(), purchases.ensureSchema()]).then(
-    () => { saveDeps.store = store; payDeps.store = purchases; console.log('cloud saves ready'); },
+  const board = new PgLeaderboardStore(pg);
+  const init = () => Promise.all([store.ensureSchema(), purchases.ensureSchema(), board.ensureSchema()]).then(
+    () => { saveDeps.store = store; payDeps.store = purchases; leaderboard = board; console.log('cloud saves and leaderboard ready'); },
     (err) => { console.error('cloud saves unavailable, retrying in 10s', err.message); setTimeout(init, 10_000); },
   );
   void init();
