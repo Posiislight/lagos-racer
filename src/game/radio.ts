@@ -49,6 +49,13 @@ export function stopRadio() {
   setStatus('off');
 }
 
+/** Pause the stream while the tab is hidden; resume it on return if it is still wanted. */
+export function setRadioHidden(hidden: boolean) {
+  if (!el) return;
+  if (hidden) el.pause();
+  else if (wanted) el.play().catch(() => setStatus('failed'));
+}
+
 /** Follows the Sound setting. */
 export function setRadioMuted(m: boolean) {
   muted = m;

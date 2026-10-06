@@ -23,6 +23,13 @@ export function setSoundEnabled(on: boolean) {
   if (master) master.gain.value = on ? 0.7 : 0;
 }
 
+/** Silence everything (loops included) while the tab is hidden, and bring it back when it is shown again. */
+export function setAudioHidden(hidden: boolean) {
+  if (!ctx) return;
+  if (hidden) void ctx.suspend();
+  else void ctx.resume();
+}
+
 export function unlockAudio() {
   if (ctx) { if (ctx.state === 'suspended') void ctx.resume(); return; }
   const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;

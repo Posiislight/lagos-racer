@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { useGame } from './game/store';
-import { setSoundEnabled, unlockAudio } from './game/audio';
-import { setRadioMuted } from './game/radio';
+import { setAudioHidden, setSoundEnabled, unlockAudio } from './game/audio';
+import { setRadioHidden, setRadioMuted } from './game/radio';
 import { startKeyboard } from './game/input';
 import { Menu } from './ui/Menu';
 import { Garage } from './ui/Garage';
@@ -34,6 +34,12 @@ export function App() {
   // A friend's invite link (?room=CODE) lands straight on the join screen.
   useEffect(() => { if (new URLSearchParams(location.search).has('room')) useGame.getState().setScreen('online'); }, []);
   useEffect(() => { setSoundEnabled(sound); setRadioMuted(!sound); }, [sound]);
+  useEffect(() => {
+    // Leaving the tab silences the game (the juju hum and engine loops would otherwise play on).
+    const onVisibility = () => { setAudioHidden(document.hidden); setRadioHidden(document.hidden); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
   useEffect(() => {
     // Browsers only allow audio after a user gesture.
     const unlock = () => unlockAudio();
